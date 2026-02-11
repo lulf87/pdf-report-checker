@@ -70,7 +70,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     title: '报告审核工具',
-    show: false // 先不显示，等加载完成再显示
+    show: true
   });
 
   // 加载页面
@@ -83,9 +83,19 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   }
 
-  // 加载完成后显示窗口
+  // 确保窗口显示并聚焦
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    mainWindow.focus();
+    if (process.platform === 'darwin') {
+      app.focus({ steal: true });
+    }
+  });
+
+  // 窗口加载完成后确保在前台
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.show();
+    mainWindow.focus();
   });
 
   mainWindow.on('closed', () => {
