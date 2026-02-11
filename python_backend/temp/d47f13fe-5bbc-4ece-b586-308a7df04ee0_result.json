@@ -1,0 +1,87 @@
+{
+  "success": true,
+  "file_id": "d47f13fe-5bbc-4ece-b586-308a7df04ee0",
+  "filename": "d47f13fe-5bbc-4ece-b586-308a7df04ee0.pdf",
+  "check_time": "2026-02-10T20:39:43.056704",
+  "total_pages": 120,
+  "home_page_fields": {
+    "委 托 方": "雅培医疗用品（上海）有限公司",
+    "样品名称": "心脏脉冲电场消融仪",
+    "型号规格": "见“样品描述”栏"
+  },
+  "third_page_fields": {
+    "委 托 方": "雅培医疗用品（上海）有限公司",
+    "样品名称": "心脏脉冲电场消融仪",
+    "型号规格": "见“样品描述”栏"
+  },
+  "home_third_comparison": [
+    {
+      "field_name": "委 托 方",
+      "table_value": "雅培医疗用品（上海）有限公司",
+      "ocr_value": "雅培医疗用品（上海）有限公司",
+      "is_match": true,
+      "issue_type": null,
+      "page_num": null,
+      "row_index": null
+    },
+    {
+      "field_name": "样品名称",
+      "table_value": "心脏脉冲电场消融仪",
+      "ocr_value": "心脏脉冲电场消融仪",
+      "is_match": true,
+      "issue_type": null,
+      "page_num": null,
+      "row_index": null
+    },
+    {
+      "field_name": "型号规格",
+      "table_value": "见“样品描述”栏",
+      "ocr_value": "见“样品描述”栏",
+      "is_match": true,
+      "issue_type": null,
+      "page_num": null,
+      "row_index": null
+    }
+  ],
+  "sample_description_table": {
+    "page_num": 4,
+    "table_index": 0,
+    "headers": [
+      "样品描述"
+    ],
+    "rows": [
+      [
+        "被检样品主要部件包括： \n序\n号 \n部件名称 \n规格型号 \n序列号/批号 \n生产日期 \n备注 \n1 \n心脏脉冲电场消融仪-主\n机 \nPFA-GEN-01 \n20539798 \n2025-04-19 \n/ \n2 \n脉冲导管连接电缆（可\n选） \nA-UNI-PF-CBL \n850778817 \n2025-04-10 \n/ \n3 \n心脏脉冲电场消融仪-推\n车 \nPFA-GEN-CART \n10627717 \n2024-11-26 \n/ \n4 \n心脏脉冲电场消融仪- \nECG 主线缆 \nPFA-ECG-CBL \n2024070069 \n2024-07-13 \n/ \n5 \n心脏脉冲电场消融仪-不\n可透射线 ECG 导联线（可\n选） \nPFA-ECG-RNAM \n2024070063 \n2024-10-11 \n/ \n6 \n心脏脉冲电场消融仪-可\n透射线 ECG 导联线（可\n选） \nPFA-ECG-LNAM \n/ \n/ \n本次检测未\n使用 \n7 \n心脏脉冲电场消融仪-记\n录系统连接线缆 \nGEN-3RD-REC \n/ \n/ \n本次检测未\n使用 \n8 \n心脏脉冲电场消融仪-触\n摸屏 \nPFA-GEN-TS \nC24H006740 \n2024-10-14 \n/ \n9 \n电源电缆（可选） \nGEN-PWR-CH \n10822757 \n2017-10-15 \n/ \n10 \n等电位线缆（3m）（可\n选） \nS100003 \n/ \n/ \n/ \n11 \n光接收器（可选） \nS100018 \n/ \n/ \n/ \n12 \n心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选） \nPFA-GEN-\nCBL10 \n/ \n/ \n本次检测未\n使用 \n13 \n心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选） \nPFA-GEN-\nCBL15 \n/ \n/ \n本次检测未\n使用 \n14 \n心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选） \nPFA-GEN-\nCBL30 \n/ \n/ \n/ \n15 \n光纤（10m）（可选） \nH700179 \n/ \n/ \n本次检测未\n使用"
+      ]
+    ],
+    "row_count": 1,
+    "col_count": 1
+  },
+  "component_checks": [],
+  "photo_page_check": {
+    "total_photos": 0,
+    "total_labels": 0,
+    "photos": [],
+    "labels": []
+  },
+  "errors": [],
+  "warnings": [],
+  "info": [
+    {
+      "level": "INFO",
+      "message": "照片页统计: 0张照片, 0个标签",
+      "page_num": null,
+      "location": null,
+      "details": {
+        "total_photos": 0,
+        "total_labels": 0,
+        "photos": [],
+        "labels": []
+      }
+    }
+  ],
+  "total_components": 0,
+  "passed_components": 0,
+  "failed_components": 0,
+  "report_path": null
+}

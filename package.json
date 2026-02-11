@@ -1,0 +1,53 @@
+{
+  "name": "report-checker",
+  "version": "1.0.0",
+  "description": "报告审核工具 - Electron + Python桌面应用",
+  "main": "src/main/main.js",
+  "scripts": {
+    "dev": "NODE_ENV=development concurrently \"npm run dev:python\" \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:electron": "wait-on tcp:8000 tcp:5173 && electron .",
+    "dev:python": "cd python_backend && uvicorn main:app --reload --port 8000",
+    "dev:renderer": "cd src/renderer && npm run dev",
+    "build": "npm run build:react && npm run build:electron",
+    "build:react": "cd src/renderer && npm run build",
+    "build:electron": "electron-builder",
+    "install:all": "npm install && cd src/renderer && npm install && cd ../../python_backend && pip install -r requirements.txt",
+    "start": "electron ."
+  },
+  "keywords": ["electron", "python", "pdf", "ocr", "report-checker"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.2"
+  },
+  "build": {
+    "appId": "com.reportchecker.app",
+    "productName": "报告审核工具",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/main/**/*",
+      "python_backend/dist/**/*",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python_backend/dist",
+        "to": "python_backend"
+      }
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
