@@ -1,4 +1,4 @@
-import type { VerificationResult } from '../types';
+import type { VerificationResult, InspectionItemCheckResult } from '../types';
 
 // Export to Excel (CSV format)
 export function exportToExcel(result: VerificationResult): void {
@@ -284,4 +284,66 @@ function formatDateTime(dateStr: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// Export inspection item check to Excel (CSV format)
+export function exportInspectionItemsToExcel(
+  result: InspectionItemCheckResult,
+  fileName: string
+): void {
+  const headers = [
+    '序号',
+    '检验项目',
+    '标准条款',
+    '标准要求',
+    '检验结果',
+    '单项结论(实际)',
+    '单项结论(期望)',
+    '核对状态',
+    '备注',
+  ];
+
+  const rows: string[][] = [];
+
+  result.item_checks.forEach((item) => {
+    item.clauses.forEach((clause) => {
+      clause.requirements.forEach((req) => {
+        rows.push([
+          item.item_number,
+          item.item_name,
+          clause.clause_number,
+          req.requirement_text,
+          req.inspection_result,
+          clause.conclusion,
+          clause.expected_conclusion,
+          clause.is_conclusion_correct ? '正确' : '错误',
+          req.remark,
+        ]);
+      });
+    });
+  });
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) =>
+      row
+        .map((cell) => {
+          const cellStr = String(cell || '');
+          if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+            return `"${cellStr.replace(/"/g, '""')}"`;
+          }
+          return cellStr;
+        })
+        .join(',')
+    ),
+  ].join('\n');
+
+  const blob = new Blob(['\ufeff' + csvContent], {
+    type: 'text/csv;charset=utf-8;',
+  });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `检验项目核对明细_${fileName}_${formatDate(new Date().toISOString())}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }

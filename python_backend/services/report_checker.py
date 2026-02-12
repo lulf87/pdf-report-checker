@@ -15,6 +15,7 @@ from models.schemas import (
 )
 from services.pdf_parser import PDFParser
 from services.ocr_service import OCRService
+from services.inspection_item_checker import InspectionItemChecker
 from utils.comparison_logger import ComparisonLogger
 from config import is_llm_comparison_enabled, settings as app_settings
 
@@ -45,6 +46,7 @@ class ReportChecker:
     def __init__(self):
         self.pdf_parser = PDFParser()
         self.ocr_service = OCRService()
+        self.inspection_checker = InspectionItemChecker()
 
     async def check(self, pdf_path: str, file_id: str, enable_detailed: bool = False) -> CheckResult:
         """
@@ -87,9 +89,14 @@ class ReportChecker:
             sample_table, photo_analysis, enable_detailed=enable_detailed
         )
 
-        # 9. 收集错误和警告
+        # 9. 检验项目表格核对（新增 v2.1）
+        inspection_item_check = self.inspection_checker.check_inspection_items(
+            pdf_path, pages
+        )
+
+        # 10. 收集错误和警告
         errors, warnings, info = self._collect_issues(
-            home_third_comparison, component_checks, photo_analysis
+            home_third_comparison, component_checks, photo_analysis, inspection_item_check
         )
 
         # 10. 保存结果
@@ -105,6 +112,7 @@ class ReportChecker:
             sample_description_table=sample_table,
             component_checks=component_checks,
             photo_page_check=photo_analysis,
+            inspection_item_check=inspection_item_check,
             errors=errors,
             warnings=warnings,
             info=info,
@@ -1139,7 +1147,8 @@ class ReportChecker:
 
     def _collect_issues(self, home_third_comparison: List[FieldComparison],
                        component_checks: List[ComponentCheck],
-                       photo_analysis: Dict[str, Any]) -> Tuple[List[ErrorItem], List[ErrorItem], List[ErrorItem]]:
+                       photo_analysis: Dict[str, Any],
+                       inspection_item_check: Optional[Any] = None) -> Tuple[List[ErrorItem], List[ErrorItem], List[ErrorItem]]:
         """收集所有问题"""
         errors = []
         warnings = []
@@ -1184,6 +1193,29 @@ class ReportChecker:
             message=f"照片页统计: {photo_analysis.get('total_photos', 0)}张照片, {photo_analysis.get('total_labels', 0)}个标签",
             details=photo_analysis
         ))
+
+        # 检验项目核对结果（新增 v2.1）
+        if inspection_item_check and inspection_item_check.has_table:
+            # 添加检验项目统计
+            info.append(ErrorItem(
+                level="INFO",
+                message=f"检验项目表格: {inspection_item_check.total_items}个项目, "
+                       f"{inspection_item_check.total_clauses}个条款, "
+                       f"{inspection_item_check.correct_conclusions}个正确结论, "
+                       f"{inspection_item_check.incorrect_conclusions}个错误结论",
+                details={
+                    'total_items': inspection_item_check.total_items,
+                    'total_clauses': inspection_item_check.total_clauses,
+                    'correct_conclusions': inspection_item_check.correct_conclusions,
+                    'incorrect_conclusions': inspection_item_check.incorrect_conclusions,
+                    'cross_page_continuations': inspection_item_check.cross_page_continuations
+                }
+            ))
+
+            # 添加检验项目错误
+            if inspection_item_check.errors:
+                for error in inspection_item_check.errors:
+                    errors.append(error)
 
         return errors, warnings, info
 

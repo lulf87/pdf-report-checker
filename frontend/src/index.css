@@ -100,3 +100,35 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Results Tabs */
+.results-tabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.results-tabs .ant-tabs-tab {
+  padding: 12px 20px;
+  font-weight: 500;
+}
+
+/* Inspection Clause Table */
+.inspection-clause-table .ant-table-cell {
+  vertical-align: top;
+}
+
+.inspection-clause-table .ant-table-row:hover {
+  background-color: #f8fafc;
+}
+
+/* Status colors */
+.status-pass {
+  color: #10b981;
+}
+
+.status-fail {
+  color: #ef4444;
+}
+
+.status-warning {
+  color: #f59e0b;
+}

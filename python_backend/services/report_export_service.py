@@ -208,7 +208,11 @@ class ReportExportService:
         ws_components = wb.create_sheet("部件核对")
         self._fill_excel_components(ws_components, result)
 
-        # 3. 问题汇总sheet
+        # 3. 检验项目核对sheet（新增 v2.1）
+        ws_inspection = wb.create_sheet("检验项目核对")
+        self._fill_excel_inspection_items(ws_inspection, result)
+
+        # 4. 问题汇总sheet
         ws_issues = wb.create_sheet("问题汇总")
         self._fill_excel_issues(ws_issues, result)
 
@@ -553,6 +557,83 @@ class ReportExportService:
             ws.cell(row=row, column=3, value=warning.get('page_num', ''))
             ws.cell(row=row, column=4, value=warning.get('location', ''))
             row += 1
+
+    def _fill_excel_inspection_items(self, ws, result: Dict[str, Any]):
+        """填充Excel检验项目核对sheet（新增 v2.1）"""
+        from openpyxl.styles import Font, PatternFill, Alignment
+
+        inspection_check = result.get('inspection_item_check')
+
+        if not inspection_check or not inspection_check.get('has_table'):
+            ws['A1'] = '未检测到检验项目表格'
+            ws['A1'].font = Font(bold=True, size=14)
+            return
+
+        # 统计信息
+        ws['A1'] = '检验项目核对结果'
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:H1')
+
+        ws['A3'] = '检验项目总数'
+        ws['B3'] = inspection_check.get('total_items', 0)
+        ws['A4'] = '标准条款总数'
+        ws['B4'] = inspection_check.get('total_clauses', 0)
+        ws['A5'] = '正确结论数'
+        ws['B5'] = inspection_check.get('correct_conclusions', 0)
+        ws['A6'] = '错误结论数'
+        ws['B6'] = inspection_check.get('incorrect_conclusions', 0)
+        ws['A7'] = '跨页续表数'
+        ws['B7'] = inspection_check.get('cross_page_continuations', 0)
+
+        for cell in ['A3', 'A4', 'A5', 'A6', 'A7']:
+            ws[cell].font = Font(bold=True)
+            ws[cell].fill = PatternFill(start_color='E0E0E0', end_color='E0E0E0', fill_type='solid')
+
+        # 详细核对结果
+        headers = ['序号', '检验项目', '标准条款', '标准要求', '检验结果', '单项结论', '期望值', '核对状态']
+        start_row = 9
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=start_row, column=col, value=header)
+            cell.font = Font(bold=True, color='FFFFFF')
+            cell.fill = PatternFill(start_color='1890FF', end_color='1890FF', fill_type='solid')
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        row = start_row + 1
+        for item in inspection_check.get('item_checks', []):
+            for clause in item.get('clauses', []):
+                for req in clause.get('requirements', []):
+                    ws.cell(row=row, column=1, value=item.get('item_number', ''))
+                    ws.cell(row=row, column=2, value=item.get('item_name', ''))
+                    ws.cell(row=row, column=3, value=clause.get('clause_number', ''))
+                    ws.cell(row=row, column=4, value=req.get('requirement_text', ''))
+                    ws.cell(row=row, column=5, value=req.get('inspection_result', ''))
+                    ws.cell(row=row, column=6, value=clause.get('conclusion', ''))
+                    ws.cell(row=row, column=7, value=clause.get('expected_conclusion', ''))
+
+                    is_correct = clause.get('is_conclusion_correct', True)
+                    status_text = '✓ 正确' if is_correct else '✗ 错误'
+                    ws.cell(row=row, column=8, value=status_text)
+
+                    # 设置状态列颜色
+                    if is_correct:
+                        ws.cell(row=row, column=8).fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+                    else:
+                        ws.cell(row=row, column=8).fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')
+                        # 错误行整行标红
+                        for col in range(1, 9):
+                            ws.cell(row=row, column=col).font = Font(color='FF0000')
+
+                    row += 1
+
+        # 调整列宽
+        ws.column_dimensions['A'].width = 8
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 30
+        ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 12
+        ws.column_dimensions['G'].width = 12
+        ws.column_dimensions['H'].width = 12
 
 
 # 单例

@@ -122,6 +122,43 @@ class ErrorItem(BaseModel):
     details: Dict[str, Any] = {}
 
 
+class RequirementCheck(BaseModel):
+    """标准要求核对 - 检验项目表格"""
+    requirement_text: str      # 标准要求内容
+    inspection_result: str     # 检验结果
+    remark: str                # 备注
+
+
+class ClauseCheck(BaseModel):
+    """标准条款核对 - 检验项目表格"""
+    clause_number: str         # 标准条款编号
+    requirements: List[RequirementCheck]  # 标准要求列表
+    conclusion: str            # 单项结论（文档中的实际值）
+    expected_conclusion: str   # 期望的单项结论
+    is_conclusion_correct: bool  # 结论是否正确
+
+
+class InspectionItemCheck(BaseModel):
+    """检验项目核对"""
+    item_number: str           # 序号
+    item_name: str             # 检验项目名称
+    clauses: List[ClauseCheck] # 标准条款列表
+    issues: List[str]          # 问题列表
+    status: str                # pass/warning/fail
+
+
+class InspectionItemCheckResult(BaseModel):
+    """检验项目核对结果"""
+    has_table: bool               # 是否检测到检验项目表格
+    total_items: int              # 检验项目总数
+    total_clauses: int            # 标准条款总数
+    correct_conclusions: int      # 单项结论正确的条款数
+    incorrect_conclusions: int    # 单项结论错误的条款数
+    item_checks: List[InspectionItemCheck]  # 各检验项目核对详情
+    cross_page_continuations: int  # 跨页续表数量
+    errors: List[ErrorItem]       # 错误列表
+
+
 class CheckResult(BaseModel):
     """核对结果"""
     model_config = {"extra": "allow"}  # 允许额外字段
@@ -149,6 +186,9 @@ class CheckResult(BaseModel):
 
     # 照片页检查
     photo_page_check: Dict[str, Any] = {}
+
+    # 检验项目核对结果（新增 v2.1）
+    inspection_item_check: Optional[InspectionItemCheckResult] = None
 
     # 错误汇总
     errors: List[ErrorItem] = []

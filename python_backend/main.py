@@ -28,7 +28,11 @@ from models.schemas import (
     PageInfo,
     TableData,
     OCRResult,
-    FieldComparison
+    FieldComparison,
+    InspectionItemCheckResult,
+    InspectionItemCheck,
+    ClauseCheck,
+    RequirementCheck
 )
 
 # 创建FastAPI应用
