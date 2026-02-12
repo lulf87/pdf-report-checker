@@ -53,3 +53,17 @@ coverage/
 .Python
 pip-log.txt
 pip-delete-this-directory.txt
+
+# Test files and reports
+*test*.json
+*test*.md
+*report*.json
+*report*.md
+OCR_FIX_*.md
+OCR_IMPROVEMENT_*.md
+
+# Backup files
+*副本*
+
+# Test PDFs
+QW*.pdf

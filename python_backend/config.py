@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     LLM_RETRY_ON_FAILURE: bool = True  # OCR失败时是否尝试LLM
     LLM_CONFIDENCE_THRESHOLD: float = 0.8  # LLM结果置信度阈值
 
+    # 视觉大模型OCR配置
+    ENABLE_VISION_LLM_OCR: bool = True  # 启用视觉大模型OCR作为fallback
+    VISION_LLM_MODE: str = "fallback"  # 模式: "primary"(优先使用), "fallback"(传统OCR失败时使用), "disabled"(禁用)
+    VISION_LLM_FALLBACK_THRESHOLD: int = 3  # 传统OCR提取字段数低于3个时触发fallback
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
@@ -104,3 +109,13 @@ def is_openrouter_model(model: str) -> bool:
         "qwen/",
     ]
     return any(model.startswith(prefix) for prefix in openrouter_prefixes)
+
+
+# 检查视觉大模型OCR是否启用
+def is_vision_llm_ocr_enabled() -> bool:
+    """检查是否启用视觉大模型OCR功能"""
+    return (
+        settings.ENABLE_VISION_LLM_OCR and
+        settings.VISION_LLM_MODE != "disabled" and
+        (settings.OPENROUTER_API_KEY or settings.ANTHROPIC_API_KEY or settings.OPENAI_API_KEY)
+    )
