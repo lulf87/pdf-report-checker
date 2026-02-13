@@ -1,1 +1,1 @@
-export { UploadZone } from './UploadZone'
+export { default as UploadZone } from './UploadZone'
