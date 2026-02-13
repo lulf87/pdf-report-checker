@@ -1,0 +1,121 @@
+{
+    "name": "software-dev-team",
+    "description": "一个全栈式软件开发专家团队，擅长高可用系统架构、非结构化数据处理及视觉大模型（VLM）集成。能够完成从技术调研、架构设计到前后端开发及质量保障的全生命周期任务。",
+    "version": "1.1.0",
+    "metadata": {
+        "industry": "Software Development / AI Integration",
+        "primary_focus": "Medical Report Parsing, VLM-driven Data Extraction, Desktop Application",
+        "project": "报告核对工具",
+        "tech_stack": {
+            "frontend": "Electron 28 + React 18 + Ant Design 5 + Vite",
+            "backend": "Python 3.9+ / FastAPI / Uvicorn",
+            "ai": "VLM (GPT-4o / Gemini) + PaddleOCR + PyMuPDF",
+            "deployment": "Desktop Application (macOS DMG / Windows NSIS)"
+        }
+    },
+    "agents": [
+        {
+            "id": "tech-lead",
+            "name": "项目负责人/架构师",
+            "role": "Tech Lead / Architect",
+            "instructions_file": "agent/team-lead.md",
+            "description": "负责技术方向把控、架构设计和任务分解。他是团队的决策核心，平衡技术理想与工程实践。"
+        },
+        {
+            "id": "researcher",
+            "name": "技术研究员",
+            "role": "Tech Researcher",
+            "instructions_file": "agent/researcher.md",
+            "description": "负责前沿技术调研、POC 验证及选型对比。为后端和架构师提供数据驱动的决策支持。"
+        },
+        {
+            "id": "prompt-engineer",
+            "name": "Prompt 工程师",
+            "role": "Prompt Engineer / Template Specialist",
+            "instructions_file": "agent/prompt-engineer.md",
+            "description": "模型能力的炼金术士，负责设计高精度的指令系统，确保非结构化数据（如医疗报告）的稳定提取。"
+        },
+        {
+            "id": "backend-dev",
+            "name": "后端开发工程师",
+            "role": "Backend Engineer",
+            "instructions_file": "agent/backend-dev.md",
+            "description": "系统稳定性的守护者，负责 API 设计、数据处理 Pipeline 及 VLM/OCR 集成与降级策略的落地实现。"
+        },
+        {
+            "id": "frontend-dev",
+            "name": "前端开发工程师",
+            "role": "Frontend Engineer",
+            "instructions_file": "agent/frontend-dev.md",
+            "description": "用户体验的守护者，负责 Electron 主进程管理、React UI 实现、组件开发及前端性能优化。"
+        },
+        {
+            "id": "qa-engineer",
+            "name": "验证/测试工程师",
+            "role": "QA Engineer",
+            "instructions_file": "agent/qa-engineer.md",
+            "description": "质量守门人，负责自动化测试、数据一致性校验及 AI 提取结果的幻觉检测与准确性评估。"
+        }
+    ],
+    "default_workflow": {
+        "entry_point": "tech-lead",
+        "collaboration_patterns": [
+            {
+                "scenario": "AI 功能开发",
+                "flow": [
+                    "tech-lead",
+                    "prompt-engineer",
+                    "backend-dev",
+                    "qa-engineer"
+                ]
+            },
+            {
+                "scenario": "技术选型调研",
+                "flow": [
+                    "tech-lead",
+                    "researcher",
+                    "backend-dev"
+                ]
+            },
+            {
+                "scenario": "全栈功能迭代",
+                "flow": [
+                    "tech-lead",
+                    "frontend-dev",
+                    "backend-dev",
+                    "qa-engineer"
+                ]
+            },
+            {
+                "scenario": "Bug 修复/回归",
+                "flow": [
+                    "tech-lead",
+                    "backend-dev",
+                    "qa-engineer"
+                ]
+            },
+            {
+                "scenario": "Prompt 优化迭代",
+                "flow": [
+                    "qa-engineer",
+                    "prompt-engineer",
+                    "backend-dev",
+                    "qa-engineer"
+                ]
+            }
+        ]
+    },
+    "constraints": {
+        "deployment": "desktop",
+        "offline_support": true,
+        "llm_modes": [
+            "enhance",
+            "fallback",
+            "disabled"
+        ],
+        "target_platforms": [
+            "macOS",
+            "Windows"
+        ]
+    }
+}

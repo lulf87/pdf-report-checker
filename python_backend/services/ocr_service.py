@@ -39,6 +39,7 @@ class OCRService:
         'batch_number': {
             'patterns': [
                 r'批号[：:\s]+([A-Z0-9][^\s]*)',  # 要求批号后面有实际内容，且不以/开头
+                r'批号[：:\s]+(\d{5,})',  # 纯数字批号（5位以上，如10627717）
                 r'(?:LOT|Lot|BATCH|Batch)\s*(?:No\.?|#)?[：:\s]*([A-Z0-9][^\s]*)',
                 r'\(10\)\s*([A-Z0-9]+)',  # 条形码数据标识符 (10)
             ],
@@ -852,6 +853,11 @@ class OCRService:
         # 查找表格中的序列号（如G250030、RC250030等格式）
         # 这些通常出现在"批号/序列号"列中
         if 'serial_number' not in result:
+            # 收集已知的 model 值，避免将规格型号误认为序列号
+            known_model_value = None
+            if 'model' in result:
+                known_model_value = result['model'].get('value', '').upper()
+
             # 匹配常见的序列号格式：
             # 1. 字母+数字（如G250030, RC250030, LC250030）
             # 2. 字母-数字格式（如OT3-250030）
@@ -874,13 +880,23 @@ class OCRService:
                 if match:
                     serial_value = match.group(1).strip()
                     # 验证不是UDI编号
-                    if not self._is_likely_udi(serial_value):
-                        result['serial_number'] = {
-                            'value': serial_value,
-                            'name': '序列号'
-                        }
-                        print(f"[OCR] 从表格中提取序列号: {serial_value}")
-                        break
+                    if self._is_likely_udi(serial_value):
+                        continue
+                    # 验证不是已提取的规格型号值（防止字段错位）
+                    if known_model_value and serial_value.upper() == known_model_value:
+                        print(f"[OCR] 序列号提取：跳过与规格型号相同的值 '{serial_value}'")
+                        continue
+                    # 检查该值在原文中是否紧跟在「规格型号」标签后（再次防止字段错位）
+                    model_label_pattern = r'(?:规格型号|型号规格|型号|规格)[：:\s]*' + re.escape(serial_value)
+                    if re.search(model_label_pattern, full_text, re.IGNORECASE):
+                        print(f"[OCR] 序列号提取：'{serial_value}' 实际属于规格型号字段，跳过")
+                        continue
+                    result['serial_number'] = {
+                        'value': serial_value,
+                        'name': '序列号'
+                    }
+                    print(f"[OCR] 从表格中提取序列号: {serial_value}")
+                    break
 
         # 处理条形码标识符格式 (11), (17), (21)等
         # 检查是否在combined_text中
@@ -1025,6 +1041,11 @@ class OCRService:
         包含日期有效性验证和自动校正功能
         """
         if not value:
+            return value
+
+        # 序列号和批号不应进行日期格式化
+        # 避免将纯数字序列号（如20539798）误转换为日期（2053-07-28）
+        if field_key in ('serial_number', 'batch_number'):
             return value
 
         # 首先尝试提取日期中的数字部分
