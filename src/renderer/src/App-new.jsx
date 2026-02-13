@@ -123,7 +123,7 @@ function App() {
     <ConfigProvider theme={themeConfig}>
       <Layout className="app-layout">
         {/* 新UI背景 - 使用GridBackground替代OptimizedBackground */}
-        <GridBackground variant="default" showGlow={true} />
+        <GridBackground gridSize="md" animated={false} />
 
         {/* 顶部状态栏 */}
         <Header className="app-header">
