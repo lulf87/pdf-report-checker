@@ -1,0 +1,275 @@
+/* ============================================
+   DataTable - 科技感表格
+   ============================================ */
+
+.data-table {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+/* 装饰性边角 */
+.data-table__corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.data-table__corner::before,
+.data-table__corner::after {
+  content: '';
+  position: absolute;
+  background: var(--color-neon-blue);
+  opacity: 0.6;
+}
+
+.data-table__corner--tl {
+  top: 0;
+  left: 0;
+}
+
+.data-table__corner--tl::before {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.data-table__corner--tl::after {
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 12px;
+}
+
+.data-table__corner--tr {
+  top: 0;
+  right: 0;
+}
+
+.data-table__corner--tr::before {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.data-table__corner--tr::after {
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 12px;
+}
+
+.data-table__corner--bl {
+  bottom: 0;
+  left: 0;
+}
+
+.data-table__corner--bl::before {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.data-table__corner--bl::after {
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 12px;
+}
+
+.data-table__corner--br {
+  bottom: 0;
+  right: 0;
+}
+
+.data-table__corner--br::before {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.data-table__corner--br::after {
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  height: 12px;
+}
+
+/* Ant Design 表格覆盖样式 */
+.data-table .ant-table {
+  background: transparent !important;
+  color: var(--text-primary);
+}
+
+.data-table .ant-table-thead > tr > th {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+}
+
+.data-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1) !important;
+  transition: all var(--transition-fast);
+}
+
+.data-table .ant-table-tbody > tr:hover > td {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+.data-table .ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
+}
+
+/* 展开图标 */
+.data-table__expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--color-neon-blue-light);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.data-table__expand-icon:hover {
+  color: var(--color-neon-blue);
+  text-shadow: 0 0 10px var(--color-neon-blue);
+}
+
+/* 展开行内容 */
+.data-table .ant-table-expanded-row > td {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1) !important;
+}
+
+.data-table .ant-table-expanded-row:last-child > td {
+  border-bottom: none !important;
+}
+
+/* 空数据提示 */
+.data-table .ant-empty {
+  color: var(--text-tertiary);
+}
+
+.data-table .ant-empty-description {
+  color: var(--text-tertiary);
+}
+
+/* 加载状态 */
+.data-table .ant-spin-dot-item {
+  background-color: var(--color-neon-blue);
+}
+
+/* 分页器 */
+.data-table .ant-pagination {
+  margin: var(--spacing-md) !important;
+}
+
+.data-table .ant-pagination-item {
+  background: transparent;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+.data-table .ant-pagination-item a {
+  color: var(--text-secondary);
+}
+
+.data-table .ant-pagination-item:hover,
+.data-table .ant-pagination-item-active {
+  border-color: var(--color-neon-blue);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.data-table .ant-pagination-item:hover a,
+.data-table .ant-pagination-item-active a {
+  color: var(--color-neon-blue-light);
+}
+
+.data-table .ant-pagination-prev,
+.data-table .ant-pagination-next {
+  color: var(--text-secondary);
+}
+
+.data-table .ant-pagination-prev:hover,
+.data-table .ant-pagination-next:hover {
+  color: var(--color-neon-blue-light);
+}
+
+/* 排序图标 */
+.data-table .ant-table-column-sorter {
+  color: var(--text-tertiary);
+}
+
+.data-table .ant-table-column-sorter-up.active,
+.data-table .ant-table-column-sorter-down.active {
+  color: var(--color-neon-blue);
+}
+
+/* 筛选图标 */
+.data-table .ant-table-filter-trigger {
+  color: var(--text-tertiary);
+}
+
+.data-table .ant-table-filter-trigger:hover,
+.data-table .ant-table-filter-trigger.active {
+  color: var(--color-neon-blue);
+}
+
+/* 行选择框 */
+.data-table .ant-checkbox-wrapper {
+  color: var(--text-primary);
+}
+
+.data-table .ant-checkbox-inner {
+  background: transparent;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.data-table .ant-checkbox-checked .ant-checkbox-inner {
+  background: var(--color-neon-blue);
+  border-color: var(--color-neon-blue);
+}
+
+/* 表格行高亮效果 */
+.data-table__row {
+  position: relative;
+  overflow: hidden;
+}
+
+.data-table__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.05) 50%,
+    transparent 100%
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.data-table__row:hover::before {
+  left: 100%;
+}

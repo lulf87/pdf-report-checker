@@ -1,0 +1,163 @@
+/* ============================================
+   FileCard - 文件信息卡片
+   ============================================ */
+
+.file-card {
+  position: relative;
+  overflow: visible;
+}
+
+.file-card__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+}
+
+/* 文件信息区 */
+.file-card__info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+  min-width: 0;
+}
+
+/* 文件图标 */
+.file-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.2) 0%,
+    rgba(6, 182, 212, 0.2) 100%
+  );
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.file-card__icon .anticon {
+  font-size: 28px;
+  color: var(--color-neon-blue-light);
+}
+
+/* 文件详情 */
+.file-card__details {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-card__name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.file-card__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.file-card__meta-icon {
+  font-size: 14px;
+  color: var(--color-neon-cyan);
+}
+
+.file-card__meta-label {
+  color: var(--text-tertiary);
+}
+
+.file-card__meta-value {
+  color: var(--color-neon-blue-light);
+  font-weight: 500;
+}
+
+/* 导出按钮 */
+.file-card__export-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.3) 0%,
+    rgba(37, 99, 235, 0.3) 100%
+  ) !important;
+  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--glow-blue) !important;
+  transition: all var(--transition-fast) !important;
+  flex-shrink: 0;
+}
+
+.file-card__export-btn:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.4) 0%,
+    rgba(37, 99, 235, 0.4) 100%
+  ) !important;
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  box-shadow: var(--glow-blue-strong) !important;
+  transform: translateY(-1px);
+}
+
+/* 扫描线装饰 */
+.file-card__scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-neon-cyan) 50%,
+    transparent 100%
+  );
+  opacity: 0.5;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .file-card__content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .file-card__info {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .file-card__details {
+    text-align: center;
+  }
+
+  .file-card__name {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .file-card__meta {
+    justify-content: center;
+  }
+
+  .file-card__export-btn {
+    width: 100%;
+  }
+}

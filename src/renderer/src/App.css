@@ -1,24 +1,26 @@
 /* ============================================
-   App Component Styles - Modern Medical UI
+   App Component Styles - 科技感数据大屏
    ============================================ */
 
+/* ---------- Layout ---------- */
 .app-layout {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  background: var(--color-bg-primary);
+  position: relative;
 }
 
 /* ---------- Header ---------- */
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 100;
-  padding: 0 24px;
+  z-index: var(--z-sticky);
+  padding: 0 var(--spacing-lg);
   height: 64px;
-  background: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
 }
 
 .header-content {
@@ -30,147 +32,239 @@
   height: 100%;
 }
 
-.app-header h1 {
-  font-size: 22px;
+/* 标题 */
+.app-title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
   font-weight: 700;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+
+.app-title__glow {
+  background: linear-gradient(
+    135deg,
+    var(--color-neon-blue-light) 0%,
+    var(--color-neon-cyan-light) 50%,
+    var(--color-neon-purple-light) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin: 0;
-  letter-spacing: -0.025em;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
 
+/* 状态指示器 */
 .status-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: var(--spacing-sm);
+  font-size: var(--text-sm);
   font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.5);
-  transition: all 0.3s ease;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  transition: all var(--transition-normal);
 }
 
-.status-indicator::before {
-  content: '';
+.status-indicator__dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  animation: pulse-dot 2s ease-in-out infinite;
+  animation: statusPulse 2s ease-in-out infinite;
 }
 
-.status-indicator.connected {
-  color: #10b981;
+.status-indicator--connected {
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
-.status-indicator.connected::before {
-  background: #10b981;
+.status-indicator--connected .status-indicator__dot {
+  background: var(--color-success);
+  box-shadow: 0 0 8px var(--color-success);
 }
 
-.status-indicator.disconnected {
-  color: #ef4444;
+.status-indicator--connected .status-indicator__text {
+  color: var(--color-success-light);
 }
 
-.status-indicator.disconnected::before {
-  background: #ef4444;
+.status-indicator--disconnected {
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
-.status-indicator.error {
-  color: #f59e0b;
+.status-indicator--disconnected .status-indicator__dot {
+  background: var(--color-error);
+  box-shadow: 0 0 8px var(--color-error);
+  animation: statusPulse 1s ease-in-out infinite;
 }
 
-.status-indicator.error::before {
-  background: #f59e0b;
+.status-indicator--disconnected .status-indicator__text {
+  color: var(--color-error-light);
 }
 
-.status-indicator.checking {
-  color: #6b7280;
+.status-indicator--error {
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
-.status-indicator.checking::before {
-  background: #6b7280;
-  animation: pulse-dot 1s ease-in-out infinite;
+.status-indicator--error .status-indicator__dot {
+  background: var(--color-warning);
+  box-shadow: 0 0 8px var(--color-warning);
 }
 
-@keyframes pulse-dot {
+.status-indicator--error .status-indicator__text {
+  color: var(--color-warning-light);
+}
+
+.status-indicator--checking {
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+.status-indicator--checking .status-indicator__dot {
+  background: var(--text-tertiary);
+  animation: statusPulse 0.8s ease-in-out infinite;
+}
+
+.status-indicator--checking .status-indicator__text {
+  color: var(--text-tertiary);
+}
+
+@keyframes statusPulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
   50% {
     opacity: 0.5;
-    transform: scale(1.2);
+    transform: scale(1.3);
   }
 }
 
 /* ---------- Content ---------- */
 .app-content {
-  padding: 24px;
+  position: relative;
+  z-index: var(--z-base);
+  padding: var(--spacing-lg);
   min-height: calc(100vh - 64px - 48px);
 }
 
 .content-wrapper {
   max-width: 1400px;
   margin: 0 auto;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 10px 15px -3px rgb(0 0 0 / 0.05);
-  padding: 32px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-xl), var(--glow-blue);
+  padding: var(--spacing-xl);
   min-height: 600px;
-  animation: fadeInUp 0.4s ease-out;
+}
+
+/* 装饰性边角 */
+.content-wrapper::before,
+.content-wrapper::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
 }
 
 /* ---------- Footer ---------- */
 .app-footer {
+  position: relative;
+  z-index: var(--z-base);
   text-align: center;
-  padding: 16px;
+  padding: var(--spacing-md);
   background: transparent !important;
-  color: #94a3b8;
-  font-size: 13px;
 }
 
-/* ---------- Responsive ---------- */
+.footer-text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.footer-text__version {
+  font-family: var(--font-mono);
+  color: var(--color-neon-blue-light);
+}
+
+.footer-text__divider {
+  opacity: 0.3;
+}
+
+.footer-text__copyright {
+  color: var(--text-tertiary);
+}
+
+/* ---------- Ant Design 全局覆盖 ---------- */
+
+/* Message */
+.ant-message-notice-content {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.ant-message-success .anticon {
+  color: var(--color-success-light) !important;
+}
+
+.ant-message-error .anticon {
+  color: var(--color-error-light) !important;
+}
+
+.ant-message-warning .anticon {
+  color: var(--color-warning-light) !important;
+}
+
+.ant-message-info .anticon {
+  color: var(--color-neon-blue-light) !important;
+}
+
+/* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .app-header {
-    padding: 0 16px;
+    padding: 0 var(--spacing-md);
     height: 56px;
   }
 
-  .app-header h1 {
-    font-size: 18px;
+  .app-title {
+    font-size: var(--text-lg);
   }
 
   .app-content {
-    padding: 16px;
+    padding: var(--spacing-md);
   }
 
   .content-wrapper {
-    padding: 20px;
-    border-radius: 16px;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-xl);
   }
 
   .status-indicator {
-    font-size: 12px;
-    padding: 4px 10px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--text-xs);
   }
 
-  .status-indicator span {
+  .status-indicator__text {
     display: none;
   }
 }
 
 @media (max-width: 480px) {
-  .app-header h1 {
-    font-size: 16px;
+  .app-title {
+    font-size: var(--text-base);
   }
 
   .content-wrapper {
-    padding: 16px;
-    border-radius: 12px;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
   }
 }

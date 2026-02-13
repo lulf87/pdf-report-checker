@@ -1,0 +1,281 @@
+/* CheckItemCard.module.css - 单项核对卡片样式 */
+
+.checkItemCard {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  margin-bottom: 8px;
+}
+
+/* 状态样式 - 通过 */
+.checkItemCard.pass {
+  border-left: 3px solid var(--color-success);
+}
+
+.checkItemCard.pass:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+}
+
+/* 状态样式 - 失败 */
+.checkItemCard.fail {
+  border-left: 3px solid var(--color-error);
+  border-color: rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15), inset 0 0 20px rgba(239, 68, 68, 0.05);
+}
+
+.checkItemCard.fail:hover {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.25), inset 0 0 30px rgba(239, 68, 68, 0.1);
+}
+
+/* 状态样式 - 警告 */
+.checkItemCard.warning {
+  border-left: 3px solid var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.checkItemCard.warning:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+/* 状态样式 - 跳过 */
+.checkItemCard.skip {
+  border-left: 3px solid var(--color-info);
+  opacity: 0.8;
+}
+
+.checkItemCard.skip:hover {
+  opacity: 1;
+}
+
+/* 展开状态 */
+.checkItemCard.expanded {
+  border-radius: var(--radius-lg);
+}
+
+.checkItemCard.expanded.fail {
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.2), inset 0 0 25px rgba(239, 68, 68, 0.08);
+}
+
+.checkItemCard.expanded.warning {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+}
+
+/* 头部区域 */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  transition: background-color 0.2s ease;
+}
+
+.cardHeader.clickable {
+  cursor: pointer;
+}
+
+.cardHeader.clickable:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+/* 左侧区域 */
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* 编号徽章 */
+.codeBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-neon-blue-light);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.codeBadge.pass {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-light);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.codeBadge.fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.codeBadge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning-light);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.codeBadge.skip {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-tertiary);
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+/* 状态图标 */
+.statusIcon {
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.statusIcon.pass {
+  color: var(--color-success);
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+}
+
+.statusIcon.fail {
+  color: var(--color-error);
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.6));
+}
+
+.statusIcon.warning {
+  color: var(--color-warning);
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.5));
+}
+
+.statusIcon.skip {
+  color: var(--color-info);
+}
+
+/* 中间区域 */
+.headerCenter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.itemName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 徽章组 */
+.badgeGroup {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.errorBadge {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--color-error-light);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.warningBadge {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--color-warning-light);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* 描述文本 */
+.description {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 展开图标 */
+.expandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.expandIcon.expanded {
+  transform: rotate(0deg);
+  color: var(--color-neon-blue-light);
+}
+
+/* 详情区域 */
+.detailsContainer {
+  overflow: hidden;
+  border-top: 1px solid var(--glass-border);
+}
+
+.detailsContent {
+  padding: 16px;
+  background: rgba(10, 14, 23, 0.5);
+}
+
+/* 响应式调整 */
+@media (max-width: 640px) {
+  .cardHeader {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .codeBadge {
+    min-width: 40px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .statusIcon {
+    font-size: 16px;
+  }
+
+  .itemName {
+    font-size: 13px;
+  }
+
+  .description {
+    display: none;
+  }
+
+  .detailsContent {
+    padding: 12px;
+  }
+}

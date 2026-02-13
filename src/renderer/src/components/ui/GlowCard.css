@@ -1,0 +1,213 @@
+/* ============================================
+   GlowCard - 霓虹发光卡片容器
+   ============================================ */
+
+.glow-card {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+/* 发光颜色变体 */
+.glow-card--blue {
+  box-shadow: var(--shadow-md), var(--glow-blue);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.glow-card--cyan {
+  box-shadow: var(--shadow-md), var(--glow-cyan);
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+.glow-card--purple {
+  box-shadow: var(--shadow-md), var(--glow-purple);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.glow-card--success {
+  box-shadow: var(--shadow-md), var(--glow-success);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.glow-card--warning {
+  box-shadow: var(--shadow-md), var(--glow-warning);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.glow-card--error {
+  box-shadow: var(--shadow-md), var(--glow-error);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* 悬停效果 */
+.glow-card--hoverable:hover {
+  transform: translateY(-2px);
+}
+
+.glow-card--hoverable.glow-card--blue:hover {
+  box-shadow: var(--shadow-lg), var(--glow-blue-strong);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.glow-card--hoverable.glow-card--cyan:hover {
+  box-shadow: var(--shadow-lg), var(--glow-cyan-strong);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+.glow-card--hoverable.glow-card--purple:hover {
+  box-shadow: var(--shadow-lg), var(--glow-purple-strong);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.glow-card--hoverable.glow-card--success:hover {
+  box-shadow: var(--shadow-lg), 0 0 25px rgba(16, 185, 129, 0.7);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.glow-card--hoverable.glow-card--warning:hover {
+  box-shadow: var(--shadow-lg), 0 0 25px rgba(245, 158, 11, 0.7);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.glow-card--hoverable.glow-card--error:hover {
+  box-shadow: var(--shadow-lg), 0 0 25px rgba(239, 68, 68, 0.7);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* 装饰性边角 */
+.glow-card__corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.glow-card__corner::before,
+.glow-card__corner::after {
+  content: '';
+  position: absolute;
+  background: var(--color-neon-blue);
+  opacity: 0.6;
+}
+
+.glow-card--cyan .glow-card__corner::before,
+.glow-card--cyan .glow-card__corner::after {
+  background: var(--color-neon-cyan);
+}
+
+.glow-card--purple .glow-card__corner::before,
+.glow-card--purple .glow-card__corner::after {
+  background: var(--color-neon-purple);
+}
+
+.glow-card--success .glow-card__corner::before,
+.glow-card--success .glow-card__corner::after {
+  background: var(--color-success);
+}
+
+.glow-card--warning .glow-card__corner::before,
+.glow-card--warning .glow-card__corner::after {
+  background: var(--color-warning);
+}
+
+.glow-card--error .glow-card__corner::before,
+.glow-card--error .glow-card__corner::after {
+  background: var(--color-error);
+}
+
+.glow-card__corner--tl {
+  top: 0;
+  left: 0;
+}
+
+.glow-card__corner--tl::before {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.glow-card__corner--tl::after {
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 12px;
+}
+
+.glow-card__corner--tr {
+  top: 0;
+  right: 0;
+}
+
+.glow-card__corner--tr::before {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.glow-card__corner--tr::after {
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 12px;
+}
+
+.glow-card__corner--bl {
+  bottom: 0;
+  left: 0;
+}
+
+.glow-card__corner--bl::before {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.glow-card__corner--bl::after {
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 12px;
+}
+
+.glow-card__corner--br {
+  bottom: 0;
+  right: 0;
+}
+
+.glow-card__corner--br::before {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 2px;
+}
+
+.glow-card__corner--br::after {
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  height: 12px;
+}
+
+/* 内容区域 */
+.glow-card__content {
+  position: relative;
+  z-index: 1;
+  padding: var(--spacing-md);
+}
+
+/* 尺寸变体 */
+.glow-card--compact .glow-card__content {
+  padding: var(--spacing-sm);
+}
+
+.glow-card--large .glow-card__content {
+  padding: var(--spacing-lg);
+}

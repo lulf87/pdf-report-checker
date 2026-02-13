@@ -1,0 +1,184 @@
+/* ============================================
+   StatusBadge - 状态徽章
+   ============================================ */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+/* 状态变体 - 实心样式 */
+.status-badge--success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-light);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.status-badge--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+.status-badge--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning-light);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+}
+
+.status-badge--info {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.status-badge--blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-neon-blue-light);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+}
+
+.status-badge--cyan {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--color-neon-cyan-light);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+}
+
+.status-badge--purple {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--color-neon-purple-light);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+}
+
+/* 轮廓样式 */
+.status-badge--outline.status-badge--success {
+  background: transparent;
+}
+
+.status-badge--outline.status-badge--error {
+  background: transparent;
+}
+
+.status-badge--outline.status-badge--warning {
+  background: transparent;
+}
+
+.status-badge--outline.status-badge--info {
+  background: transparent;
+}
+
+.status-badge--outline.status-badge--blue {
+  background: transparent;
+}
+
+.status-badge--outline.status-badge--cyan {
+  background: transparent;
+}
+
+.status-badge--outline.status-badge--purple {
+  background: transparent;
+}
+
+/* 状态指示灯 */
+.status-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-badge--success .status-badge__dot {
+  background: var(--color-success);
+  box-shadow: 0 0 6px var(--color-success);
+}
+
+.status-badge--error .status-badge__dot {
+  background: var(--color-error);
+  box-shadow: 0 0 6px var(--color-error);
+}
+
+.status-badge--warning .status-badge__dot {
+  background: var(--color-warning);
+  box-shadow: 0 0 6px var(--color-warning);
+}
+
+.status-badge--info .status-badge__dot {
+  background: var(--text-tertiary);
+}
+
+.status-badge--blue .status-badge__dot {
+  background: var(--color-neon-blue);
+  box-shadow: 0 0 6px var(--color-neon-blue);
+}
+
+.status-badge--cyan .status-badge__dot {
+  background: var(--color-neon-cyan);
+  box-shadow: 0 0 6px var(--color-neon-cyan);
+}
+
+.status-badge--purple .status-badge__dot {
+  background: var(--color-neon-purple);
+  box-shadow: 0 0 6px var(--color-neon-purple);
+}
+
+/* 脉冲动画 */
+.status-badge--pulse .status-badge__dot {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+/* 图标 */
+.status-badge__icon {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+/* 文本 */
+.status-badge__text {
+  line-height: 1;
+}
+
+/* 尺寸变体 */
+.status-badge--sm {
+  padding: 2px 6px;
+  font-size: var(--text-xs);
+}
+
+.status-badge--sm .status-badge__dot {
+  width: 4px;
+  height: 4px;
+}
+
+.status-badge--lg {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--text-base);
+}
+
+.status-badge--lg .status-badge__dot {
+  width: 8px;
+  height: 8px;
+}

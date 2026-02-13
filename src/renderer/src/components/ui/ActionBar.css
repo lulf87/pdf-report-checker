@@ -1,0 +1,245 @@
+/* ============================================
+   ActionBar - 底部操作栏
+   ============================================ */
+
+.action-bar {
+  position: relative;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  box-shadow: var(--shadow-lg), var(--glow-blue);
+  transition: all var(--transition-normal);
+}
+
+/* 固定在底部 */
+.action-bar--fixed {
+  position: fixed;
+  bottom: var(--spacing-lg);
+  left: var(--spacing-lg);
+  right: var(--spacing-lg);
+  z-index: var(--z-sticky);
+}
+
+/* 顶部发光线 */
+.action-bar__glow-line {
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-neon-blue) 50%,
+    transparent 100%
+  );
+  opacity: 0.6;
+}
+
+/* 装饰性边角 */
+.action-bar__corner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.action-bar__corner::before,
+.action-bar__corner::after {
+  content: '';
+  position: absolute;
+  background: var(--color-neon-blue);
+  opacity: 0.6;
+}
+
+.action-bar__corner--tl {
+  top: 0;
+  left: 0;
+}
+
+.action-bar__corner--tl::before {
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 1px;
+}
+
+.action-bar__corner--tl::after {
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 8px;
+}
+
+.action-bar__corner--tr {
+  top: 0;
+  right: 0;
+}
+
+.action-bar__corner--tr::before {
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 1px;
+}
+
+.action-bar__corner--tr::after {
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 8px;
+}
+
+.action-bar__corner--bl {
+  bottom: 0;
+  left: 0;
+}
+
+.action-bar__corner--bl::before {
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  height: 1px;
+}
+
+.action-bar__corner--bl::after {
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 8px;
+}
+
+.action-bar__corner--br {
+  bottom: 0;
+  right: 0;
+}
+
+.action-bar__corner--br::before {
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 1px;
+}
+
+.action-bar__corner--br::after {
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  height: 8px;
+}
+
+/* 内容区域 */
+.action-bar__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+/* LLM 开关 */
+.action-bar__llm-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: var(--radius-md);
+  margin-right: var(--spacing-sm);
+}
+
+.action-bar__llm-icon {
+  color: var(--color-neon-purple-light);
+  font-size: 14px;
+}
+
+.action-bar__llm-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.action-bar__llm-label .anticon {
+  color: var(--color-neon-purple-light);
+}
+
+/* Ant Design Switch 覆盖 */
+.action-bar .ant-switch {
+  background: rgba(107, 114, 128, 0.3);
+}
+
+.action-bar .ant-switch-checked {
+  background: linear-gradient(135deg, var(--color-neon-purple) 0%, var(--color-neon-blue) 100%);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+/* 按钮样式 */
+.action-bar__btn {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  color: var(--color-neon-blue-light) !important;
+  border-radius: var(--radius-md) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.action-bar__btn:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow: var(--glow-blue) !important;
+  transform: translateY(-1px);
+}
+
+.action-bar__btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 主要按钮 */
+.action-bar__btn--primary {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.3) 0%,
+    rgba(37, 99, 235, 0.3) 100%
+  ) !important;
+  border: 1px solid rgba(59, 130, 246, 0.5) !important;
+  box-shadow: var(--glow-blue) !important;
+}
+
+.action-bar__btn--primary:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.4) 0%,
+    rgba(37, 99, 235, 0.4) 100%
+  ) !important;
+  box-shadow: var(--glow-blue-strong) !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .action-bar--fixed {
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+    bottom: var(--spacing-md);
+  }
+
+  .action-bar__llm-toggle {
+    width: 100%;
+    justify-content: center;
+    margin-right: 0;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .action-bar__content {
+    flex-direction: column;
+  }
+
+  .action-bar__content .ant-space {
+    width: 100%;
+    justify-content: center;
+  }
+}

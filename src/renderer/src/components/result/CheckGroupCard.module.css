@@ -1,0 +1,242 @@
+/* CheckGroupCard.module.css - 核对分组卡片样式 */
+
+.checkGroupCard {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.checkGroupCard:hover {
+  border-color: var(--border-color-hover);
+  box-shadow: var(--shadow-md);
+}
+
+/* 分组状态样式 */
+.groupPass {
+  border-left: 3px solid var(--color-success);
+}
+
+.groupWarning {
+  border-left: 3px solid var(--color-warning);
+}
+
+.groupFail {
+  border-left: 3px solid var(--color-error);
+}
+
+/* 分组头部 */
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* 图标包装器 */
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--color-neon-blue-light);
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.groupPass .iconWrapper {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--color-success-light);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.groupWarning .iconWrapper {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--color-warning-light);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.groupFail .iconWrapper {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--color-error-light);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+/* 标题区域 */
+.titleSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.groupName {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.progressText {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.progressIcon {
+  font-size: 12px;
+  color: var(--color-success);
+}
+
+.issueSummary {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* 进度环 */
+.progressRing {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circularChart {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.circleBg {
+  fill: none;
+  stroke: rgba(59, 130, 246, 0.1);
+  stroke-width: 3;
+}
+
+.circle {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.8s ease;
+}
+
+.progressSuccess {
+  stroke: var(--color-success);
+}
+
+.progressWarning {
+  stroke: var(--color-warning);
+}
+
+.progressError {
+  stroke: var(--color-error);
+}
+
+.progressPercentage {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* 进度条容器 */
+.progressBarContainer {
+  height: 3px;
+  background: rgba(59, 130, 246, 0.1);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: 0 2px 2px 0;
+  transition: width 0.8s ease;
+}
+
+.progressBar.progressSuccess {
+  background: linear-gradient(90deg, var(--color-success) 0%, var(--color-success-light) 100%);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.progressBar.progressWarning {
+  background: linear-gradient(90deg, var(--color-warning) 0%, var(--color-warning-light) 100%);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+.progressBar.progressError {
+  background: linear-gradient(90deg, var(--color-error) 0%, var(--color-error-light) 100%);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+/* 核对项列表 */
+.itemsList {
+  padding: 16px 20px 20px;
+}
+
+/* 空状态 */
+.emptyState {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.emptyText {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+/* 响应式调整 */
+@media (max-width: 640px) {
+  .groupHeader {
+    padding: 14px 16px;
+  }
+
+  .iconWrapper {
+    width: 38px;
+    height: 38px;
+    font-size: 16px;
+  }
+
+  .groupName {
+    font-size: 15px;
+  }
+
+  .progressText {
+    font-size: 12px;
+  }
+
+  .progressRing {
+    width: 40px;
+    height: 40px;
+  }
+
+  .progressPercentage {
+    font-size: 10px;
+  }
+
+  .itemsList {
+    padding: 12px 16px 16px;
+  }
+}

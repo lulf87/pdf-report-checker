@@ -1,0 +1,236 @@
+/* C07ConclusionDetail - 单项结论核对详情样式 */
+
+.detailWrapper {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-top: var(--spacing-md);
+}
+
+/* 头部 */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  background: rgba(59, 130, 246, 0.05);
+  border-bottom: 1px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.header:hover {
+  border-bottom-color: var(--glass-border);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.headerIcon {
+  color: var(--color-neon-blue);
+  font-size: 16px;
+}
+
+.headerTitle {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+}
+
+.expandIcon {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* 内容区域 */
+.content {
+  overflow: hidden;
+}
+
+/* 统计卡片 */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.statCard {
+  position: relative;
+  padding: var(--spacing-md);
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+
+.statCard::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+}
+
+.statCard.blue::before {
+  background: var(--color-neon-blue);
+  box-shadow: var(--glow-blue);
+}
+
+.statCard.success::before {
+  background: var(--color-success);
+  box-shadow: var(--glow-success);
+}
+
+.statCard.error::before {
+  background: var(--color-error);
+  box-shadow: var(--glow-error);
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  color: var(--text-primary);
+}
+
+.statLabel {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* 错误提示 */
+.errorAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.errorAlertIcon {
+  color: var(--color-error);
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.errorAlertContent {
+  flex: 1;
+}
+
+.errorAlertTitle {
+  font-weight: 600;
+  color: var(--color-error-light);
+  margin-bottom: 4px;
+}
+
+.errorAlertDesc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* 表格区域 */
+.tableWrapper {
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+}
+
+.dataTable {
+  background: transparent !important;
+}
+
+.dataTable :global(.ant-table) {
+  background: transparent !important;
+}
+
+.dataTable :global(.ant-table-thead > tr > th) {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  font-weight: 600;
+}
+
+.dataTable :global(.ant-table-tbody > tr > td) {
+  border-bottom: 1px solid var(--glass-border) !important;
+  color: var(--text-primary);
+}
+
+.dataTable :global(.ant-table-tbody > tr:hover > td) {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* 序号单元格 */
+.numberCell {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* 结论标签 */
+.conclusionTag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.conclusionTag.successTag {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-light);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.conclusionTag.errorTag {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* 状态图标 */
+.statusIconError {
+  color: var(--color-error);
+  font-size: 18px;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+}
+
+/* 空状态 */
+.emptyState {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-secondary);
+}
+
+.emptyIcon {
+  font-size: 48px;
+  color: var(--color-success);
+  margin-bottom: var(--spacing-md);
+  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5));
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .header {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .tableWrapper {
+    padding: var(--spacing-sm);
+  }
+}
