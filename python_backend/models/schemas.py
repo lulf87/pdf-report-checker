@@ -190,6 +190,12 @@ class CheckResult(BaseModel):
     # 检验项目核对结果（新增 v2.1）
     inspection_item_check: Optional[InspectionItemCheckResult] = None
 
+    # 第三页扩展字段核对结果（新增 v2.2）
+    third_page_extended_checks: Optional[Dict[str, Any]] = None
+
+    # 页码连续性校验结果（新增 v2.2）
+    page_number_check: Optional[Dict[str, Any]] = None
+
     # 错误汇总
     errors: List[ErrorItem] = []
     warnings: List[ErrorItem] = []

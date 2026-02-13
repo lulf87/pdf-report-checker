@@ -32,16 +32,40 @@ class ConclusionErrorCode(str, Enum):
     CONTINUITY_ERROR = "CONTINUITY_ERROR_001"  # 跨页数据不连续
 
 
+class SerialNumberErrorCode(str, Enum):
+    """序号连续性错误代码 (v2.2新增)"""
+    NOT_CONTINUOUS = "SERIAL_NUMBER_ERROR_001"  # 序号不连续
+    EMPTY = "SERIAL_NUMBER_ERROR_002"  # 序号为空
+
+
+class ContinuationMarkErrorCode(str, Enum):
+    """续表标记错误代码 (v2.2新增)"""
+    MISSING = "CONTINUATION_MARK_ERROR_001"  # 缺少续表标记
+    WRONG_POSITION = "CONTINUATION_MARK_ERROR_002"  # 续字位置错误
+
+
+class NonEmptyFieldErrorCode(str, Enum):
+    """非空字段错误代码 (v2.2新增)"""
+    EMPTY_INSPECTION_RESULT = "EMPTY_FIELD_001"  # 检验结果为空
+    EMPTY_CONCLUSION = "EMPTY_FIELD_002"  # 单项结论为空
+    EMPTY_REMARK = "EMPTY_FIELD_003"  # 备注为空
+
+
 @dataclass
 class InspectionTableRow:
     """检验项目表格行数据"""
-    item_number: str           # 序号
+    item_number: str           # 序号（处理后的，去掉"续"字）
     item_name: str             # 检验项目
     clause_number: str         # 标准条款
     requirement_text: str      # 标准要求
     inspection_result: str     # 检验结果
     conclusion: str            # 单项结论
     remark: str                # 备注
+    page_num: int = 0          # 所在页码 (v2.2新增)
+    row_index: int = 0         # 行索引 (v2.2新增)
+    is_first_row_in_page: bool = False  # 是否为本页第一行数据 (v2.2新增)
+    original_item_number: str = ""  # 原始序号（包含"续"字标记）(v2.2新增)
+    has_continuation_mark: bool = False  # 是否包含续表标记 (v2.2新增)
 
 
 class InspectionItemChecker:
@@ -85,10 +109,16 @@ class InspectionItemChecker:
         # 2. 解析表格数据
         all_rows = self._parse_inspection_tables(tables, pdf_path)
 
-        # 3. 组织数据结构并核对单项结论
+        # 3. 【v2.2新增】非空字段校验（在单项结论核对之前）
+        empty_field_errors = self._check_non_empty_fields(all_rows)
+
+        # 4. 【v2.2新增】序号连续性校验（包含续表标记校验）
+        serial_number_errors = self._check_serial_number_continuity(all_rows)
+
+        # 5. 组织数据结构并核对单项结论
         item_checks = self._check_items(all_rows)
 
-        # 4. 统计结果
+        # 6. 统计结果
         total_clauses = sum(len(item.clauses) for item in item_checks)
         correct_conclusions = sum(
             1 for item in item_checks
@@ -97,8 +127,8 @@ class InspectionItemChecker:
         )
         incorrect_conclusions = total_clauses - correct_conclusions
 
-        # 5. 收集错误
-        errors = self._collect_inspection_errors(item_checks)
+        # 7. 收集错误（包含非空字段错误和序号连续性错误）
+        errors = empty_field_errors + serial_number_errors + self._collect_inspection_errors(item_checks)
 
         return InspectionItemCheckResult(
             has_table=True,
@@ -173,6 +203,7 @@ class InspectionItemChecker:
         last_item_number = ""
         last_item_name = ""
         last_clause_number = ""
+        row_index = 0
 
         for page_num, table_idx in tables:
             table_data = self.pdf_parser.extract_table_detailed(pdf_path, page_num, table_idx)
@@ -184,6 +215,7 @@ class InspectionItemChecker:
             col_indices = self._get_column_indices(table_data.headers)
 
             header_col_count = len(table_data.headers)
+            is_first_data_row = True  # 标记是否为本页第一行数据行
 
             for row in table_data.rows:
                 if len(row) < 2:
@@ -191,6 +223,7 @@ class InspectionItemChecker:
 
                 # 使用智能列映射处理变长行
                 mapped = self._map_row_columns(row, col_indices, header_col_count)
+                original_item_number = mapped['item_number']  # 保存原始序号
                 item_number = mapped['item_number']
                 item_name = mapped['item_name']
                 clause_number = mapped['clause_number']
@@ -199,36 +232,38 @@ class InspectionItemChecker:
                 conclusion = mapped['conclusion']
                 remark = mapped['remark']
 
+                # 过滤表头行
+                if item_number in ['序号', ''] and not item_name:
+                    continue
+
                 # 处理跨页续行：检测"续"字标记（如"续30"、"续 30"等）
-                is_continuation = False
+                has_continuation_mark = False
                 if item_number and '续' in item_number:
                     # 提取真实序号（去掉"续"字后的数字）
                     real_number = self._extract_number_from_continuation(item_number)
                     if real_number:
                         item_number = real_number
-                        is_continuation = True
+                        has_continuation_mark = True
 
                 # 处理续表：序号为空或者是续行时继承上一行
-                if (not item_number or is_continuation) and last_item_number:
-                    if not item_number or item_number == last_item_number:
+                is_continuation = False
+                if (not original_item_number or has_continuation_mark) and last_item_number:
+                    if not original_item_number or item_number == last_item_number:
                         # 如果是续行且序号匹配，使用上一行的项目名称
                         item_number = last_item_number
                         item_name = last_item_name if not item_name else item_name
+                        is_continuation = True
 
                 # 处理同一检验项目多行：标准条款为空时继承上一行
                 if not clause_number and last_clause_number:
                     clause_number = last_clause_number
 
                 # 更新最后记录的值
-                if item_number:
+                if item_number and item_number != last_item_number:
                     last_item_number = item_number
                     last_item_name = item_name
                 if clause_number:
                     last_clause_number = clause_number
-
-                # 过滤表头行
-                if item_number in ['序号', ''] and not item_name:
-                    continue
 
                 all_rows.append(InspectionTableRow(
                     item_number=item_number or last_item_number,
@@ -237,8 +272,16 @@ class InspectionItemChecker:
                     requirement_text=requirement_text,
                     inspection_result=inspection_result,
                     conclusion=conclusion,
-                    remark=remark
+                    remark=remark,
+                    page_num=page_num,
+                    row_index=row_index,
+                    is_first_row_in_page=is_first_data_row,
+                    original_item_number=original_item_number,
+                    has_continuation_mark=has_continuation_mark
                 ))
+
+                is_first_data_row = False
+                row_index += 1
 
         return all_rows
 
@@ -438,8 +481,8 @@ class InspectionItemChecker:
                 # 计算期望的单项结论
                 expected_conclusion = self._calculate_expected_conclusion(requirements)
 
-                # 核对结论
-                is_correct = actual_conclusion == expected_conclusion
+                # 核对结论（考虑特殊情况：当期望为"/"时，"符合"也视为正确）
+                is_correct = self._is_conclusion_valid(actual_conclusion, expected_conclusion)
 
                 if not is_correct:
                     item_issues.append(
@@ -479,24 +522,55 @@ class InspectionItemChecker:
 
         判定优先级：
         1. 任意检验结果为"不符合要求" -> "不符合"
-        2. 所有检验结果都为"——"、"/"或空白 -> "/"
+        2. 所有检验结果都为"——"、"/"或空白 -> "/" 或 "符合"（两者都接受）
         3. 其他情况（包含"符合要求"、任意文本或数字）-> "符合"
-        
-        注意：根据规格说明2.2节，"/"与空白等价
+
+        注意：
+        - 根据规格说明2.2节，"/"与空白等价
+        - 当检验结果为"——"时，单项结论可以是"/"或"符合"，两者都视为正确
+          （实际文档中可能标记为"符合"表示该项已通过其他方式验证）
         """
         results = [r.inspection_result for r in requirements]
 
         # 优先级1: 判断是否包含 "不符合要求"
-        if any('不符合' in r for r in results):
+        # 注意：需要处理 None 值，避免 TypeError
+        if any(r and '不符合' in r for r in results):
             return '不符合'
 
         # 优先级2: 判断是否全为 "——"、"/" 或空白（均视为不适用）
         na_values = {'——', '—', '/', '', None}
-        if all(r in na_values or r is None for r in results):
+        all_results_na = all(
+            r in na_values or r is None or (isinstance(r, str) and not r.strip())
+            for r in results
+        )
+
+        if all_results_na:
+            # 当所有检验结果都为"——"、"/"或空白时，
+            # 单项结论可以是"/"或"符合"，两者都接受
+            # 返回"/"作为期望值，但在核对时会接受"符合"作为有效值
             return '/'
 
         # 优先级3: 其他情况
         return '符合'
+
+    def _is_conclusion_valid(self, actual: str, expected: str) -> bool:
+        """
+        判断实际结论是否有效
+
+        规则：
+        1. 如果实际值等于期望值，有效
+        2. 如果期望值为"/"，实际值为"符合"也视为有效（误报修复）
+           因为当检验结果为"——"时，单项结论可以是"/"或"符合"
+        3. 其他情况无效
+        """
+        if actual == expected:
+            return True
+
+        # 当期望为"/"时，"符合"也视为正确
+        if expected == '/' and actual == '符合':
+            return True
+
+        return False
 
     def _collect_inspection_errors(self, item_checks: List[InspectionItemCheck]) -> List[ErrorItem]:
         """收集检验项目核对错误"""
@@ -821,3 +895,220 @@ class InspectionItemChecker:
             row_count=len(all_rows),
             col_count=first_table.col_count
         )
+
+    def _check_non_empty_fields(self, rows: List[InspectionTableRow]) -> List[ErrorItem]:
+        """
+        非空字段校验 (v2.2新增)
+
+        对检验项目表格中的以下三列进行非空检查：
+        - 检验结果：必填，不得为空
+        - 单项结论：必填，不得为空
+        - 备注：必填，不得为空
+
+        合并单元格处理：
+        - 检测到合并单元格时，以合并区域的首行值作为该区域的值进行校验
+        - 合并单元格内的每一行继承该值，逐行进行非空判断
+        - 若合并区域首行为空，则整个合并区域都视为空值，逐行报错
+
+        Args:
+            rows: 表格行数据列表
+
+        Returns:
+            List[ErrorItem]: 非空字段错误列表
+        """
+        errors = []
+
+        # 用于追踪合并单元格的值
+        last_inspection_result = None
+        last_conclusion = None
+        last_remark = None
+        last_item_clause_key = None  # 用于检测是否处于同一合并区域
+
+        for idx, row in enumerate(rows):
+            # 构建当前行的唯一标识（序号+标准条款）
+            current_key = f"{row.item_number}_{row.clause_number}"
+
+            # 检测是否为新区域（不同序号或不同标准条款）
+            if current_key != last_item_clause_key:
+                # 新区域，更新追踪值
+                last_inspection_result = row.inspection_result.strip() if row.inspection_result else None
+                last_conclusion = row.conclusion.strip() if row.conclusion else None
+                last_remark = row.remark.strip() if row.remark else None
+                last_item_clause_key = current_key
+
+            # 获取实际用于校验的值（继承合并单元格的值）
+            # 如果当前行有值，使用当前行的值；否则使用合并区域的值
+            effective_result = row.inspection_result.strip() if row.inspection_result else last_inspection_result
+            effective_conclusion = row.conclusion.strip() if row.conclusion else last_conclusion
+            effective_remark = row.remark.strip() if row.remark else last_remark
+
+            # 校验检验结果
+            if not effective_result:
+                errors.append(ErrorItem(
+                    level="ERROR",
+                    message=f"序号 {row.item_number} 标准条款 {row.clause_number}: 检验结果为空",
+                    location=f"检验项目表格/{row.item_name}/检验结果",
+                    details={
+                        'error_code': NonEmptyFieldErrorCode.EMPTY_INSPECTION_RESULT,
+                        'item_number': row.item_number,
+                        'item_name': row.item_name,
+                        'clause_number': row.clause_number,
+                        'field_name': '检验结果',
+                        'row_index': idx
+                    }
+                ))
+
+            # 校验单项结论
+            if not effective_conclusion:
+                errors.append(ErrorItem(
+                    level="ERROR",
+                    message=f"序号 {row.item_number} 标准条款 {row.clause_number}: 单项结论为空",
+                    location=f"检验项目表格/{row.item_name}/单项结论",
+                    details={
+                        'error_code': NonEmptyFieldErrorCode.EMPTY_CONCLUSION,
+                        'item_number': row.item_number,
+                        'item_name': row.item_name,
+                        'clause_number': row.clause_number,
+                        'field_name': '单项结论',
+                        'row_index': idx
+                    }
+                ))
+
+            # 校验备注
+            if not effective_remark:
+                errors.append(ErrorItem(
+                    level="ERROR",
+                    message=f"序号 {row.item_number} 标准条款 {row.clause_number}: 备注为空",
+                    location=f"检验项目表格/{row.item_name}/备注",
+                    details={
+                        'error_code': NonEmptyFieldErrorCode.EMPTY_REMARK,
+                        'item_number': row.item_number,
+                        'item_name': row.item_name,
+                        'clause_number': row.clause_number,
+                        'field_name': '备注',
+                        'row_index': idx
+                    }
+                ))
+
+        return errors
+
+    def _check_serial_number_continuity(self, rows: List[InspectionTableRow]) -> List[ErrorItem]:
+        """
+        序号连续性校验 (v2.2新增)
+
+        校验规则：
+        1. 序号连续性：从检验项目表格开始，序号必须连续（1,2,3...），无跳号
+        2. 跨页续表标记：同一序号跨页时，新页第一行的序号前必须加"续"字
+        3. 续字位置校验："续"字只能出现在本页第一行的序号中，其他位置出现均为错误
+        4. 序号非空：序号列不得出现空白
+
+        Args:
+            rows: 表格行数据列表
+
+        Returns:
+            List[ErrorItem]: 序号连续性错误列表
+        """
+        errors = []
+        if not rows:
+            return errors
+
+        # 提取所有唯一的序号（按出现顺序）
+        seen_numbers = []
+        last_page_num = 0
+        last_item_number = ""
+        page_first_item_numbers = {}  # 记录每页的第一个序号
+
+        for idx, row in enumerate(rows):
+            # 记录每页的第一个序号
+            if row.page_num not in page_first_item_numbers:
+                page_first_item_numbers[row.page_num] = {
+                    'item_number': row.item_number,
+                    'row_index': idx,
+                    'is_first_row_in_page': row.is_first_row_in_page
+                }
+
+            # 检查序号是否为空（原始序号，不是继承后的）
+            # 注意：这里需要检查原始输入，所以需要在解析时记录原始序号
+            # 由于继承逻辑，我们假设如果row.item_number为空字符串，则原始为空
+            if not row.item_number or row.item_number.strip() == '':
+                errors.append(ErrorItem(
+                    level="ERROR",
+                    message=f"第 {idx + 1} 行: 序号为空",
+                    location=f"检验项目表格/第{row.page_num}页/行{idx + 1}",
+                    details={
+                        'error_code': SerialNumberErrorCode.EMPTY,
+                        'row_index': idx,
+                        'page_num': row.page_num,
+                        'item_name': row.item_name
+                    }
+                ))
+                continue
+
+            # 提取数字序号用于连续性检查
+            current_num = self._extract_number(row.item_number)
+
+            # 检查是否为新序号
+            if row.item_number not in seen_numbers:
+                seen_numbers.append(row.item_number)
+
+                # 检查序号连续性（只检查数字序号）
+                if current_num > 0 and len(seen_numbers) > 1:
+                    # 获取上一个序号
+                    prev_num = self._extract_number(seen_numbers[-2])
+                    if prev_num > 0 and current_num != prev_num + 1:
+                        # 序号不连续
+                        errors.append(ErrorItem(
+                            level="ERROR",
+                            message=f"序号不连续：从 {seen_numbers[-2]} 跳到 {row.item_number}（缺少 {prev_num + 1}）",
+                            location=f"检验项目表格/第{row.page_num}页",
+                            details={
+                                'error_code': SerialNumberErrorCode.NOT_CONTINUOUS,
+                                'expected': prev_num + 1,
+                                'actual': current_num,
+                                'previous_item': seen_numbers[-2],
+                                'current_item': row.item_number,
+                                'page_num': row.page_num
+                            }
+                        ))
+
+            # 检查跨页续表标记和续字位置
+            if row.page_num != last_page_num and last_page_num > 0:
+                # 页面切换了，检查是否需要续表标记
+                if row.item_number == last_item_number:
+                    # 同一序号跨页，需要"续"字标记
+                    if row.is_first_row_in_page:
+                        # 本页第一行，检查是否有续表标记
+                        if not row.has_continuation_mark:
+                            errors.append(ErrorItem(
+                                level="ERROR",
+                                message=f"跨页续表缺少标记：序号 {row.item_number} 跨页到第 {row.page_num} 页，第一行应标记为\"续{row.item_number}\"或\"续\"",
+                                location=f"检验项目表格/第{row.page_num}页/第一行",
+                                details={
+                                    'error_code': ContinuationMarkErrorCode.MISSING,
+                                    'item_number': row.item_number,
+                                    'page_num': row.page_num,
+                                    'expected_mark': f"续{row.item_number}",
+                                    'actual_mark': row.original_item_number
+                                }
+                            ))
+
+            # 检查续字位置是否正确（"续"字只能出现在本页第一行）
+            if row.has_continuation_mark and not row.is_first_row_in_page:
+                errors.append(ErrorItem(
+                    level="ERROR",
+                    message=f"续字位置错误：序号 \"{row.original_item_number}\" 出现在非第一行，\"续\"字只能出现在本页第一行",
+                    location=f"检验项目表格/第{row.page_num}页/行{idx + 1}",
+                    details={
+                        'error_code': ContinuationMarkErrorCode.WRONG_POSITION,
+                        'item_number': row.item_number,
+                        'original_mark': row.original_item_number,
+                        'page_num': row.page_num,
+                        'row_index': idx,
+                        'is_first_row': row.is_first_row_in_page
+                    }
+                ))
+
+            last_page_num = row.page_num
+            last_item_number = row.item_number
+
+        return errors

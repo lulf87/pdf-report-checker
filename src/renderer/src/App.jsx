@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Layout, message } from 'antd'
+import { motion, AnimatePresence } from 'framer-motion'
 import FileUpload from './components/FileUpload'
-import CheckResult from './components/CheckResult'
+import CheckResult from './components/check-result'
 import './App.css'
 
 const { Header, Content, Footer } = Layout
@@ -67,53 +68,79 @@ function App() {
     setCheckResult(null)
   }
 
-  const getStatusText = () => {
+  const getStatusConfig = () => {
     switch (backendStatus) {
       case 'connected':
-        return { text: '后端已连接', color: '#52c41a' }
+        return { text: '后端已连接', className: 'connected' }
       case 'disconnected':
-        return { text: '后端未连接', color: '#ff4d4f' }
+        return { text: '后端未连接', className: 'disconnected' }
       case 'error':
-        return { text: '后端异常', color: '#faad14' }
+        return { text: '后端异常', className: 'error' }
       default:
-        return { text: '检查中...', color: '#999' }
+        return { text: '检查中...', className: 'checking' }
     }
   }
 
-  const status = getStatusText()
+  const statusConfig = getStatusConfig()
 
   return (
     <Layout className="app-layout">
       <Header className="app-header">
         <div className="header-content">
-          <h1>报告审核工具</h1>
-          <div className="status-indicator" style={{ color: status.color }}>
-            {status.text}
-          </div>
+          <motion.h1
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            报告审核工具
+          </motion.h1>
+          <motion.div
+            className={`status-indicator ${statusConfig.className}`}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <span>{statusConfig.text}</span>
+          </motion.div>
         </div>
       </Header>
 
       <Content className="app-content">
-        <div className="content-wrapper">
-          {!currentFile ? (
-            <FileUpload onUpload={handleFileUpload} apiBaseUrl={API_BASE_URL} />
-          ) : (
-            <CheckResult
-              fileInfo={currentFile}
-              result={checkResult}
-              loading={loading}
-              onCheck={() => handleCheck(currentFile.file_id)}
-              onReset={handleReset}
-              llmEnabled={llmEnabled}
-              onLlmToggle={setLlmEnabled}
-              apiBaseUrl={API_BASE_URL}
-            />
-          )}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentFile ? 'result' : 'upload'}
+            className="content-wrapper"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+          >
+            {!currentFile ? (
+              <FileUpload onUpload={handleFileUpload} apiBaseUrl={API_BASE_URL} />
+            ) : (
+              <CheckResult
+                fileInfo={currentFile}
+                result={checkResult}
+                loading={loading}
+                onCheck={() => handleCheck(currentFile.file_id)}
+                onReset={handleReset}
+                llmEnabled={llmEnabled}
+                onLlmToggle={setLlmEnabled}
+                apiBaseUrl={API_BASE_URL}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </Content>
 
       <Footer className="app-footer">
-        报告审核工具 v1.0.0
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+        >
+          报告审核工具 v1.0.0
+        </motion.span>
       </Footer>
     </Layout>
   )

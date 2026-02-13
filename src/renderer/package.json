@@ -9,12 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "antd": "^5.12.8",
+    "autoprefixer": "^10.4.24",
+    "axios": "^1.6.2",
+    "classnames": "^2.5.1",
+    "framer-motion": "^12.34.0",
+    "postcss": "^8.5.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.1",
-    "axios": "^1.6.2",
-    "antd": "^5.12.8",
-    "@ant-design/icons": "^5.2.6"
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

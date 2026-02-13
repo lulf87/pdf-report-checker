@@ -37,6 +37,10 @@ uploads/*
 !uploads/.gitkeep
 temp/*
 !temp/.gitkeep
+python_backend/uploads/*
+!python_backend/uploads/.gitkeep
+python_backend/temp/*
+!python_backend/temp/.gitkeep
 
 # Logs
 *.log

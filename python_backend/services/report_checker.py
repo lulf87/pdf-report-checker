@@ -16,6 +16,8 @@ from models.schemas import (
 from services.pdf_parser import PDFParser
 from services.ocr_service import OCRService
 from services.inspection_item_checker import InspectionItemChecker
+from services.page_number_checker import PageNumberChecker
+from services.third_page_checker import third_page_checker
 from utils.comparison_logger import ComparisonLogger
 from config import is_llm_comparison_enabled, settings as app_settings
 
@@ -47,6 +49,7 @@ class ReportChecker:
         self.pdf_parser = PDFParser()
         self.ocr_service = OCRService()
         self.inspection_checker = InspectionItemChecker()
+        self.page_number_checker = PageNumberChecker()
 
     async def check(self, pdf_path: str, file_id: str, enable_detailed: bool = False) -> CheckResult:
         """
@@ -84,22 +87,38 @@ class ReportChecker:
         # 7. 解析照片页内容
         photo_analysis = self._analyze_photo_pages(pdf_path, photo_pages)
 
-        # 8. 核对部件
+        # 8. 第三页扩展字段核对（新增 v2.2）
+        third_page_extended_checks = self._check_third_page_extended_fields(
+            pdf_path, third_page_num, third_page_fields, photo_analysis
+        )
+
+        # 9. 核对部件
         component_checks = self._check_components(
             sample_table, photo_analysis, enable_detailed=enable_detailed
         )
 
-        # 9. 检验项目表格核对（新增 v2.1）
+        # 10. 检验项目表格核对（新增 v2.1）
         inspection_item_check = self.inspection_checker.check_inspection_items(
             pdf_path, pages
         )
 
-        # 10. 收集错误和警告
-        errors, warnings, info = self._collect_issues(
-            home_third_comparison, component_checks, photo_analysis, inspection_item_check
+        # 11. 页码连续性校验（新增 v2.2）
+        page_number_infos, page_number_errors = self.page_number_checker.check_page_numbers(
+            pdf_path, pages
         )
 
-        # 10. 保存结果
+        # 构建页码校验结果
+        page_number_check = self._build_page_number_check_result(
+            page_number_infos, page_number_errors
+        )
+
+        # 12. 收集错误和警告
+        errors, warnings, info = self._collect_issues(
+            home_third_comparison, component_checks, photo_analysis,
+            inspection_item_check, page_number_errors, third_page_extended_checks
+        )
+
+        # 13. 保存结果
         result = CheckResult(
             success=True,
             file_id=file_id,
@@ -113,6 +132,8 @@ class ReportChecker:
             component_checks=component_checks,
             photo_page_check=photo_analysis,
             inspection_item_check=inspection_item_check,
+            third_page_extended_checks=third_page_extended_checks,
+            page_number_check=page_number_check,
             errors=errors,
             warnings=warnings,
             info=info,
@@ -1145,10 +1166,43 @@ class ReportChecker:
 
         return comparisons
 
+    def _check_third_page_extended_fields(
+        self,
+        pdf_path: str,
+        third_page_num: Optional[int],
+        third_page_fields: Dict[str, str],
+        photo_analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        核对第三页扩展字段（v2.2新增）
+
+        核对型号规格、生产日期、产品编号/批号三个字段与中文标签的一致性
+        """
+        if not third_page_num:
+            return {'comparisons': [], 'errors': []}
+
+        # 提取样品名称（从第三页字段或首页字段）
+        sample_name = third_page_fields.get('样品名称', '')
+
+        # 获取照片页标签
+        labels = photo_analysis.get('labels', [])
+
+        # 调用第三页核对器
+        comparisons, errors = third_page_checker.check_third_page_fields(
+            third_page_fields, sample_name, labels
+        )
+
+        return {
+            'comparisons': comparisons,
+            'errors': errors
+        }
+
     def _collect_issues(self, home_third_comparison: List[FieldComparison],
                        component_checks: List[ComponentCheck],
                        photo_analysis: Dict[str, Any],
-                       inspection_item_check: Optional[Any] = None) -> Tuple[List[ErrorItem], List[ErrorItem], List[ErrorItem]]:
+                       inspection_item_check: Optional[Any] = None,
+                       page_number_errors: Optional[List[ErrorItem]] = None,
+                       third_page_extended_checks: Optional[Dict[str, Any]] = None) -> Tuple[List[ErrorItem], List[ErrorItem], List[ErrorItem]]:
         """收集所有问题"""
         errors = []
         warnings = []
@@ -1167,6 +1221,28 @@ class ReportChecker:
                         'third_value': comp.ocr_value
                     }
                 ))
+
+        # 第三页扩展字段核对问题（v2.2新增）
+        if third_page_extended_checks:
+            # 添加扩展字段比对信息到info
+            if third_page_extended_checks.get('comparisons'):
+                for comp in third_page_extended_checks['comparisons']:
+                    if comp.is_match:
+                        info.append(ErrorItem(
+                            level="INFO",
+                            message=f"第三页扩展字段'{comp.field_name}'核对通过",
+                            page_num=comp.page_num,
+                            location=f"第三页表格/{comp.field_name}",
+                            details={
+                                'table_value': comp.table_value,
+                                'label_value': comp.ocr_value
+                            }
+                        ))
+
+            # 添加扩展字段错误
+            if third_page_extended_checks.get('errors'):
+                for error in third_page_extended_checks['errors']:
+                    errors.append(error)
 
         # 部件问题
         for check in component_checks:
@@ -1217,7 +1293,89 @@ class ReportChecker:
                 for error in inspection_item_check.errors:
                     errors.append(error)
 
+        # 页码连续性错误（新增 v2.2）
+        if page_number_errors:
+            for error in page_number_errors:
+                errors.append(error)
+
         return errors, warnings, info
+
+    def _build_page_number_check_result(
+        self,
+        page_number_infos: List[Any],
+        page_number_errors: List[ErrorItem]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        构建页码校验结果
+
+        Args:
+            page_number_infos: 页码信息列表
+            page_number_errors: 页码错误列表
+
+        Returns:
+            页码校验结果字典，如果没有页码信息则返回None
+        """
+        if not page_number_infos:
+            return None
+
+        # 构建页码列表
+        page_numbers = []
+        for info in page_number_infos:
+            # 查找该页的错误
+            page_errors = [
+                error for error in page_number_errors
+                if error.page_num == info.page_num
+            ]
+
+            page_numbers.append({
+                'page_num': info.page_num,
+                'total_pages': info.total_pages,
+                'current_page': info.current_page,
+                'raw_text': info.raw_text,
+                'errors': [
+                    {
+                        'type': error.details.get('error_code', 'UNKNOWN').replace('PAGE_NUMBER_ERROR_', ''),
+                        'message': error.message
+                    }
+                    for error in page_errors
+                ] if page_errors else []
+            })
+
+        # 构建连续性错误列表（去重，不包含具体页码错误）
+        continuity_errors = []
+        for error in page_number_errors:
+            error_code = error.details.get('error_code', '')
+            if error_code == 'PAGE_NUMBER_ERROR_001':
+                error_type = 'skip' if '跳号' in error.message else 'duplicate'
+            elif error_code == 'PAGE_NUMBER_ERROR_002':
+                error_type = 'last_page_mismatch'
+            elif error_code == 'PAGE_NUMBER_ERROR_003':
+                error_type = 'mismatch_total'
+            else:
+                error_type = 'unknown'
+
+            continuity_errors.append({
+                'type': error_type,
+                'message': error.message,
+                'page_num': error.page_num
+            })
+
+        # 构建总页数信息
+        total_pages_info = None
+        if page_number_infos:
+            first_info = page_number_infos[0]
+            actual_count = len(page_number_infos)
+            total_pages_info = {
+                'declared_total': first_info.total_pages,
+                'actual_count': actual_count,
+                'is_match': first_info.total_pages == actual_count
+            }
+
+        return {
+            'page_numbers': page_numbers,
+            'continuity_errors': continuity_errors,
+            'total_pages_info': total_pages_info
+        }
 
     def _save_result(self, file_id: str, result: CheckResult):
         """保存核对结果"""

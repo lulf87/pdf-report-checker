@@ -50,6 +50,13 @@
             "description": "用户体验的守护者，负责 Electron 主进程管理、React UI 实现、组件开发及前端性能优化。"
         },
         {
+            "id": "ui-designer",
+            "name": "UI/UX 设计师",
+            "role": "UI Designer",
+            "instructions_file": "agent/ui-designer.md",
+            "description": "视觉美学的缔造者，负责定义 Design Tokens、设计组件样式、微交互动画及 Tailwind 配置。"
+        },
+        {
             "id": "qa-engineer",
             "name": "验证/测试工程师",
             "role": "QA Engineer",
@@ -66,6 +73,8 @@
                     "tech-lead",
                     "prompt-engineer",
                     "backend-dev",
+                    "ui-designer",
+                    "frontend-dev",
                     "qa-engineer"
                 ]
             },
@@ -81,8 +90,18 @@
                 "scenario": "全栈功能迭代",
                 "flow": [
                     "tech-lead",
+                    "ui-designer",
                     "frontend-dev",
                     "backend-dev",
+                    "qa-engineer"
+                ]
+            },
+            {
+                "scenario": "UI/UX 设计优化",
+                "flow": [
+                    "tech-lead",
+                    "ui-designer",
+                    "frontend-dev",
                     "qa-engineer"
                 ]
             },
@@ -91,6 +110,7 @@
                 "flow": [
                     "tech-lead",
                     "backend-dev",
+                    "frontend-dev",
                     "qa-engineer"
                 ]
             },
@@ -117,5 +137,49 @@
             "macOS",
             "Windows"
         ]
+    },
+    "execution_policy": {
+        "mode": "strict_team",
+        "lead_responsibilities": [
+            "team_creation",
+            "task_assignment",
+            "progress_coordination",
+            "result_integration"
+        ],
+        "lead_restrictions": [
+            "NO_DIRECT_FILE_EDITING",
+            "NO_DIRECT_CODE_IMPLEMENTATION",
+            "NO_DIRECT_TEST_EXECUTION",
+            "NO_DIRECT_DEBUGGING"
+        ],
+        "subagent_execution": {
+            "enabled": true,
+            "assignment_required": true,
+            "parallel_capable": true
+        },
+        "workflow_rules": {
+            "tech_lead_must_delegate": true,
+            "implementation_only_by_subagents": true,
+            "qa_only_by_qa_engineer": true,
+            "all_coding_by_backend_frontend_devs": true,
+            "ui_design_by_ui_designer": true,
+            "design_tokens_by_ui_designer": true
+        }
+    },
+    "activation_triggers": {
+        "keywords": [
+            "用团队",
+            "使用团队",
+            "团队模式",
+            "召唤团队",
+            "分配给",
+            "让backend-dev",
+            "让frontend-dev",
+            "让ui-designer",
+            "让qa-engineer",
+            "让prompt-engineer",
+            "让researcher"
+        ],
+        "auto_strict_mode": true
     }
 }

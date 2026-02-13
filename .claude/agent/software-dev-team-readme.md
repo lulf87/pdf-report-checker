@@ -7,6 +7,7 @@
 | 角色 | 文件名 | 核心职责 |
 |------|--------|----------|
 | 项目负责人/架构师 | `team-lead.md` | 架构设计、技术决策、进度把控 |
+| UI/UX 设计师 | `ui-designer.md` | 视觉系统、组件美学、交互动效 |
 | 技术研究员 | `researcher.md` | 技术选型调研、POC 验证、方案对比 |
 | Prompt 工程师 | `prompt-engineer.md` | Prompt 设计、模板管理、VLM 调优 |
 | 前端开发工程师 | `frontend-dev.md` | UI实现、组件开发、用户体验 |
@@ -53,6 +54,20 @@ QA (同步测试设计)
 集成测试 ← 代码审查
    ↓
 交付验收
+```
+
+### UI/UX 设计优化流程
+
+```
+Tech Lead/Product 提出设计需求
+   ↓
+UI Designer 设计视觉方案 (Tokens/Mockups)
+   ↓
+Frontend 对接实现 (Tailwind/React)
+   ↓
+UI Designer 视觉走查 (Design Review)
+   ↓
+QA 功能验证
 ```
 
 ### 技术调研专项流程
@@ -123,6 +138,7 @@ Prompt Engineer 基于 Bad Case 持续优化
 每个角色都按照行业顶尖水平设计：
 
 - **Tech Lead**: Martin Fowler 级别的架构思维
+- **UI Designer**: Adam Wathan (Tailwind) / Rauno Freiberg (Vercel) 级别的视觉设计
 - **Researcher**: Jeremy Howard 级别的技术选型与实验设计
 - **Prompt Engineer**: Riley Goodside 级别的 Prompt 工程专家
 - **Frontend**: Dan Abramov 级别的 React 专家
