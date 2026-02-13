@@ -101,7 +101,7 @@ function DataTable({
           <thead className={styles.dataTable__thead}>
             <tr>
               {selectable && (
-                <th className={classNames(styles.dataTable__th, styles.dataTable__th--checkbox)}>
+                <th className={classNames(styles.dataTable__th, styles['dataTable__th--checkbox'])}>
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -132,7 +132,7 @@ function DataTable({
                             <ChevronDown size={14} />
                           )
                         ) : (
-                          <ChevronUp size={14} className={styles.dataTable__sortIcon--inactive} />
+                          <ChevronUp size={14} className={styles['dataTable__sortIcon--inactive']} />
                         )}
                       </span>
                     )}
@@ -167,7 +167,7 @@ function DataTable({
                 >
                   {selectable && (
                     <td
-                      className={classNames(styles.dataTable__td, styles.dataTable__td--checkbox)}
+                      className={classNames(styles.dataTable__td, styles['dataTable__td--checkbox'])}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
