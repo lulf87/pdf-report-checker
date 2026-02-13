@@ -170,7 +170,7 @@
   border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: var(--radius-md);
   color: var(--color-neon-blue-light);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -197,7 +197,7 @@
   border: 1px solid rgba(59, 130, 246, 0.4);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
   transition: all var(--transition-fast);
   box-shadow: var(--glow-blue);
@@ -222,7 +222,7 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--space-sm) var(--space-md);
   outline: none;
   transition: all var(--transition-fast);
 }
@@ -246,7 +246,7 @@
     rgba(59, 130, 246, 0.3) 50%,
     transparent 100%
   );
-  margin: var(--spacing-md) 0;
+  margin: var(--space-md) 0;
 }
 
 .glass-divider-vertical {

@@ -1,0 +1,255 @@
+/* ============================================
+   CheckItemCard - 核对项卡片
+   ============================================ */
+
+.checkItemCard {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.checkItemCard:hover {
+  border-color: var(--border-strong);
+}
+
+/* ---------- 状态变体 ---------- */
+.checkItemCard--success {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.checkItemCard--success:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: var(--glow-success);
+}
+
+.checkItemCard--error {
+  border-color: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.checkItemCard--error:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: var(--glow-error);
+}
+
+.checkItemCard--warning {
+  border-color: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.checkItemCard--warning:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: var(--glow-warning);
+}
+
+.checkItemCard--pending {
+  border-color: rgba(107, 114, 128, 0.2);
+}
+
+.checkItemCard--pending:hover {
+  border-color: rgba(107, 114, 128, 0.4);
+}
+
+/* ---------- 可点击 ---------- */
+.checkItemCard--clickable .checkItemCard__header {
+  cursor: pointer;
+}
+
+.checkItemCard--clickable .checkItemCard__header:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.checkItemCard--clickable:focus-visible {
+  outline: 2px solid var(--color-neon-blue);
+  outline-offset: 2px;
+}
+
+/* ---------- 头部 ---------- */
+.checkItemCard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  gap: var(--space-md);
+  transition: background var(--transition-fast);
+}
+
+.checkItemCard__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.checkItemCard__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-neon-blue);
+  flex-shrink: 0;
+}
+
+.checkItemCard--success .checkItemCard__icon {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+}
+
+.checkItemCard--error .checkItemCard__icon {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+}
+
+.checkItemCard--warning .checkItemCard__icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+.checkItemCard--pending .checkItemCard__icon {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-muted);
+}
+
+.checkItemCard__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.checkItemCard__title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkItemCard__description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 元信息 ---------- */
+.checkItemCard__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.checkItemCard__status {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.checkItemCard__status--success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+}
+
+.checkItemCard__status--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error);
+}
+
+.checkItemCard__status--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+}
+
+.checkItemCard__status--pending {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-muted);
+}
+
+.checkItemCard__statusIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.checkItemCard__statusIcon--success {
+  color: var(--color-success);
+}
+
+.checkItemCard__statusIcon--error {
+  color: var(--color-error);
+}
+
+.checkItemCard__statusIcon--warning {
+  color: var(--color-warning);
+}
+
+.checkItemCard__statusIcon--pending {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--text-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.checkItemCard__arrow {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.checkItemCard__arrow--expanded {
+  transform: rotate(90deg);
+}
+
+/* ---------- 展开内容 ---------- */
+.checkItemCard__content {
+  padding: var(--space-md);
+  padding-top: 0;
+  border-top: 1px solid var(--glass-border);
+  animation: slideDown 200ms ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .checkItemCard__statusIcon--pending {
+    animation: none;
+  }
+
+  .checkItemCard__arrow {
+    transition: none;
+  }
+
+  .checkItemCard__content {
+    animation: none;
+  }
+}

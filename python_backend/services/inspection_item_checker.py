@@ -453,9 +453,9 @@ class InspectionItemChecker:
                     'conclusion': row.conclusion
                 }
             else:
-                # 更新结论：使用最后一行的结论（处理同一标准条款跨多行的情况）
-                if row.conclusion:
-                    items_dict[item_num]['clauses'][clause_num]['conclusion'] = row.conclusion
+                # 保留第一行的单项结论（通常是主要结论行）
+                # 不覆盖已有的结论，因为第一行通常是父行，包含正确的单项结论
+                pass
 
             items_dict[item_num]['clauses'][clause_num]['requirements'].append(
                 RequirementCheck(
@@ -537,8 +537,9 @@ class InspectionItemChecker:
         if any(r and '不符合' in r for r in results):
             return '不符合'
 
-        # 优先级2: 判断是否全为 "——"、"/" 或空白（均视为不适用）
-        na_values = {'——', '—', '/', '', None}
+        # 优先级2: 判断是否全为 "/"、"——" 或空白（"/"、"——"视为不适用）
+        # "—"、"-" 被视为非法值，不在此处理
+        na_values = {'/', '——', '', None}
         all_results_na = all(
             r in na_values or r is None or (isinstance(r, str) and not r.strip())
             for r in results
@@ -896,6 +897,45 @@ class InspectionItemChecker:
             col_count=first_table.col_count
         )
 
+    def _is_field_filled(self, value: Optional[str], allow_na: bool = True) -> bool:
+        """
+        判断字段是否已填写（非空）
+
+        区分"真正的空值"和"不适用标记":
+        - 真正的空值: None, "", "  " → 返回 False（应该报错）
+        - 不适用标记: "/", "——", "—", "-" → 返回 True（合法值，不报错）
+        - 有效内容: "符合要求", "0.01"等 → 返回 True
+
+        Args:
+            value: 字段值
+            allow_na: 是否允许"/"、"——"等表示"不适用"的值为有效值
+
+        Returns:
+            bool: True表示字段已填写（或有合法的不适用标记），False表示为空
+        """
+        if value is None:
+            return False
+
+        if not isinstance(value, str):
+            return False
+
+        stripped = value.strip()
+        if not stripped:
+            # 空字符串或只有空白字符
+            return False
+
+        if allow_na:
+            # "/"、"——" 表示"不适用"，是合法的有效值
+            # 其他非空内容（如"符合要求"、"0.01"）也是合法的
+            # "—"、"-" 被视为非法值
+            if stripped in {'—', '-'}:
+                return False
+            # "/"、"——" 或任何其他非空内容都视为有效
+            return True
+
+        # allow_na=False时，所有非空内容都视为有效
+        return True
+
     def _check_non_empty_fields(self, rows: List[InspectionTableRow]) -> List[ErrorItem]:
         """
         非空字段校验 (v2.2新增)
@@ -918,32 +958,57 @@ class InspectionItemChecker:
         """
         errors = []
 
-        # 用于追踪合并单元格的值
-        last_inspection_result = None
-        last_conclusion = None
-        last_remark = None
+        # 预计算：检测哪些key（序号+标准条款）跨了多页
+        key_page_count = {}  # key -> set of page_nums
+        for row in rows:
+            key = f"{row.item_number}_{row.clause_number}"
+            if key not in key_page_count:
+                key_page_count[key] = set()
+            key_page_count[key].add(row.page_num)
+
         last_item_clause_key = None  # 用于检测是否处于同一合并区域
 
         for idx, row in enumerate(rows):
             # 构建当前行的唯一标识（序号+标准条款）
             current_key = f"{row.item_number}_{row.clause_number}"
 
-            # 检测是否为新区域（不同序号或不同标准条款）
-            if current_key != last_item_clause_key:
-                # 新区域，更新追踪值
-                last_inspection_result = row.inspection_result.strip() if row.inspection_result else None
-                last_conclusion = row.conclusion.strip() if row.conclusion else None
-                last_remark = row.remark.strip() if row.remark else None
+            # 检测是否为key的第一行
+            is_first_row_of_key = (current_key != last_item_clause_key)
+            if is_first_row_of_key:
                 last_item_clause_key = current_key
 
-            # 获取实际用于校验的值（继承合并单元格的值）
-            # 如果当前行有值，使用当前行的值；否则使用合并区域的值
-            effective_result = row.inspection_result.strip() if row.inspection_result else last_inspection_result
-            effective_conclusion = row.conclusion.strip() if row.conclusion else last_conclusion
-            effective_remark = row.remark.strip() if row.remark else last_remark
+            # 每一行的检验结果独立检查（不继承）
+            # 只有真正的空值（None/""）才报错，"——"和"/"是合法的
+            effective_result = row.inspection_result.strip() if row.inspection_result else None
+            effective_conclusion = row.conclusion.strip() if row.conclusion else None
+            effective_remark = row.remark.strip() if row.remark else None
+
+            # 检测是否为"标题行"（多级表格中的父行，本身无检验结果，子行才有）
+            # 特征：
+            # 1. 当前行是key的第一行（不是后续行）
+            # 2. 当前行检验结果为空
+            # 3. 后面有相同key的行有检验结果
+            is_title_row = False
+
+            if is_first_row_of_key and (not row.inspection_result or not row.inspection_result.strip()):
+                # 检查后面的行是否有相同的序号+标准条款且有检验结果
+                for next_row in rows[idx + 1:]:
+                    next_key = f"{next_row.item_number}_{next_row.clause_number}"
+                    if next_key == current_key and next_row.inspection_result and next_row.inspection_result.strip():
+                        is_title_row = True
+                        break
+                    elif next_key != current_key:
+                        # 不同序号，停止搜索
+                        break
+
+            # 如果是标题行，跳过非空校验（因为它本身没有检验结果，子行才有）
+            if is_title_row:
+                continue
 
             # 校验检验结果
-            if not effective_result:
+            # 注意："/"、"——"、"—"、"-" 表示不适用，是合法值，不应视为空
+            # 真正的空值（None/""）会报错
+            if not self._is_field_filled(effective_result):
                 errors.append(ErrorItem(
                     level="ERROR",
                     message=f"序号 {row.item_number} 标准条款 {row.clause_number}: 检验结果为空",
@@ -959,7 +1024,8 @@ class InspectionItemChecker:
                 ))
 
             # 校验单项结论
-            if not effective_conclusion:
+            # 注意："/" 表示不适用，是合法值，不应视为空
+            if not self._is_field_filled(effective_conclusion, allow_na=True):
                 errors.append(ErrorItem(
                     level="ERROR",
                     message=f"序号 {row.item_number} 标准条款 {row.clause_number}: 单项结论为空",
@@ -975,7 +1041,8 @@ class InspectionItemChecker:
                 ))
 
             # 校验备注
-            if not effective_remark:
+            # 注意："/"、"——"、"—" 表示不适用，是合法值，不应视为空
+            if not self._is_field_filled(effective_remark, allow_na=True):
                 errors.append(ErrorItem(
                     level="ERROR",
                     message=f"序号 {row.item_number} 标准条款 {row.clause_number}: 备注为空",

@@ -1,0 +1,146 @@
+/**
+ * FileCard - 文件信息卡片组件样式 (重构版)
+ * 使用新的设计系统CSS变量
+ */
+
+.fileCard {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.fileCard:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.fileCardContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  gap: var(--space-lg);
+}
+
+/* ========== 文件信息 ========== */
+.fileInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: 1;
+}
+
+.fileIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-primary-light);
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.fileDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.fileName {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.metaIcon {
+  color: var(--text-muted);
+}
+
+.metaLabel {
+  color: var(--text-tertiary);
+}
+
+.metaValue {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ========== 导出按钮 ========== */
+.exportBtn {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.exportBtn:hover {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* ========== 装饰性扫描线 ========== */
+.scanline {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-primary-light), transparent);
+  animation: scanline 3s linear infinite;
+  opacity: 0.5;
+}
+
+@keyframes scanline {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+  .fileCardContent {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-md);
+  }
+
+  .fileIcon {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .fileName {
+    font-size: var(--text-base);
+  }
+
+  .exportBtn {
+    width: 100%;
+  }
+}

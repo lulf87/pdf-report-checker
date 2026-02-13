@@ -14,7 +14,7 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  padding: 0 var(--spacing-lg);
+  padding: 0 var(--space-lg);
   height: 64px;
   background: var(--glass-bg-strong) !important;
   backdrop-filter: blur(16px);
@@ -58,10 +58,10 @@
 .status-indicator {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--space-sm);
   font-size: var(--text-sm);
   font-weight: 500;
-  padding: var(--spacing-xs) var(--spacing-md);
+  padding: var(--space-xs) var(--space-md);
   border-radius: var(--radius-full);
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -143,7 +143,7 @@
 .app-content {
   position: relative;
   z-index: var(--z-base);
-  padding: var(--spacing-lg);
+  padding: var(--space-lg);
   min-height: calc(100vh - 64px - 48px);
 }
 
@@ -156,7 +156,7 @@
   border-radius: var(--radius-2xl);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-xl), var(--glow-blue);
-  padding: var(--spacing-xl);
+  padding: var(--space-xl);
   min-height: 600px;
 }
 
@@ -175,14 +175,14 @@
   position: relative;
   z-index: var(--z-base);
   text-align: center;
-  padding: var(--spacing-md);
+  padding: var(--space-md);
   background: transparent !important;
 }
 
 .footer-text {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--space-sm);
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
@@ -231,7 +231,7 @@
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .app-header {
-    padding: 0 var(--spacing-md);
+    padding: 0 var(--space-md);
     height: 56px;
   }
 
@@ -240,16 +240,16 @@
   }
 
   .app-content {
-    padding: var(--spacing-md);
+    padding: var(--space-md);
   }
 
   .content-wrapper {
-    padding: var(--spacing-md);
+    padding: var(--space-md);
     border-radius: var(--radius-xl);
   }
 
   .status-indicator {
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: var(--space-xs) var(--space-sm);
     font-size: var(--text-xs);
   }
 
@@ -264,7 +264,7 @@
   }
 
   .content-wrapper {
-    padding: var(--spacing-md);
+    padding: var(--space-md);
     border-radius: var(--radius-lg);
   }
 }

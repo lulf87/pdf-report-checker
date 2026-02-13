@@ -1,9 +1,9 @@
 /**
- * InspectionTable - 检验项目表格
+ * InspectionTable - 检验项目表格 (高性能优化版)
  * 科技感数据大屏设计系统
  */
 
-import React, { useState } from 'react'
+import React, { useState, useMemo, useCallback, memo } from 'react'
 import { Table, Tag, Input, Select, Tooltip, Badge, Alert, List } from 'antd'
 import {
   CheckCircleOutlined,
@@ -19,13 +19,135 @@ const { Option } = Select
 const { Search } = Input
 
 /**
+ * 统计卡片组件
+ */
+const StatCard = memo(function StatCard({ label, value, color }) {
+  return (
+    <div className={`${styles.statCard} ${styles[color]}`}>
+      <div className={styles.statValue}>{value}</div>
+      <div className={styles.statLabel}>{label}</div>
+    </div>
+  )
+})
+
+/**
+ * 错误提示组件
+ */
+const ErrorAlert = memo(function ErrorAlert({ errors }) {
+  if (errors.length === 0) return null
+
+  return (
+    <Alert
+      message="非空字段校验错误"
+      description={
+        <List
+          size="small"
+          dataSource={errors}
+          renderItem={(error) => (
+            <List.Item style={{ color: 'var(--color-error-light, #f87171)' }}>
+              {error.message}
+            </List.Item>
+          )}
+        />
+      }
+      type="error"
+      showIcon
+      icon={<ExclamationCircleOutlined />}
+      className={styles.errorAlert}
+    />
+  )
+})
+
+/**
+ * 展开行内容组件
+ */
+const ExpandedRowContent = memo(function ExpandedRowContent({ record }) {
+  const clauses = record.clauses || []
+
+  const columns = useMemo(() => [
+    {
+      title: '标准条款',
+      dataIndex: 'clause_number',
+      key: 'clause_number',
+      width: 120,
+    },
+    {
+      title: '标准要求',
+      key: 'requirements',
+      render: (_, clause) => (
+        <div className={styles.requirementsList}>
+          {(clause.requirements || []).map((req, idx) => (
+            <div key={idx} className={styles.requirementItem}>
+              <div className={styles.requirementText}>{req.requirement_text}</div>
+              <div className={styles.requirementMeta}>
+                <span>结果: {req.inspection_result || '-'}</span>
+                {req.remark && <span>备注: {req.remark}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      title: '单项结论',
+      key: 'conclusion',
+      width: 200,
+      render: (_, clause) => (
+        <div className={styles.conclusionCell}>
+          <div className={styles.conclusionRow}>
+            <span className={styles.conclusionLabel}>实际:</span>
+            <Tag className={clause.is_conclusion_correct ? styles.success : styles.error}>
+              {clause.conclusion || '/'}
+            </Tag>
+          </div>
+          {!clause.is_conclusion_correct && clause.expected_conclusion && (
+            <div className={styles.conclusionRow}>
+              <span className={styles.conclusionLabel}>期望:</span>
+              <Tag className={styles.info}>{clause.expected_conclusion}</Tag>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: '状态',
+      key: 'status',
+      width: 80,
+      render: (_, clause) => (
+        clause.is_conclusion_correct ? (
+          <CheckCircleOutlined className={styles.statusIconCorrect} />
+        ) : (
+          <Tooltip title="结论错误">
+            <CloseCircleOutlined className={styles.statusIconError} />
+          </Tooltip>
+        )
+      ),
+    },
+  ], [])
+
+  return (
+    <div className={styles.expandedContent}>
+      <Table
+        columns={columns}
+        dataSource={clauses}
+        rowKey="clause_number"
+        pagination={false}
+        size="small"
+        rowClassName={(clause) => !clause.is_conclusion_correct ? styles.rowError : ''}
+      />
+    </div>
+  )
+})
+
+/**
  * 检验项目表格组件
  * @param {Object} props
  * @param {Object} props.data - inspection_item_check 数据
  */
-export default function InspectionTable({ data }) {
+function InspectionTable({ data }) {
   const [filter, setFilter] = useState('all')
   const [searchText, setSearchText] = useState('')
+  const [expandedRowKeys, setExpandedRowKeys] = useState([])
 
   // 检查数据是否存在
   if (!data) return null
@@ -47,34 +169,42 @@ export default function InspectionTable({ data }) {
     )
   }
 
-  const errors = data.errors || []
-  const emptyFieldErrors = errors.filter(e =>
-    e.details?.error_code?.startsWith('EMPTY_FIELD_')
-  )
-  const serialNumberErrors = errors.filter(e =>
-    e.details?.error_code?.startsWith('SERIAL_NUMBER_ERROR_') ||
-    e.details?.error_code?.startsWith('CONTINUATION_MARK_ERROR_')
-  )
+  // 使用useMemo缓存错误分类结果
+  const { emptyFieldErrors, serialNumberErrors, totalErrors } = useMemo(() => {
+    const errors = data.errors || []
+    const emptyFieldErrors = errors.filter(e =>
+      e.details?.error_code?.startsWith('EMPTY_FIELD_')
+    )
+    const serialNumberErrors = errors.filter(e =>
+      e.details?.error_code?.startsWith('SERIAL_NUMBER_ERROR_') ||
+      e.details?.error_code?.startsWith('CONTINUATION_MARK_ERROR_')
+    )
+    const totalErrors = (data.incorrect_conclusions || 0) + emptyFieldErrors.length + serialNumberErrors.length
 
-  // 统计数据
-  const stats = [
+    return { emptyFieldErrors, serialNumberErrors, totalErrors }
+  }, [data.errors, data.incorrect_conclusions])
+
+  // 统计数据 - useMemo缓存
+  const stats = useMemo(() => [
     { label: '检验项目', value: data.total_items || 0, color: 'blue' },
     { label: '结论正确', value: data.correct_conclusions || 0, color: 'green' },
     { label: '结论错误', value: data.incorrect_conclusions || 0, color: 'red' },
-  ]
+  ], [data.total_items, data.correct_conclusions, data.incorrect_conclusions])
 
-  // 过滤数据
-  const filteredItems = (data.item_checks || []).filter(item => {
-    const matchesSearch = item.item_name?.toLowerCase().includes(searchText.toLowerCase()) ||
-                         item.item_number?.includes(searchText)
-    const matchesFilter = filter === 'all' ? true :
-                         filter === 'correct' ? item.status === 'pass' :
-                         item.status !== 'pass'
-    return matchesSearch && matchesFilter
-  })
+  // 过滤数据 - useMemo缓存
+  const filteredItems = useMemo(() => {
+    return (data.item_checks || []).filter(item => {
+      const matchesSearch = item.item_name?.toLowerCase().includes(searchText.toLowerCase()) ||
+                           item.item_number?.includes(searchText)
+      const matchesFilter = filter === 'all' ? true :
+                           filter === 'correct' ? item.status === 'pass' :
+                           item.status !== 'pass'
+      return matchesSearch && matchesFilter
+    })
+  }, [data.item_checks, searchText, filter])
 
-  // 表格列定义
-  const columns = [
+  // 表格列定义 - useMemo缓存
+  const columns = useMemo(() => [
     {
       title: '序号',
       dataIndex: 'item_number',
@@ -133,85 +263,27 @@ export default function InspectionTable({ data }) {
         </Tag>
       ),
     },
-  ]
+  ], [])
 
-  // 展开行内容
-  const expandedRowRender = (record) => {
-    const clauses = record.clauses || []
-    return (
-      <div className={styles.expandedContent}>
-        <Table
-          columns={[
-            {
-              title: '标准条款',
-              dataIndex: 'clause_number',
-              key: 'clause_number',
-              width: 120,
-            },
-            {
-              title: '标准要求',
-              key: 'requirements',
-              render: (_, clause) => (
-                <div className={styles.requirementsList}>
-                  {(clause.requirements || []).map((req, idx) => (
-                    <div key={idx} className={styles.requirementItem}>
-                      <div className={styles.requirementText}>{req.requirement_text}</div>
-                      <div className={styles.requirementMeta}>
-                        <span>结果: {req.inspection_result || '-'}</span>
-                        {req.remark && <span>备注: {req.remark}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ),
-            },
-            {
-              title: '单项结论',
-              key: 'conclusion',
-              width: 200,
-              render: (_, clause) => (
-                <div className={styles.conclusionCell}>
-                  <div className={styles.conclusionRow}>
-                    <span className={styles.conclusionLabel}>实际:</span>
-                    <Tag className={clause.is_conclusion_correct ? styles.success : styles.error}>
-                      {clause.conclusion || '/'}
-                    </Tag>
-                  </div>
-                  {!clause.is_conclusion_correct && clause.expected_conclusion && (
-                    <div className={styles.conclusionRow}>
-                      <span className={styles.conclusionLabel}>期望:</span>
-                      <Tag className={styles.info}>{clause.expected_conclusion}</Tag>
-                    </div>
-                  )}
-                </div>
-              ),
-            },
-            {
-              title: '状态',
-              key: 'status',
-              width: 80,
-              render: (_, clause) => (
-                clause.is_conclusion_correct ? (
-                  <CheckCircleOutlined className={styles.statusIconCorrect} />
-                ) : (
-                  <Tooltip title="结论错误">
-                    <CloseCircleOutlined className={styles.statusIconError} />
-                  </Tooltip>
-                )
-              ),
-            },
-          ]}
-          dataSource={clauses}
-          rowKey="clause_number"
-          pagination={false}
-          size="small"
-          rowClassName={(clause) => !clause.is_conclusion_correct ? styles.rowError : ''}
-        />
-      </div>
-    )
-  }
+  // 展开行渲染 - useCallback缓存
+  const expandedRowRender = useCallback((record) => {
+    return <ExpandedRowContent record={record} />
+  }, [])
 
-  const totalErrors = (data.incorrect_conclusions || 0) + emptyFieldErrors.length + serialNumberErrors.length
+  // 处理展开行变化
+  const handleExpandChange = useCallback((expandedKeys) => {
+    setExpandedRowKeys(expandedKeys)
+  }, [])
+
+  // 处理搜索变化 - useCallback缓存
+  const handleSearchChange = useCallback((e) => {
+    setSearchText(e.target.value)
+  }, [])
+
+  // 处理筛选变化 - useCallback缓存
+  const handleFilterChange = useCallback((value) => {
+    setFilter(value)
+  }, [])
 
   return (
     <div className={styles.inspectionTableWrapper}>
@@ -231,38 +303,16 @@ export default function InspectionTable({ data }) {
       {/* 统计卡片 */}
       <div className={styles.statsGrid}>
         {stats.map((stat, index) => (
-          <div key={index} className={`${styles.statCard} ${styles[stat.color]}`}>
-            <div className={styles.statValue}>{stat.value}</div>
-            <div className={styles.statLabel}>{stat.label}</div>
-          </div>
+          <StatCard key={index} {...stat} />
         ))}
       </div>
 
       {/* 错误提示 */}
-      {emptyFieldErrors.length > 0 && (
-        <Alert
-          message="非空字段校验错误"
-          description={
-            <List
-              size="small"
-              dataSource={emptyFieldErrors}
-              renderItem={(error) => (
-                <List.Item style={{ color: 'var(--color-error-light, #f87171)' }}>
-                  {error.message}
-                </List.Item>
-              )}
-            />
-          }
-          type="error"
-          showIcon
-          icon={<ExclamationCircleOutlined />}
-          className={styles.errorAlert}
-        />
-      )}
+      <ErrorAlert errors={emptyFieldErrors} />
 
       {/* 筛选栏 */}
       <div className={styles.filterBar}>
-        <Select value={filter} onChange={setFilter} className={styles.filterSelect}>
+        <Select value={filter} onChange={handleFilterChange} className={styles.filterSelect}>
           <Option value="all">全部显示</Option>
           <Option value="correct">仅正确</Option>
           <Option value="incorrect">仅错误</Option>
@@ -271,7 +321,7 @@ export default function InspectionTable({ data }) {
         <Search
           placeholder="搜索检验项目或序号"
           value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
+          onChange={handleSearchChange}
           className={styles.searchInput}
           allowClear
         />
@@ -281,20 +331,30 @@ export default function InspectionTable({ data }) {
         </button>
       </div>
 
-      {/* 表格 */}
+      {/* 表格 - 使用虚拟滚动优化 */}
       <Table
         columns={columns}
         dataSource={filteredItems}
         rowKey={(record) => `${record.item_number}-${record.item_name}`}
         expandable={{
           expandedRowRender,
+          expandedRowKeys,
+          onExpandedRowsChange: handleExpandChange,
           expandRowByClick: true,
         }}
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: false,
+          showTotal: (total) => `共 ${total} 项`,
+        }}
         size="middle"
         className={styles.dataTable}
         rowClassName={(record) => record.status !== 'pass' ? styles.rowError : ''}
+        scroll={{ y: 400 }}
       />
     </div>
   )
 }
+
+// 使用memo包装，避免不必要的重渲染
+export default memo(InspectionTable)

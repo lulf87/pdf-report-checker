@@ -666,8 +666,213 @@ class TestNonEmptyFieldValidation:
         assert NonEmptyFieldErrorCode.EMPTY_CONCLUSION in error_codes
         assert NonEmptyFieldErrorCode.EMPTY_REMARK in error_codes
 
+    def test_na_values_not_empty(self):
+        """测试"/"、"——"表示"不适用"的值不应被视为空，但"-"、"—"应被视为空"""
+        checker = InspectionItemChecker()
+
+        # "/" 和 "——" 是合法的"不适用"标记
+        legal_values = ['/', '——']
+        for val in legal_values:
+            rows = [
+                InspectionTableRow(
+                    item_number='59',
+                    item_name='测试项目',
+                    clause_number='8.7',
+                    requirement_text='要求1',
+                    inspection_result=val,
+                    conclusion='/',
+                    remark='/'
+                )
+            ]
+            errors = checker._check_non_empty_fields(rows)
+            assert len(errors) == 0, f"'{val}' 不应被视为空值，但报错了"
+
+        # "-"、"—" 应被视为非法值（空值）
+        illegal_values = ['-', '—']
+        for val in illegal_values:
+            rows = [
+                InspectionTableRow(
+                    item_number='59',
+                    item_name='测试项目',
+                    clause_number='8.7',
+                    requirement_text='要求1',
+                    inspection_result=val,
+                    conclusion='/',
+                    remark='/'
+                )
+            ]
+            errors = checker._check_non_empty_fields(rows)
+            assert len(errors) > 0, f"'{val}' 应被视为空值，但没有报错"
+            assert NonEmptyFieldErrorCode.EMPTY_INSPECTION_RESULT in [e.details['error_code'] for e in errors]
+
+    def test_cross_page_continuation_scenarios(self):
+        """测试跨页续表的四种情况（用户定义的规则）"""
+        checker = InspectionItemChecker()
+
+        # 情况1: 前一页非空内容，后一页"——"
+        # 预期：不报错（都有值，只是类型不同）
+        rows_case1 = [
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求1', inspection_result='符合要求',  # 非空内容
+                conclusion='符合', remark='无', page_num=80
+            ),
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求2', inspection_result='——',  # 不适用标记
+                conclusion='/', remark='——', page_num=81  # 跨页
+            ),
+        ]
+        errors = checker._check_non_empty_fields(rows_case1)
+        assert len(errors) == 0, f"情况1应该不报错，但报错了: {[e.message for e in errors]}"
+
+        # 情况2: 前一页"——"，后一页非空内容
+        # 预期：不报错
+        rows_case2 = [
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求1', inspection_result='——',
+                conclusion='/', remark='——', page_num=80
+            ),
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求2', inspection_result='0.05',  # 非空内容
+                conclusion='符合', remark='正常', page_num=81  # 跨页
+            ),
+        ]
+        errors = checker._check_non_empty_fields(rows_case2)
+        assert len(errors) == 0, f"情况2应该不报错，但报错了: {[e.message for e in errors]}"
+
+        # 情况3: 前一页和后一页都是"——"
+        # 预期：不报错（"——"是合法的不适用标记）
+        rows_case3 = [
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求1', inspection_result='——',
+                conclusion='/', remark='——', page_num=80
+            ),
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求2', inspection_result='——',
+                conclusion='/', remark='——', page_num=81  # 跨页
+            ),
+        ]
+        errors = checker._check_non_empty_fields(rows_case3)
+        assert len(errors) == 0, f"情况3应该不报错，但报错了: {[e.message for e in errors]}"
+
+        # 情况4: 前一页或后一页有任何一个是真正的空值（不是"——"）
+        # 预期：报错
+        rows_case4 = [
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求1', inspection_result='——',
+                conclusion='/', remark='——', page_num=80
+            ),
+            InspectionTableRow(
+                item_number='113', item_name='测试项目', clause_number='201.7.8.1',
+                requirement_text='要求2', inspection_result='',  # 真正的空值！
+                conclusion='', remark='', page_num=81  # 跨页
+            ),
+        ]
+        errors = checker._check_non_empty_fields(rows_case4)
+        assert len(errors) > 0, "情况4应该报错（有真正的空值），但没有报错"
+        # 应该报检验结果为空
+        error_codes = [e.details['error_code'] for e in errors]
+        assert NonEmptyFieldErrorCode.EMPTY_INSPECTION_RESULT in error_codes
+
+    def test_cross_multiple_pages_same_item(self):
+        """测试同一序号跨多页（如5-6页都是同一序号）所有行都独立检查"""
+        checker = InspectionItemChecker()
+
+        # 序号59跨第5页和第6页，每页有多行
+        rows = [
+            # 第5页第1行
+            InspectionTableRow(
+                item_number='59', item_name='测试项目', clause_number='8.7',
+                requirement_text='要求1', inspection_result='——',
+                conclusion='/', remark='——', page_num=5
+            ),
+            # 第5页第2行（同页，但跨页key所有行都独立）
+            InspectionTableRow(
+                item_number='59', item_name='测试项目', clause_number='8.7',
+                requirement_text='要求2', inspection_result='',  # 真正的空值！
+                conclusion='/', remark='——', page_num=5
+            ),
+            # 第6页第1行（跨页）
+            InspectionTableRow(
+                item_number='59', item_name='测试项目', clause_number='8.7',
+                requirement_text='要求3', inspection_result='——',
+                conclusion='/', remark='——', page_num=6
+            ),
+            # 第6页第2行（跨页）
+            InspectionTableRow(
+                item_number='59', item_name='测试项目', clause_number='8.7',
+                requirement_text='要求4', inspection_result='0.01',
+                conclusion='符合', remark='正常', page_num=6
+            ),
+        ]
+
+        errors = checker._check_non_empty_fields(rows)
+        # 应该只报第5页第2行的错误（真正的空值）
+        assert len(errors) == 1, f"应该只报1个错误（第5页第2行空值），但报了{len(errors)}个: {[e.message for e in errors]}"
+        assert errors[0].details['row_index'] == 1  # 第2行（索引1）
+        assert NonEmptyFieldErrorCode.EMPTY_INSPECTION_RESULT in errors[0].details['error_code']
+
+    def test_multi_level_table_title_row(self):
+        """测试多级表格标题行（父行无检验结果，子行有）不应报错"""
+        checker = InspectionItemChecker()
+
+        # 模拟序号59的情况：标题行 + 多个子行
+        rows = [
+            # 标题行（父行）：无检验结果
+            InspectionTableRow(
+                item_number='59',
+                item_name='漏电流和患者辅助电流的测量（潮湿预处理前）',
+                clause_number='8.7',
+                requirement_text='漏电流和患者辅助电流的测量（潮湿预处理前） 单位：mA',
+                inspection_result='',  # 空，因为标题行本身无检验结果
+                conclusion='',
+                remark=''
+            ),
+            # 子行1：有检验结果
+            InspectionTableRow(
+                item_number='59',
+                item_name='漏电流和患者辅助电流的测量（潮湿预处理前）',
+                clause_number='8.7',
+                requirement_text='无频率加权漏电流',
+                inspection_result='——',
+                conclusion='/',
+                remark='——'
+            ),
+            # 子行2：有检验结果
+            InspectionTableRow(
+                item_number='59',
+                item_name='漏电流和患者辅助电流的测量（潮湿预处理前）',
+                clause_number='8.7',
+                requirement_text='对地漏电流（正常状态）',
+                inspection_result='——',
+                conclusion='/',
+                remark='——'
+            ),
+            # 子行3：有检验结果
+            InspectionTableRow(
+                item_number='59',
+                item_name='漏电流和患者辅助电流的测量（潮湿预处理前）',
+                clause_number='8.7',
+                requirement_text='对地漏电流（单一故障状态）',
+                inspection_result='——',
+                conclusion='/',
+                remark='——'
+            ),
+        ]
+
+        errors = checker._check_non_empty_fields(rows)
+        # 标题行不应报错，只有子行会被检查
+        # 所有子行的检验结果都是"——"（合法值），所以不应报错
+        assert len(errors) == 0, f"标题行不应报错，但报错了: {[e.message for e in errors]}"
+
     def test_merged_cell_inheritance(self):
-        """测试合并单元格值继承（首行有值，续行继承）"""
+        """测试合并单元格场景：每行独立检查，不继承值"""
         checker = InspectionItemChecker()
 
         rows = [
@@ -681,24 +886,55 @@ class TestNonEmptyFieldValidation:
                 conclusion='符合',
                 remark='正常'
             ),
-            # 续行（合并单元格），字段为空但应继承首行值
+            # 续行（合并单元格），但检验结果是"——"（合法值）
             InspectionTableRow(
                 item_number='1',
                 item_name='测试项目',
                 clause_number='5.1',
                 requirement_text='要求2',
-                inspection_result='',  # 空，应继承
-                conclusion='',  # 空，应继承
-                remark=''  # 空，应继承
+                inspection_result='——',  # 合法的不适用标记
+                conclusion='/',
+                remark='——'
             )
         ]
 
         errors = checker._check_non_empty_fields(rows)
-        # 续行继承了首行的值，不应该报错
+        # 每行都有值（第一行有实际值，第二行有"——"），不应该报错
         assert len(errors) == 0
 
+    def test_merged_cell_empty_value(self):
+        """测试合并单元格场景：续行是真正空值的情况（应报错）"""
+        checker = InspectionItemChecker()
+
+        rows = [
+            # 首行有值
+            InspectionTableRow(
+                item_number='1',
+                item_name='测试项目',
+                clause_number='5.1',
+                requirement_text='要求1',
+                inspection_result='符合要求',
+                conclusion='符合',
+                remark='正常'
+            ),
+            # 续行为真正的空值（不是"——"）
+            InspectionTableRow(
+                item_number='1',
+                item_name='测试项目',
+                clause_number='5.1',
+                requirement_text='要求2',
+                inspection_result='',  # 真正的空值
+                conclusion='',  # 真正的空值
+                remark=''  # 真正的空值
+            )
+        ]
+
+        errors = checker._check_non_empty_fields(rows)
+        # 续行是真正的空值，应该报错（不继承首行的值）
+        assert len(errors) == 3  # 续行的3个字段都为空
+
     def test_merged_cell_first_row_empty(self):
-        """测试合并单元格首行为空的情况（整个区域视为空）"""
+        """测试合并单元格首行为空的情况（每行独立检查）"""
         checker = InspectionItemChecker()
 
         rows = [
@@ -725,8 +961,68 @@ class TestNonEmptyFieldValidation:
         ]
 
         errors = checker._check_non_empty_fields(rows)
-        # 首行为空，整个合并区域视为空，每行都应该报错
+        # 每行独立检查，所有空字段都报错
         assert len(errors) == 6  # 2行 x 3个字段
+
+    def test_extreme_cross_page_scenario(self):
+        """
+        测试极端跨页场景：
+        序号1在第一页有10行，第1行="符合要求"，其余9行="——"
+        第3-4页续1各="——"
+        结论：单项结论应为"符合"（因为有一个非NA值）
+        """
+        checker = InspectionItemChecker()
+
+        rows = [
+            # 第1页 - 第1行：有实际值
+            InspectionTableRow(
+                item_number='1', item_name='测试项目', clause_number='5.1',
+                requirement_text='要求1', inspection_result='符合要求',
+                conclusion='符合', remark='正常', page_num=1
+            ),
+            # 第1页 - 第2-10行：都是"——"
+            InspectionTableRow(
+                item_number='1', item_name='测试项目', clause_number='5.1',
+                requirement_text='要求2', inspection_result='——',
+                conclusion='/', remark='——', page_num=1
+            ),
+            InspectionTableRow(
+                item_number='1', item_name='测试项目', clause_number='5.1',
+                requirement_text='要求3', inspection_result='——',
+                conclusion='/', remark='——', page_num=1
+            ),
+            # ... 省略中间行
+            InspectionTableRow(
+                item_number='1', item_name='测试项目', clause_number='5.1',
+                requirement_text='要求10', inspection_result='——',
+                conclusion='/', remark='——', page_num=1
+            ),
+            # 第3页续1
+            InspectionTableRow(
+                item_number='1', item_name='测试项目', clause_number='5.1',
+                requirement_text='要求11', inspection_result='——',
+                conclusion='/', remark='——', page_num=3
+            ),
+            # 第4页续1
+            InspectionTableRow(
+                item_number='1', item_name='测试项目', clause_number='5.1',
+                requirement_text='要求12', inspection_result='——',
+                conclusion='/', remark='——', page_num=4
+            ),
+        ]
+
+        # 非空字段校验：每行都有值（"符合要求"或"——"），不应报错
+        errors = checker._check_non_empty_fields(rows)
+        assert len(errors) == 0, f"所有行都有值，不应报错: {[e.message for e in errors]}"
+
+        # 单项结论计算：基于所有行汇总
+        item_checks = checker._check_items(rows)
+        assert len(item_checks) == 1
+        assert len(item_checks[0].clauses) == 1
+
+        # 期望结论："符合"（因为有一个非NA值"符合要求"）
+        expected = item_checks[0].clauses[0].expected_conclusion
+        assert expected == '符合', f"期望结论应为'符合'，实际为'{expected}'"
 
     def test_multiple_items_with_different_clauses(self):
         """测试多个项目不同条款的情况"""

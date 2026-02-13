@@ -9,7 +9,7 @@
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--space-md) var(--space-lg);
   box-shadow: var(--shadow-lg), var(--glow-blue);
   transition: all var(--transition-normal);
 }
@@ -17,9 +17,9 @@
 /* 固定在底部 */
 .action-bar--fixed {
   position: fixed;
-  bottom: var(--spacing-lg);
-  left: var(--spacing-lg);
-  right: var(--spacing-lg);
+  bottom: var(--space-lg);
+  left: var(--space-lg);
+  right: var(--space-lg);
   z-index: var(--z-sticky);
 }
 
@@ -137,19 +137,19 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: var(--spacing-sm);
+  gap: var(--space-sm);
 }
 
 /* LLM 开关 */
 .action-bar__llm-toggle {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-md);
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
   background: rgba(139, 92, 246, 0.1);
   border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: var(--radius-md);
-  margin-right: var(--spacing-sm);
+  margin-right: var(--space-sm);
 }
 
 .action-bar__llm-icon {
@@ -222,16 +222,16 @@
 /* 响应式调整 */
 @media (max-width: 768px) {
   .action-bar--fixed {
-    left: var(--spacing-md);
-    right: var(--spacing-md);
-    bottom: var(--spacing-md);
+    left: var(--space-md);
+    right: var(--space-md);
+    bottom: var(--space-md);
   }
 
   .action-bar__llm-toggle {
     width: 100%;
     justify-content: center;
     margin-right: 0;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--space-sm);
   }
 
   .action-bar__content {

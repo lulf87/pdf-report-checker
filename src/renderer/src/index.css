@@ -5,8 +5,29 @@
 
 /* 引入设计系统样式文件 */
 @import './styles/variables.css';
+@import './styles/design-system.css';
 @import './styles/animations.css';
 @import './styles/glassmorphism.css';
+
+/* ============================================
+   新主题系统 (v2.0 - 医疗科技感)
+   状态：开发中，待测试完成后切换
+   ============================================ */
+/*
+ * 新主题配色方案：
+ * - Primary: #0EA5E9 (天空蓝)
+ * - Secondary: #06B6D4 (青色)
+ * - Success: #10B981 (翠绿)
+ * - Warning: #F59E0B (琥珀)
+ * - Error: #EF4444 (红色)
+ * - Background: #0F172A (深蓝灰)
+ * - Surface: #1E293B (次级背景)
+ * - Text: #F8FAFC (主文字)
+ * - TextMuted: #94A3B8 (次要文字)
+ *
+ * 启用方式：取消下面这行的注释
+ * @import './styles/theme-new.css';
+ */
 
 /* ---------- Base Reset ---------- */
 * {
@@ -66,13 +87,18 @@ body {
   position: relative;
 }
 
-/* 背景网格效果 */
+/* ============================================
+   高性能背景效果 (替代粒子背景)
+   ============================================ */
+
+/* 背景网格效果 - 高性能CSS实现 */
 .app-background {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  background-color: var(--bg-primary);
   background-image:
     linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
@@ -81,20 +107,109 @@ body {
   z-index: -2;
 }
 
-/* 渐变光晕效果 */
+/* 静态渐变光晕 - 替代动态粒子效果 */
 .app-glow {
   position: fixed;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(59, 130, 246, 0.05) 0%,
-    transparent 50%
-  );
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: -1;
+}
+
+/* ============================================
+   性能优化工具类
+   ============================================ */
+
+/* 使用 contain 限制渲染范围 */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+/* 动画优化 */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+.will-animate-complete {
+  will-change: auto;
+}
+
+/* 内容可见性优化 - 延迟渲染屏幕外内容 */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* 高性能卡片 */
+.card-optimized {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  contain: layout style;
+}
+
+.card-optimized:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* 折叠动画 - 纯CSS实现 */
+.collapse-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height var(--transition-normal), opacity var(--transition-fast);
+}
+
+.collapse-content.expanded {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-normal) ease forwards;
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .collapse-content {
+    transition: none;
+  }
 }
 
 /* ---------- Utility Classes ---------- */

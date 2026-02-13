@@ -1,0 +1,766 @@
+/* ============================================
+   UploadZone.module.css - 现代化上传区域样式
+   使用CSS Modules + 新设计系统
+   ============================================ */
+
+/* ---------- 主容器 ---------- */
+.uploadZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  padding: var(--space-lg);
+  max-width: 900px;
+  margin: 0 auto;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 标题区域 ---------- */
+.header {
+  text-align: center;
+  animation: slideUp 0.5s ease 0.1s both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  margin: 0 0 var(--space-md) 0;
+  line-height: 1.2;
+}
+
+.titleGlow {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-light) 0%,
+    var(--color-secondary) 50%,
+    var(--color-accent) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
+}
+
+.subtitle {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ---------- 拖拽上传区域 ---------- */
+.dropArea {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  transition: all var(--transition-normal);
+  overflow: hidden;
+  cursor: pointer;
+  animation: slideUp 0.5s ease 0.2s both;
+}
+
+.dropArea:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.dropAreaActive {
+  border-color: var(--color-secondary);
+  border-style: solid;
+  background: rgba(6, 182, 212, 0.05);
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.3);
+}
+
+.dropAreaUploading {
+  cursor: default;
+}
+
+/* 隐藏的文件输入 */
+.hiddenInput {
+  display: none;
+}
+
+/* 装饰性边角 */
+.corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.corner::before,
+.corner::after {
+  content: '';
+  position: absolute;
+  background: var(--color-primary);
+  opacity: 0.6;
+  transition: all var(--transition-normal);
+}
+
+.dropAreaActive .corner::before,
+.dropAreaActive .corner::after {
+  background: var(--color-secondary);
+  opacity: 1;
+}
+
+.cornerTl {
+  top: 0;
+  left: 0;
+}
+
+.cornerTl::before {
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 2px;
+}
+
+.cornerTl::after {
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 20px;
+}
+
+.cornerTr {
+  top: 0;
+  right: 0;
+}
+
+.cornerTr::before {
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 2px;
+}
+
+.cornerTr::after {
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 20px;
+}
+
+.cornerBl {
+  bottom: 0;
+  left: 0;
+}
+
+.cornerBl::before {
+  bottom: 0;
+  left: 0;
+  width: 20px;
+  height: 2px;
+}
+
+.cornerBl::after {
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 20px;
+}
+
+.cornerBr {
+  bottom: 0;
+  right: 0;
+}
+
+.cornerBr::before {
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 2px;
+}
+
+.cornerBr::after {
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  height: 20px;
+}
+
+/* 扫描线效果 */
+.scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-secondary) 50%,
+    transparent 100%
+  );
+  animation: scanline 2s linear infinite;
+  pointer-events: none;
+  opacity: 0.8;
+  z-index: 1;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(200px);
+  }
+}
+
+/* ---------- 空闲状态 ---------- */
+.idleState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.iconWrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.15) 0%,
+    rgba(6, 182, 212, 0.15) 100%
+  );
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  margin-bottom: var(--space-lg);
+  transition: all var(--transition-normal);
+}
+
+.dropArea:hover .iconWrapper {
+  box-shadow: var(--shadow-glow-sm);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: scale(1.05);
+}
+
+.uploadIcon {
+  color: var(--color-primary-light);
+}
+
+.dropTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-sm) 0;
+  font-weight: 600;
+}
+
+.dropHint {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ---------- 上传中状态 ---------- */
+.uploadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.uploadingIconWrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(6, 182, 212, 0.1);
+  border: 2px solid rgba(6, 182, 212, 0.3);
+  margin-bottom: var(--space-lg);
+}
+
+.spinnerIcon {
+  color: var(--color-secondary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progressContainer {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.progressBar {
+  flex: 1;
+  height: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.progressText {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary-light);
+  font-family: var(--font-mono);
+  min-width: 40px;
+  text-align: right;
+}
+
+.uploadingText {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ---------- 已选文件状态 ---------- */
+.fileState {
+  display: flex;
+  justify-content: center;
+}
+
+.fileCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  min-width: 320px;
+  max-width: 100%;
+  transition: all var(--transition-fast);
+}
+
+.fileCard:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.fileIconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.1);
+  flex-shrink: 0;
+}
+
+.fileIconPdf {
+  color: var(--color-error-light);
+}
+
+.fileIconDocx {
+  color: var(--color-primary-light);
+}
+
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fileName {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileSize {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.removeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.removeButton:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+}
+
+/* ---------- 错误提示 ---------- */
+.errorMessage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-lg);
+  color: var(--color-error-light);
+  font-size: var(--text-sm);
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* ---------- 支持的文件类型 ---------- */
+.fileTypes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  animation: slideUp 0.5s ease 0.3s both;
+}
+
+.fileTypeCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  transition: all var(--transition-fast);
+}
+
+.fileTypeCard:hover {
+  border-color: var(--border-default);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.fileTypeIconPdf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+}
+
+.fileTypeIconDocx {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary-light);
+}
+
+.fileTypeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileTypeName {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.fileTypeDesc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* ---------- 核对内容说明 ---------- */
+.checkInfo {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  animation: slideUp 0.5s ease 0.4s both;
+}
+
+.checkInfoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.checkInfoHeader:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.checkInfoTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.checkInfoTitle h4 {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  margin: 0;
+  font-weight: 600;
+}
+
+.checkInfoIcon {
+  color: var(--color-success);
+}
+
+.checkInfoBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--color-success-light);
+  font-family: var(--font-mono);
+  margin-left: var(--space-sm);
+}
+
+.expandButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.expandButton:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary-light);
+}
+
+/* 核对内容分组 */
+.checkGroups {
+  padding: 0 var(--space-lg) var(--space-lg);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  animation: fadeIn 0.3s ease;
+}
+
+.checkGroup {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  border-left: 3px solid transparent;
+}
+
+.checkGroupBlue {
+  border-left-color: var(--color-primary);
+}
+
+.checkGroupPurple {
+  border-left-color: var(--color-accent);
+}
+
+.checkGroupGreen {
+  border-left-color: var(--color-success);
+}
+
+.checkGroupCyan {
+  border-left-color: var(--color-secondary);
+}
+
+.checkGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.checkGroupIcon {
+  color: var(--text-secondary);
+}
+
+.checkGroupBlue .checkGroupIcon {
+  color: var(--color-primary-light);
+}
+
+.checkGroupPurple .checkGroupIcon {
+  color: var(--color-accent);
+}
+
+.checkGroupGreen .checkGroupIcon {
+  color: var(--color-success-light);
+}
+
+.checkGroupCyan .checkGroupIcon {
+  color: var(--color-secondary);
+}
+
+.checkGroupTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.checkGroupList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.checkGroupItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.checkItemIcon {
+  color: var(--color-success);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.checkItemText {
+  flex: 1;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .uploadZone {
+    padding: var(--space-md);
+    gap: var(--space-lg);
+  }
+
+  .title {
+    font-size: var(--text-2xl);
+  }
+
+  .subtitle {
+    font-size: var(--text-sm);
+  }
+
+  .dropArea {
+    padding: var(--space-xl);
+  }
+
+  .iconWrapper {
+    width: 80px;
+    height: 80px;
+  }
+
+  .uploadIcon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .fileTypes {
+    grid-template-columns: 1fr;
+  }
+
+  .checkGroups {
+    grid-template-columns: 1fr;
+  }
+
+  .fileCard {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: var(--text-xl);
+  }
+
+  .dropTitle {
+    font-size: var(--text-lg);
+  }
+
+  .checkInfoTitle h4 {
+    font-size: var(--text-sm);
+  }
+}
+
+/* ---------- 减少动画偏好 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .uploadZone,
+  .header,
+  .dropArea,
+  .fileTypes,
+  .checkInfo,
+  .spinnerIcon {
+    animation: none;
+  }
+
+  .dropArea:hover .iconWrapper {
+    transform: none;
+  }
+}

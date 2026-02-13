@@ -200,14 +200,14 @@
 .glow-card__content {
   position: relative;
   z-index: 1;
-  padding: var(--spacing-md);
+  padding: var(--space-md);
 }
 
 /* 尺寸变体 */
 .glow-card--compact .glow-card__content {
-  padding: var(--spacing-sm);
+  padding: var(--space-sm);
 }
 
 .glow-card--large .glow-card__content {
-  padding: var(--spacing-lg);
+  padding: var(--space-lg);
 }

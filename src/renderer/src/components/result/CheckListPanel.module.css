@@ -166,6 +166,29 @@
   min-height: 200px;
 }
 
+/* 分组包装器 - 淡入动画 */
+.groupWrapper {
+  animation: fadeInUp 0.4s ease forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 进度条填充 - CSS过渡替代Framer Motion */
+.progressBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%);
+  border-radius: 3px;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+  transition: width 0.5s ease;
+}
+
 /* 空状态 */
 .emptyContainer {
   display: flex;

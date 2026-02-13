@@ -178,7 +178,7 @@
 
 /* 分页器 */
 .data-table .ant-pagination {
-  margin: var(--spacing-md) !important;
+  margin: var(--space-md) !important;
 }
 
 .data-table .ant-pagination-item {

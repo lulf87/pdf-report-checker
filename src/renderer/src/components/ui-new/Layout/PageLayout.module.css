@@ -1,0 +1,93 @@
+/* ============================================
+   PageLayout - 页面布局框架
+   ============================================ */
+
+.pageLayout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+/* ---------- 头部 ---------- */
+.pageLayout__header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
+  padding: var(--space-md) var(--space-lg);
+}
+
+/* ---------- 主体 ---------- */
+.pageLayout__body {
+  display: flex;
+  flex: 1;
+}
+
+/* ---------- 侧边栏 ---------- */
+.pageLayout__sidebar {
+  width: 260px;
+  background: var(--glass-bg);
+  border-right: 1px solid var(--glass-border);
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+/* ---------- 主内容区 ---------- */
+.pageLayout__main {
+  flex: 1;
+  padding: var(--space-lg);
+  overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.pageLayout--fullWidth .pageLayout__main {
+  max-width: none;
+}
+
+.pageLayout--withSidebar .pageLayout__main {
+  margin: 0;
+}
+
+/* ---------- 底部 ---------- */
+.pageLayout__footer {
+  background: var(--glass-bg);
+  border-top: 1px solid var(--glass-border);
+  padding: var(--space-md) var(--space-lg);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .pageLayout__sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: var(--z-modal);
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+  }
+
+  .pageLayout__sidebar--open {
+    transform: translateX(0);
+  }
+
+  .pageLayout__main {
+    padding: var(--space-md);
+  }
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .pageLayout__sidebar {
+    transition: none;
+  }
+}

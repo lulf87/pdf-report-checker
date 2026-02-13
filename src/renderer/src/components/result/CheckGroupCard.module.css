@@ -191,9 +191,75 @@
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
 }
 
-/* 核对项列表 */
+/* 核对项列表 - 可折叠 */
 .itemsList {
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+}
+
+.itemsList.expanded {
+  max-height: 2000px;
+  opacity: 1;
   padding: 16px 20px 20px;
+}
+
+.itemsList.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding: 0 20px;
+}
+
+/* 列表项动画 */
+.itemWrapper {
+  animation: fadeInUp 0.3s ease forwards;
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 可点击头部 */
+.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.clickable:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* 头部右侧区域 */
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 展开/折叠图标 */
+.expandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.expandIcon.expanded {
+  transform: rotate(0deg);
+  color: var(--color-primary-light);
 }
 
 /* 空状态 */

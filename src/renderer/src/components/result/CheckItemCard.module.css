@@ -230,24 +230,41 @@
   height: 24px;
   color: var(--text-tertiary);
   font-size: 12px;
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, color 0.2s ease;
   flex-shrink: 0;
 }
 
 .expandIcon.expanded {
-  transform: rotate(0deg);
-  color: var(--color-neon-blue-light);
+  transform: rotate(90deg);
+  color: var(--color-primary-light);
 }
 
-/* 详情区域 */
+/* 详情区域 - 可折叠 */
 .detailsContainer {
   overflow: hidden;
   border-top: 1px solid var(--glass-border);
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+}
+
+.detailsContainer.expanded {
+  max-height: 1000px;
+  opacity: 1;
+}
+
+.detailsContainer.collapsed {
+  max-height: 0;
+  opacity: 0;
 }
 
 .detailsContent {
   padding: 16px;
   background: rgba(10, 14, 23, 0.5);
+}
+
+/* 焦点状态 */
+.cardHeader:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 /* 响应式调整 */

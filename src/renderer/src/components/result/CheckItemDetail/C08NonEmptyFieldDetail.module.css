@@ -7,7 +7,7 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  margin-top: var(--spacing-md);
+  margin-top: var(--space-md);
 }
 
 /* 头部 */
@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--space-md) var(--space-lg);
   cursor: pointer;
   background: rgba(59, 130, 246, 0.05);
   border-bottom: 1px solid transparent;
@@ -29,7 +29,7 @@
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--space-sm);
 }
 
 .headerIcon {
@@ -61,14 +61,14 @@
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
+  gap: var(--space-md);
+  padding: var(--space-lg);
   border-bottom: 1px solid var(--glass-border);
 }
 
 .statCard {
   position: relative;
-  padding: var(--spacing-md);
+  padding: var(--space-md);
   background: rgba(59, 130, 246, 0.05);
   border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);
@@ -116,9 +116,9 @@
 .errorAlert {
   display: flex;
   align-items: flex-start;
-  gap: var(--spacing-sm);
-  margin: var(--spacing-md) var(--spacing-lg);
-  padding: var(--spacing-md);
+  gap: var(--space-sm);
+  margin: var(--space-md) var(--space-lg);
+  padding: var(--space-md);
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-md);
@@ -147,7 +147,7 @@
 
 /* 表格区域 */
 .tableWrapper {
-  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
 }
 
 .dataTable {
@@ -211,14 +211,14 @@
 /* 空状态 */
 .emptyState {
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--space-xl);
   color: var(--text-secondary);
 }
 
 .emptyIcon {
   font-size: 48px;
   color: var(--color-success);
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--space-md);
   filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5));
 }
 
@@ -229,10 +229,10 @@
   }
 
   .header {
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--space-sm) var(--space-md);
   }
 
   .tableWrapper {
-    padding: var(--spacing-sm);
+    padding: var(--space-sm);
   }
 }

@@ -1,13 +1,12 @@
 /**
- * CheckListPanel - 核对内容清单总面板
+ * CheckListPanel - 核对内容清单总面板 (高性能优化版)
  * 显示所有11个核对项（C01-C11）的汇总
  * 包含筛选功能：全部/仅错误/仅警告标签页
- * 按4个分组展示
+ * 按4个分组展示，支持分组折叠
  * 科技感数据大屏设计系统
  */
 
-import React, { useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useMemo, useCallback, memo } from 'react'
 import { Radio, Badge, Empty } from 'antd'
 import {
   FileTextOutlined,
@@ -74,13 +73,114 @@ const defaultCheckGroups = [
 ]
 
 /**
+ * 统计摘要组件 - 纯展示，使用memo优化
+ */
+const StatsSummary = memo(function StatsSummary({ stats }) {
+  return (
+    <div className={styles.statsSummary}>
+      <span className={styles.statItem}>
+        <Badge count={stats.total} className={styles.statBadge} showZero />
+        <span className={styles.statLabel}>总计</span>
+      </span>
+      {stats.passed > 0 && (
+        <span className={styles.statItem}>
+          <Badge count={stats.passed} className={`${styles.statBadge} ${styles.passBadge}`} showZero />
+          <span className={styles.statLabel}>通过</span>
+        </span>
+      )}
+      {stats.failed > 0 && (
+        <span className={styles.statItem}>
+          <Badge count={stats.failed} className={`${styles.statBadge} ${styles.failBadge}`} showZero />
+          <span className={styles.statLabel}>失败</span>
+        </span>
+      )}
+      {stats.warnings > 0 && (
+        <span className={styles.statItem}>
+          <Badge count={stats.warnings} className={`${styles.statBadge} ${styles.warningBadge}`} showZero />
+          <span className={styles.statLabel}>警告</span>
+        </span>
+      )}
+    </div>
+  )
+})
+
+/**
+ * 筛选控件组件
+ */
+const FilterControl = memo(function FilterControl({ filter, stats, onChange }) {
+  const handleChange = useCallback((e) => {
+    onChange(e.target.value)
+  }, [onChange])
+
+  return (
+    <div className={styles.filterSection}>
+      <FilterOutlined className={styles.filterIcon} />
+      <Radio.Group
+        value={filter}
+        onChange={handleChange}
+        className={styles.filterGroup}
+        optionType="button"
+        buttonStyle="solid"
+        size="small"
+      >
+        <Radio.Button value={FilterType.ALL}>
+          全部
+          <span className={styles.filterCount}>{stats.total}</span>
+        </Radio.Button>
+        <Radio.Button value={FilterType.ERROR}>
+          仅错误
+          {stats.failed > 0 && <span className={styles.filterCount}>{stats.failed}</span>}
+        </Radio.Button>
+        <Radio.Button value={FilterType.WARNING}>
+          仅警告
+          {stats.warnings > 0 && <span className={styles.filterCount}>{stats.warnings}</span>}
+        </Radio.Button>
+      </Radio.Group>
+    </div>
+  )
+})
+
+/**
+ * 进度条组件 - CSS动画替代Framer Motion
+ */
+const ProgressBar = memo(function ProgressBar({ percentage }) {
+  return (
+    <div className={styles.progressBarBg}>
+      <div
+        className={styles.progressBarFill}
+        style={{ width: `${percentage}%` }}
+      />
+    </div>
+  )
+})
+
+/**
  * CheckListPanel 组件
  * @param {Object} props
  * @param {Array} props.checkGroups - 核对分组数据（可选，默认使用defaultCheckGroups）
  * @param {Function} props.onItemClick - 点击核对项回调
  */
-export default function CheckListPanel({ checkGroups = defaultCheckGroups, onItemClick }) {
+function CheckListPanel({ checkGroups = defaultCheckGroups, onItemClick }) {
   const [filter, setFilter] = useState(FilterType.ALL)
+  // 跟踪各分组的展开状态
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    // 默认全部折叠
+    const initial = {}
+    checkGroups.forEach(group => {
+      initial[group.id] = false
+    })
+    return initial
+  })
+
+  /**
+   * 切换分组展开状态
+   */
+  const toggleGroup = useCallback((groupId) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }))
+  }, [])
 
   /**
    * 根据筛选条件过滤核对项
@@ -136,31 +236,9 @@ export default function CheckListPanel({ checkGroups = defaultCheckGroups, onIte
     return { count }
   }, [filteredGroups])
 
-  /**
-   * 动画配置
-   */
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.1
-      }
-    }
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.4,
-        ease: [0.34, 1.56, 0.64, 1]
-      }
-    }
-  }
+  const passRate = useMemo(() => {
+    return stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0
+  }, [stats])
 
   return (
     <div className={styles.checkListPanel}>
@@ -168,84 +246,34 @@ export default function CheckListPanel({ checkGroups = defaultCheckGroups, onIte
       <div className={styles.panelHeader}>
         <div className={styles.headerLeft}>
           <h2 className={styles.panelTitle}>核对内容清单</h2>
-          <div className={styles.statsSummary}>
-            <span className={styles.statItem}>
-              <Badge count={stats.total} className={styles.statBadge} showZero />
-              <span className={styles.statLabel}>总计</span>
-            </span>
-            {stats.passed > 0 && (
-              <span className={styles.statItem}>
-                <Badge count={stats.passed} className={`${styles.statBadge} ${styles.passBadge}`} showZero />
-                <span className={styles.statLabel}>通过</span>
-              </span>
-            )}
-            {stats.failed > 0 && (
-              <span className={styles.statItem}>
-                <Badge count={stats.failed} className={`${styles.statBadge} ${styles.failBadge}`} showZero />
-                <span className={styles.statLabel}>失败</span>
-              </span>
-            )}
-            {stats.warnings > 0 && (
-              <span className={styles.statItem}>
-                <Badge count={stats.warnings} className={`${styles.statBadge} ${styles.warningBadge}`} showZero />
-                <span className={styles.statLabel}>警告</span>
-              </span>
-            )}
-          </div>
+          <StatsSummary stats={stats} />
         </div>
 
         {/* 筛选控件 */}
-        <div className={styles.filterSection}>
-          <FilterOutlined className={styles.filterIcon} />
-          <Radio.Group
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className={styles.filterGroup}
-            optionType="button"
-            buttonStyle="solid"
-            size="small"
-          >
-            <Radio.Button value={FilterType.ALL}>
-              全部
-              <span className={styles.filterCount}>{stats.total}</span>
-            </Radio.Button>
-            <Radio.Button value={FilterType.ERROR}>
-              仅错误
-              {stats.failed > 0 && <span className={styles.filterCount}>{stats.failed}</span>}
-            </Radio.Button>
-            <Radio.Button value={FilterType.WARNING}>
-              仅警告
-              {stats.warnings > 0 && <span className={styles.filterCount}>{stats.warnings}</span>}
-            </Radio.Button>
-          </Radio.Group>
-        </div>
+        <FilterControl filter={filter} stats={stats} onChange={setFilter} />
       </div>
 
-      {/* 分组列表 */}
-      <motion.div
-        className={styles.groupsContainer}
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
+      {/* 分组列表 - 使用CSS动画替代Framer Motion */}
+      <div className={styles.groupsContainer}>
         {filteredGroups.length > 0 ? (
-          filteredGroups.map((group) => (
-            <motion.div key={group.id} variants={itemVariants}>
+          filteredGroups.map((group, index) => (
+            <div
+              key={group.id}
+              className={styles.groupWrapper}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
               <CheckGroupCard
                 id={group.id}
                 name={group.name}
                 icon={group.icon}
                 items={group.items}
+                isExpanded={expandedGroups[group.id]}
+                onToggle={() => toggleGroup(group.id)}
               />
-            </motion.div>
+            </div>
           ))
         ) : (
-          <motion.div
-            className={styles.emptyContainer}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
+          <div className={`${styles.emptyContainer} fade-in`}>
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
@@ -258,24 +286,17 @@ export default function CheckListPanel({ checkGroups = defaultCheckGroups, onIte
                 </span>
               }
             />
-          </motion.div>
+          </div>
         )}
-      </motion.div>
+      </div>
 
       {/* 底部汇总 */}
       {filteredGroups.length > 0 && (
         <div className={styles.panelFooter}>
           <div className={styles.footerProgress}>
-            <div className={styles.progressBarBg}>
-              <motion.div
-                className={styles.progressBarFill}
-                initial={{ width: 0 }}
-                animate={{ width: `${(stats.passed / stats.total) * 100}%` }}
-                transition={{ duration: 1, delay: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-              />
-            </div>
+            <ProgressBar percentage={passRate} />
             <span className={styles.progressText}>
-              总体通过率: {stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}%
+              总体通过率: {passRate}%
               {filter !== FilterType.ALL && (
                 <span className={styles.filteredHint}>（已筛选: {filteredStats.count} 项）</span>
               )}
@@ -286,3 +307,6 @@ export default function CheckListPanel({ checkGroups = defaultCheckGroups, onIte
     </div>
   )
 }
+
+// 使用memo包装整个组件，避免不必要的重渲染
+export default memo(CheckListPanel)

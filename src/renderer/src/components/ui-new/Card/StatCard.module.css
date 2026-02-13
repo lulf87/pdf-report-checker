@@ -1,0 +1,213 @@
+/* ============================================
+   StatCard - 统计卡片
+   ============================================ */
+
+.statCard {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* ---------- 类型变体 ---------- */
+.statCard--blue {
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.statCard--blue:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: var(--glow-blue);
+}
+
+.statCard--cyan {
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.statCard--cyan:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: var(--glow-cyan);
+}
+
+.statCard--purple {
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.statCard--purple:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: var(--glow-purple);
+}
+
+.statCard--success {
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.statCard--success:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: var(--glow-success);
+}
+
+.statCard--warning {
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.statCard--warning:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: var(--glow-warning);
+}
+
+.statCard--error {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.statCard--error:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: var(--glow-error);
+}
+
+.statCard--info {
+  border-color: rgba(107, 114, 128, 0.2);
+}
+
+/* ---------- 头部 ---------- */
+.statCard__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.statCard__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-neon-blue);
+}
+
+.statCard--cyan .statCard__icon {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--color-neon-cyan);
+}
+
+.statCard--purple .statCard__icon {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--color-neon-purple);
+}
+
+.statCard--success .statCard__icon {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+}
+
+.statCard--warning .statCard__icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+.statCard--error .statCard__icon {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+}
+
+.statCard__title {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ---------- 数值 ---------- */
+.statCard__value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-bottom: var(--space-xs);
+}
+
+.statCard__prefix,
+.statCard__suffix {
+  font-size: var(--text-lg);
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.statCard__number {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  line-height: 1.2;
+}
+
+/* ---------- 趋势 ---------- */
+.statCard__trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.statCard__trend--up {
+  color: var(--color-success);
+}
+
+.statCard__trend--down {
+  color: var(--color-error);
+}
+
+.statCard__trend--neutral {
+  color: var(--text-muted);
+}
+
+.statCard__trendLabel {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ---------- 底部发光条 ---------- */
+.statCard__glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-neon-blue), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.statCard:hover .statCard__glow {
+  opacity: 0.5;
+}
+
+.statCard--cyan .statCard__glow {
+  background: linear-gradient(90deg, transparent, var(--color-neon-cyan), transparent);
+}
+
+.statCard--purple .statCard__glow {
+  background: linear-gradient(90deg, transparent, var(--color-neon-purple), transparent);
+}
+
+.statCard--success .statCard__glow {
+  background: linear-gradient(90deg, transparent, var(--color-success), transparent);
+}
+
+.statCard--warning .statCard__glow {
+  background: linear-gradient(90deg, transparent, var(--color-warning), transparent);
+}
+
+.statCard--error .statCard__glow {
+  background: linear-gradient(90deg, transparent, var(--color-error), transparent);
+}
