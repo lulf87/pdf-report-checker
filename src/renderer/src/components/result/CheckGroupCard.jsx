@@ -1,8 +1,8 @@
 /**
- * CheckGroupCard - 核对分组卡片组件 (高性能优化版)
+ * CheckGroupCard - 核对分组卡片组件 (重构版)
  * 显示分组名称、图标、通过进度
  * 支持折叠/展开功能
- * 科技感数据大屏设计系统
+ * 使用新的设计系统和CSS变量
  */
 
 import React, { useMemo, useCallback, memo } from 'react'
@@ -39,7 +39,7 @@ const ProgressRing = memo(function ProgressRing({ passRate, colorClass }) {
 })
 
 /**
- * 进度条组件 - CSS过渡替代动画库
+ * 进度条组件
  */
 const ProgressBar = memo(function ProgressBar({ passRate, colorClass }) {
   return (
@@ -127,7 +127,7 @@ function CheckGroupCard({
   isExpanded = true,
   onToggle
 }) {
-  // 计算统计信息 - 使用useMemo缓存
+  // 计算统计信息
   const stats = useMemo(() => {
     const totalItems = items.length
     const passedItems = items.filter(item => item.status === 'pass').length
@@ -166,7 +166,7 @@ function CheckGroupCard({
   }, [onToggle, id])
 
   return (
-    <div className={`${styles.checkGroupCard} ${groupStatusClass} fade-in`}>
+    <div className={`${styles.checkGroupCard} ${groupStatusClass}`}>
       {/* 分组头部 - 可点击折叠/展开 */}
       <GroupHeader
         name={name}

@@ -1,14 +1,13 @@
 /**
- * CheckResult - 核对结果主组件
- * 科技感数据大屏设计系统
- * 整合所有结果展示子组件
+ * CheckResult - 核对结果主组件 (重构版)
+ * 使用新的设计系统和CSS变量
+ * 更清晰的信息层级，更好的视觉引导
  */
 
 import React, { useMemo } from 'react'
 import { Result, Typography } from 'antd'
-import { motion, AnimatePresence } from 'framer-motion'
 import { FileTextOutlined, LoadingOutlined, PictureOutlined, AuditOutlined, FileOutlined } from '@ant-design/icons'
-import { FileCard, IssuesPanel, InspectionTable, ComparisonTable, PageCheckSection, CheckListPanel } from './'
+import { FileCard, IssuesPanel, InspectionTable, ComparisonTable, PageCheckSection, CheckListPanel, DashboardStats } from './'
 import { ActionBar } from '../ui'
 import styles from './CheckResult.module.css'
 
@@ -28,44 +27,6 @@ import {
 } from './CheckItemDetail'
 
 const { Text } = Typography
-
-// 动画配置
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-      ease: [0.34, 1.56, 0.64, 1]
-    }
-  }
-}
-
-const loadingVariants = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.3 }
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.9,
-    transition: { duration: 0.2 }
-  }
-}
 
 /**
  * CheckResult - 核对结果主组件
@@ -400,167 +361,100 @@ function CheckResult({
   // 未开始核对状态
   if (!result && !loading) {
     return (
-      <motion.div
-        className={styles.container}
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
-      >
-        <motion.div variants={itemVariants}>
-          <FileCard fileInfo={fileInfo} />
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Result
-            icon={
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-              >
-                <FileTextOutlined style={{ color: 'var(--color-neon-blue)', fontSize: 72, filter: 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))' }} />
-              </motion.div>
-            }
-            title={
-              <span style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                文件已上传
-              </span>
-            }
-            subTitle={
-              <span style={{ color: 'var(--text-secondary)' }}>
-                {fileInfo?.filename} 准备就绪，点击下方按钮开始核对
-              </span>
-            }
-            extra={
-              <ActionBar
-                onCheck={onCheck}
-                onReset={onReset}
-                llmEnabled={llmEnabled}
-                onLlmToggle={onLlmToggle}
-                showExport={false}
-              />
-            }
-          />
-        </motion.div>
-      </motion.div>
+      <div className={styles.container}>
+        <FileCard fileInfo={fileInfo} />
+        <Result
+          icon={
+            <div className={styles.readyIcon}>
+              <FileTextOutlined />
+            </div>
+          }
+          title={
+            <span className={styles.readyTitle}>
+              文件已上传
+            </span>
+          }
+          subTitle={
+            <span className={styles.readySubtitle}>
+              {fileInfo?.filename} 准备就绪，点击下方按钮开始核对
+            </span>
+          }
+          extra={
+            <ActionBar
+              onCheck={onCheck}
+              onReset={onReset}
+              llmEnabled={llmEnabled}
+              onLlmToggle={onLlmToggle}
+              showExport={false}
+            />
+          }
+        />
+      </div>
     )
   }
 
   // 加载中状态
   if (loading) {
     return (
-      <AnimatePresence>
-        <motion.div
-          className={styles.loadingContainer}
-          variants={loadingVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-        >
-          <motion.div
-            animate={{
-              rotate: 360,
-              transition: { duration: 2, repeat: Infinity, ease: 'linear' }
-            }}
-          >
-            <LoadingOutlined style={{ fontSize: 48, color: 'var(--color-neon-blue)', filter: 'drop-shadow(0 0 15px rgba(59, 130, 246, 0.5))' }} />
-          </motion.div>
-          <div className={styles.loadingText}>
-            <Text style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>正在核对报告，请稍候...</Text>
+      <div className={styles.loadingContainer}>
+        <div className={styles.loadingSpinner}>
+          <LoadingOutlined />
+        </div>
+        <div className={styles.loadingText}>
+          <Text>正在核对报告，请稍候...</Text>
+        </div>
+        <div className={styles.loadingSubtext}>
+          <Text type="secondary">包括：PDF解析、OCR识别、字段比对等步骤</Text>
+        </div>
+        {/* 进度条动画 */}
+        <div className={styles.loadingProgress}>
+          <div className={styles.loadingProgressBar}>
+            <div className={styles.loadingProgressFill} />
           </div>
-          <div className={styles.loadingSubtext}>
-            <Text style={{ color: 'var(--text-secondary)' }}>包括：PDF解析、OCR识别、字段比对等步骤</Text>
-          </div>
-
-          {/* 进度条动画 */}
-          <div style={{ width: 256, margin: '24px auto 0' }}>
-            <motion.div
-              style={{
-                height: 4,
-                background: 'rgba(59, 130, 246, 0.2)',
-                borderRadius: 2,
-                overflow: 'hidden'
-              }}
-            >
-              <motion.div
-                style={{
-                  height: '100%',
-                  background: 'linear-gradient(90deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%)',
-                  borderRadius: 2,
-                  boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)'
-                }}
-                initial={{ width: '0%' }}
-                animate={{
-                  width: ['0%', '30%', '60%', '80%', '90%'],
-                  transition: {
-                    duration: 8,
-                    times: [0, 0.2, 0.5, 0.8, 1],
-                    repeat: Infinity
-                  }
-                }}
-              />
-            </motion.div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+        </div>
+      </div>
     )
   }
 
   // 核对结果展示
   return (
-    <motion.div
-      className={styles.container}
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
+    <div className={styles.container}>
       {/* 文件信息卡片 */}
-      <motion.div variants={itemVariants}>
-        <FileCard fileInfo={fileInfo} onExport={handleExport} />
-      </motion.div>
+      <FileCard fileInfo={fileInfo} onExport={handleExport} />
+
+      {/* 统计仪表盘 */}
+      <DashboardStats result={result} />
 
       {/* 核对清单面板 */}
-      <motion.div variants={itemVariants}>
-        <CheckListPanel checkGroups={checkGroups} />
-      </motion.div>
+      <CheckListPanel checkGroups={checkGroups} />
 
       {/* 问题汇总面板 */}
-      <motion.div variants={itemVariants}>
-        <IssuesPanel
-          errors={result?.errors || []}
-          warnings={result?.warnings || []}
-          info={result?.info || []}
-        />
-      </motion.div>
+      <IssuesPanel
+        errors={result?.errors || []}
+        warnings={result?.warnings || []}
+        info={result?.info || []}
+      />
 
       {/* 检验项目表格 */}
-      <motion.div variants={itemVariants}>
-        <InspectionTable data={result?.inspection_item_check} />
-      </motion.div>
+      <InspectionTable data={result?.inspection_item_check} />
 
       {/* 字段比对表格 */}
-      <motion.div variants={itemVariants}>
-        <ComparisonTable data={result?.home_third_comparison || []} />
-      </motion.div>
+      <ComparisonTable data={result?.home_third_comparison || []} />
 
       {/* 页码校验区域 */}
-      <motion.div variants={itemVariants}>
-        <PageCheckSection data={result?.page_number_check} />
-      </motion.div>
+      <PageCheckSection data={result?.page_number_check} />
 
       {/* 底部操作栏 */}
-      <motion.div variants={itemVariants}>
-        <ActionBar
-          onCheck={onCheck}
-          onReset={onReset}
-          onExportPdf={() => handleExport('pdf')}
-          onExportExcel={() => handleExport('excel')}
-          llmEnabled={llmEnabled}
-          onLlmToggle={onLlmToggle}
-          showExport={true}
-        />
-      </motion.div>
-    </motion.div>
+      <ActionBar
+        onCheck={onCheck}
+        onReset={onReset}
+        onExportPdf={() => handleExport('pdf')}
+        onExportExcel={() => handleExport('excel')}
+        llmEnabled={llmEnabled}
+        onLlmToggle={onLlmToggle}
+        showExport={true}
+      />
+    </div>
   )
 }
 

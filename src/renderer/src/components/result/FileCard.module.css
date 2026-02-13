@@ -1,163 +1,146 @@
-/* ============================================
-   FileCard - 文件信息卡片
-   ============================================ */
+/**
+ * FileCard - 文件信息卡片组件样式 (重构版)
+ * 使用新的设计系统CSS变量
+ */
 
-.file-card {
+.fileCard {
   position: relative;
-  overflow: visible;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.file-card__content {
+.fileCard:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.fileCardContent {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: var(--space-lg);
   gap: var(--space-lg);
 }
 
-/* 文件信息区 */
-.file-card__info {
+/* ========== 文件信息 ========== */
+.fileInfo {
   display: flex;
   align-items: center;
   gap: var(--space-md);
   flex: 1;
-  min-width: 0;
 }
 
-/* 文件图标 */
-.file-card__icon {
+.fileIcon {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 56px;
   height: 56px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.2) 0%,
-    rgba(6, 182, 212, 0.2) 100%
-  );
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-primary-light);
+  font-size: 28px;
   flex-shrink: 0;
 }
 
-.file-card__icon .anticon {
-  font-size: 28px;
-  color: var(--color-neon-blue-light);
-}
-
-/* 文件详情 */
-.file-card__details {
-  flex: 1;
+.fileDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
   min-width: 0;
 }
 
-.file-card__name {
-  font-family: var(--font-display);
+.fileName {
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 var(--space-xs) 0;
-  white-space: nowrap;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.file-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-.file-card__meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.fileMeta {
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
-.file-card__meta-icon {
-  font-size: 14px;
-  color: var(--color-neon-cyan);
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
-.file-card__meta-label {
+.metaIcon {
+  color: var(--text-muted);
+}
+
+.metaLabel {
   color: var(--text-tertiary);
 }
 
-.file-card__meta-value {
-  color: var(--color-neon-blue-light);
+.metaValue {
+  color: var(--text-primary);
   font-weight: 500;
 }
 
-/* 导出按钮 */
-.file-card__export-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.3) 0%,
-    rgba(37, 99, 235, 0.3) 100%
-  ) !important;
-  border: 1px solid rgba(59, 130, 246, 0.4) !important;
-  color: var(--text-primary) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--glow-blue) !important;
-  transition: all var(--transition-fast) !important;
+/* ========== 导出按钮 ========== */
+.exportBtn {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   flex-shrink: 0;
 }
 
-.file-card__export-btn:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.4) 0%,
-    rgba(37, 99, 235, 0.4) 100%
-  ) !important;
-  border-color: rgba(59, 130, 246, 0.6) !important;
-  box-shadow: var(--glow-blue-strong) !important;
-  transform: translateY(-1px);
+.exportBtn:hover {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  box-shadow: var(--shadow-glow-sm);
 }
 
-/* 扫描线装饰 */
-.file-card__scanline {
+/* ========== 装饰性扫描线 ========== */
+.scanline {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--color-neon-cyan) 50%,
-    transparent 100%
-  );
+  left: -100%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-primary-light), transparent);
+  animation: scanline 3s linear infinite;
   opacity: 0.5;
 }
 
-/* 响应式 */
+@keyframes scanline {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* ========== 响应式 ========== */
 @media (max-width: 768px) {
-  .file-card__content {
+  .fileCardContent {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
+    padding: var(--space-md);
   }
 
-  .file-card__info {
-    flex-direction: column;
-    text-align: center;
+  .fileIcon {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
   }
 
-  .file-card__details {
-    text-align: center;
+  .fileName {
+    font-size: var(--text-base);
   }
 
-  .file-card__name {
-    white-space: normal;
-    word-break: break-all;
-  }
-
-  .file-card__meta {
-    justify-content: center;
-  }
-
-  .file-card__export-btn {
+  .exportBtn {
     width: 100%;
   }
 }

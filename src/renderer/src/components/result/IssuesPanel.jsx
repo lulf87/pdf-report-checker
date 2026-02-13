@@ -1,6 +1,6 @@
 /**
- * IssuesPanel - 问题汇总面板
- * 科技感数据大屏设计系统
+ * IssuesPanel - 问题汇总面板 (重构版)
+ * 使用新的设计系统和CSS变量
  */
 
 import React from 'react'
@@ -48,7 +48,7 @@ export default function IssuesPanel({ errors = [], warnings = [], info = [] }) {
       <div className={styles.issuesPanelEmpty}>
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={<span style={{ color: 'var(--text-tertiary)' }}>未发现任何问题</span>}
+          description={<span className={styles.emptyText}>未发现任何问题</span>}
         />
       </div>
     )

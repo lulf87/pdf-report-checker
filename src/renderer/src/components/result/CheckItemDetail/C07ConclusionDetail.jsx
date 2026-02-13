@@ -1,32 +1,19 @@
 /**
- * C07ConclusionDetail - 检验项目单项结论核对详情
- * 科技感数据大屏设计系统
+ * C07ConclusionDetail - 检验项目单项结论核对详情 (重构版)
+ * 使用新的设计系统和CSS变量
  */
 
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Table, Tag, Tooltip } from 'antd'
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  DownOutlined,
-  FileSearchOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons'
-import StatusBadge from '../../ui/StatusBadge'
-import styles from './C07ConclusionDetail.module.css'
+import { DownOutlined, CheckCircleOutlined, CloseCircleOutlined, FileSearchOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { Table, Tag } from 'antd'
+import styles from './CheckItemDetail.module.css'
 
 /**
- * 检验项目单项结论核对详情组件
+ * C07: 检验项目单项结论核对详情组件
  * @param {Object} props
  * @param {Object} props.data - 核对结果数据
- * @param {Array} props.data.errors - 错误列表
- * @param {Array} props.data.item_checks - 检验项目检查列表
- * @param {number} props.data.total_items - 检验项目总数
- * @param {number} props.data.correct_conclusions - 正确结论数
- * @param {number} props.data.incorrect_conclusions - 错误结论数
  */
-export default function C07ConclusionDetail({ data }) {
+function C07ConclusionDetail({ data }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   if (!data) return null
@@ -90,7 +77,7 @@ export default function C07ConclusionDetail({ data }) {
       key: 'actual_conclusion',
       width: 100,
       render: (text) => (
-        <Tag className={`${styles.conclusionTag} ${styles.errorTag}`}>
+        <Tag className={styles.errorTag}>
           {text}
         </Tag>
       ),
@@ -101,7 +88,7 @@ export default function C07ConclusionDetail({ data }) {
       key: 'expected_conclusion',
       width: 100,
       render: (text) => (
-        <Tag className={`${styles.conclusionTag} ${styles.successTag}`}>
+        <Tag className={styles.successTag}>
           {text}
         </Tag>
       ),
@@ -111,9 +98,7 @@ export default function C07ConclusionDetail({ data }) {
       key: 'status',
       width: 80,
       render: () => (
-        <Tooltip title="结论错误">
-          <CloseCircleOutlined className={styles.statusIconError} />
-        </Tooltip>
+        <CloseCircleOutlined className={styles.statusIconError} />
       ),
     },
   ]
@@ -126,90 +111,79 @@ export default function C07ConclusionDetail({ data }) {
   ]
 
   return (
-    <div className={styles.detailWrapper}>
+    <div className={styles.checkDetail}>
       {/* 折叠头部 */}
-      <motion.div
-        className={styles.header}
+      <div
+        className={styles.detailHeader}
         onClick={() => setIsExpanded(!isExpanded)}
-        whileHover={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && setIsExpanded(!isExpanded)}
       >
         <div className={styles.headerLeft}>
           <FileSearchOutlined className={styles.headerIcon} />
-          <span className={styles.headerTitle}>单项结论核对详情</span>
+          <span className={styles.detailTitle}>单项结论核对详情</span>
           {hasErrors && (
-            <StatusBadge
-              status="error"
-              text={`${incorrect_conclusions} 处错误`}
-              size="sm"
-            />
+            <Tag className={styles.errorTag}>
+              {incorrect_conclusions} 处错误
+            </Tag>
           )}
         </div>
         <div className={styles.headerRight}>
-          <motion.span
-            animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <DownOutlined className={styles.expandIcon} />
-          </motion.span>
+          <span className={`${styles.expandIcon} ${isExpanded ? styles.expanded : ''}`}>
+            <DownOutlined />
+          </span>
         </div>
-      </motion.div>
+      </div>
 
       {/* 展开内容 */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            className={styles.content}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            {/* 统计卡片 */}
-            <div className={styles.statsGrid}>
-              {stats.map((stat, index) => (
-                <div
-                  key={index}
-                  className={`${styles.statCard} ${styles[stat.status]}`}
-                >
-                  <div className={styles.statValue}>{stat.value}</div>
-                  <div className={styles.statLabel}>{stat.label}</div>
-                </div>
-              ))}
+      <div className={`${styles.detailContent} ${isExpanded ? styles.expanded : ''}`}>
+        {/* 统计卡片 */}
+        <div className={styles.statsGrid}>
+          {stats.map((stat, index) => (
+            <div
+              key={index}
+              className={`${styles.statCard} ${styles[stat.status]}`}
+            >
+              <div className={styles.statValue}>{stat.value}</div>
+              <div className={styles.statLabel}>{stat.label}</div>
             </div>
+          ))}
+        </div>
 
-            {/* 错误提示 */}
-            {hasErrors && (
-              <div className={styles.errorAlert}>
-                <InfoCircleOutlined className={styles.errorAlertIcon} />
-                <div className={styles.errorAlertContent}>
-                  <div className={styles.errorAlertTitle}>结论核对错误</div>
-                  <div className={styles.errorAlertDesc}>
-                    发现 {incorrect_conclusions} 处单项结论与期望不符，请核对检验结果与结论的逻辑关系
-                  </div>
-                </div>
+        {/* 错误提示 */}
+        {hasErrors && (
+          <div className={styles.errorAlert}>
+            <InfoCircleOutlined className={styles.errorAlertIcon} />
+            <div className={styles.errorAlertContent}>
+              <div className={styles.errorAlertTitle}>结论核对错误</div>
+              <div className={styles.errorAlertDesc}>
+                发现 {incorrect_conclusions} 处单项结论与期望不符，请核对检验结果与结论的逻辑关系
               </div>
-            )}
-
-            {/* 详情表格 */}
-            {tableData.length > 0 ? (
-              <div className={styles.tableWrapper}>
-                <Table
-                  columns={columns}
-                  dataSource={tableData}
-                  pagination={{ pageSize: 5, size: 'small' }}
-                  size="small"
-                  className={styles.dataTable}
-                />
-              </div>
-            ) : (
-              <div className={styles.emptyState}>
-                <CheckCircleOutlined className={styles.emptyIcon} />
-                <p>所有单项结论核对正确</p>
-              </div>
-            )}
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+
+        {/* 详情表格 */}
+        {tableData.length > 0 ? (
+          <div className={styles.tableWrapper}>
+            <Table
+              columns={columns}
+              dataSource={tableData}
+              pagination={{ pageSize: 5, size: 'small' }}
+              size="small"
+              className={styles.detailTable}
+            />
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <CheckCircleOutlined className={styles.emptyIcon} />
+            <p>所有单项结论核对正确</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
+
+export default C07ConclusionDetail

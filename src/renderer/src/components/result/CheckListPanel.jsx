@@ -1,9 +1,9 @@
 /**
- * CheckListPanel - 核对内容清单总面板 (高性能优化版)
+ * CheckListPanel - 核对内容清单总面板 (重构版)
  * 显示所有11个核对项（C01-C11）的汇总
  * 包含筛选功能：全部/仅错误/仅警告标签页
  * 按4个分组展示，支持分组折叠
- * 科技感数据大屏设计系统
+ * 使用新的设计系统和CSS变量
  */
 
 import React, { useState, useMemo, useCallback, memo } from 'react'
@@ -73,7 +73,7 @@ const defaultCheckGroups = [
 ]
 
 /**
- * 统计摘要组件 - 纯展示，使用memo优化
+ * 统计摘要组件
  */
 const StatsSummary = memo(function StatsSummary({ stats }) {
   return (
@@ -141,7 +141,7 @@ const FilterControl = memo(function FilterControl({ filter, stats, onChange }) {
 })
 
 /**
- * 进度条组件 - CSS动画替代Framer Motion
+ * 进度条组件
  */
 const ProgressBar = memo(function ProgressBar({ percentage }) {
   return (
@@ -253,7 +253,7 @@ function CheckListPanel({ checkGroups = defaultCheckGroups, onItemClick }) {
         <FilterControl filter={filter} stats={stats} onChange={setFilter} />
       </div>
 
-      {/* 分组列表 - 使用CSS动画替代Framer Motion */}
+      {/* 分组列表 */}
       <div className={styles.groupsContainer}>
         {filteredGroups.length > 0 ? (
           filteredGroups.map((group, index) => (
@@ -273,7 +273,7 @@ function CheckListPanel({ checkGroups = defaultCheckGroups, onItemClick }) {
             </div>
           ))
         ) : (
-          <div className={`${styles.emptyContainer} fade-in`}>
+          <div className={styles.emptyContainer}>
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={

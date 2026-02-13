@@ -1,6 +1,10 @@
+/**
+ * FileCard - 文件信息卡片组件 (重构版)
+ * 使用新的设计系统和CSS变量
+ */
+
 import React from 'react'
 import { Button, Dropdown, Space } from 'antd'
-import { motion } from 'framer-motion'
 import {
   FileTextOutlined,
   DownloadOutlined,
@@ -9,11 +13,10 @@ import {
   ClockCircleOutlined,
   FileOutlined,
 } from '@ant-design/icons'
-import { GlowCard } from '../ui'
-import './FileCard.module.css'
+import styles from './FileCard.module.css'
 
 /**
- * 文件信息卡片组件 - 科技感风格
+ * 文件信息卡片组件
  * @param {Object} props
  * @param {Object} props.fileInfo - 文件信息对象
  * @param {string} props.fileInfo.filename - 文件名
@@ -52,37 +55,33 @@ function FileCard({ fileInfo, checkTime, pageCount, onExport }) {
   }
 
   return (
-    <GlowCard glowColor="blue" className="file-card">
-      <div className="file-card__content">
+    <div className={styles.fileCard}>
+      <div className={styles.fileCardContent}>
         {/* 左侧：文件信息 */}
-        <div className="file-card__info">
+        <div className={styles.fileInfo}>
           {/* 文件图标 */}
-          <motion.div
-            className="file-card__icon"
-            whileHover={{ scale: 1.05 }}
-            transition={{ duration: 0.2 }}
-          >
+          <div className={styles.fileIcon}>
             <FileTextOutlined />
-          </motion.div>
+          </div>
 
           {/* 文件详情 */}
-          <div className="file-card__details">
-            <h3 className="file-card__name">{fileInfo.filename}</h3>
-            <div className="file-card__meta">
+          <div className={styles.fileDetails}>
+            <h3 className={styles.fileName}>{fileInfo.filename}</h3>
+            <div className={styles.fileMeta}>
               <Space size="middle">
-                <span className="file-card__meta-item">
-                  <FileOutlined className="file-card__meta-icon" />
+                <span className={styles.metaItem}>
+                  <FileOutlined className={styles.metaIcon} />
                   <span>{fileInfo.file_type?.toUpperCase() || '未知'}</span>
                 </span>
                 {pageCount && (
-                  <span className="file-card__meta-item">
-                    <span className="file-card__meta-label">页数:</span>
-                    <span className="file-card__meta-value">{pageCount}</span>
+                  <span className={styles.metaItem}>
+                    <span className={styles.metaLabel}>页数:</span>
+                    <span className={styles.metaValue}>{pageCount}</span>
                   </span>
                 )}
                 {checkTime && (
-                  <span className="file-card__meta-item">
-                    <ClockCircleOutlined className="file-card__meta-icon" />
+                  <span className={styles.metaItem}>
+                    <ClockCircleOutlined className={styles.metaIcon} />
                     <span>{formatTime(checkTime)}</span>
                   </span>
                 )}
@@ -100,7 +99,7 @@ function FileCard({ fileInfo, checkTime, pageCount, onExport }) {
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              className="file-card__export-btn"
+              className={styles.exportBtn}
             >
               导出报告
             </Button>
@@ -109,8 +108,8 @@ function FileCard({ fileInfo, checkTime, pageCount, onExport }) {
       </div>
 
       {/* 装饰性扫描线 */}
-      <div className="file-card__scanline" />
-    </GlowCard>
+      <div className={styles.scanline} />
+    </div>
   )
 }
 

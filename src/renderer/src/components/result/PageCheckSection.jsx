@@ -1,6 +1,6 @@
 /**
- * PageCheckSection - 页码校验区域
- * 科技感数据大屏设计系统
+ * PageCheckSection - 页码校验区域 (重构版)
+ * 使用新的设计系统和CSS变量
  */
 
 import React from 'react'

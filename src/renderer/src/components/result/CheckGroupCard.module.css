@@ -1,22 +1,22 @@
-/* CheckGroupCard.module.css - 核对分组卡片样式 */
+/**
+ * CheckGroupCard - 核对分组卡片组件样式 (重构版)
+ * 使用新的设计系统CSS变量
+ */
 
 .checkGroupCard {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: all 0.3s ease;
-  margin-bottom: 20px;
+  transition: all var(--transition-fast);
 }
 
 .checkGroupCard:hover {
-  border-color: var(--border-color-hover);
-  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
 }
 
-/* 分组状态样式 */
+/* 状态边框 */
 .groupPass {
   border-left: 3px solid var(--color-success);
 }
@@ -29,99 +29,89 @@
   border-left: 3px solid var(--color-error);
 }
 
-/* 分组头部 */
+/* ========== 分组头部 ========== */
 .groupHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--glass-border);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+  padding: var(--space-md) var(--space-lg);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, transparent 100%);
+  transition: background-color var(--transition-fast);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-md);
+  flex: 1;
 }
 
-/* 图标包装器 */
 .iconWrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  color: var(--color-neon-blue-light);
-  font-size: 20px;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  color: var(--color-primary-light);
+  font-size: var(--text-lg);
 }
 
-.groupPass .iconWrapper {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
-  border-color: rgba(16, 185, 129, 0.3);
-  color: var(--color-success-light);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
-}
-
-.groupWarning .iconWrapper {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%);
-  border-color: rgba(245, 158, 11, 0.3);
-  color: var(--color-warning-light);
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
-}
-
-.groupFail .iconWrapper {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: var(--color-error-light);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-/* 标题区域 */
 .titleSection {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .groupName {
-  margin: 0;
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: 0.3px;
+  margin: 0;
 }
 
 .progressText {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
 .progressIcon {
-  font-size: 12px;
   color: var(--color-success);
 }
 
 .issueSummary {
-  color: var(--text-tertiary);
-  font-size: 12px;
+  color: var(--text-muted);
 }
 
-/* 进度环 */
-.progressRing {
-  position: relative;
-  width: 48px;
-  height: 48px;
+.headerRight {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--space-md);
+}
+
+/* ========== 进度环 ========== */
+.progressRing {
+  position: relative;
+  width: 40px;
+  height: 40px;
 }
 
 .circularChart {
@@ -140,7 +130,7 @@
   fill: none;
   stroke-width: 3;
   stroke-linecap: round;
-  transition: stroke-dasharray 0.8s ease;
+  transition: stroke-dasharray 0.5s ease;
 }
 
 .progressSuccess {
@@ -157,13 +147,30 @@
 
 .progressPercentage {
   position: absolute;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
-/* 进度条容器 */
+/* ========== 展开/折叠指示器 ========== */
+.expandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.expandIcon.expanded {
+  transform: rotate(90deg);
+}
+
+/* ========== 进度条 ========== */
 .progressBarContainer {
   height: 3px;
   background: rgba(59, 130, 246, 0.1);
@@ -172,137 +179,86 @@
 
 .progressBar {
   height: 100%;
-  border-radius: 0 2px 2px 0;
-  transition: width 0.8s ease;
+  transition: width 0.5s ease;
 }
 
-.progressBar.progressSuccess {
-  background: linear-gradient(90deg, var(--color-success) 0%, var(--color-success-light) 100%);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-}
-
-.progressBar.progressWarning {
-  background: linear-gradient(90deg, var(--color-warning) 0%, var(--color-warning-light) 100%);
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-}
-
-.progressBar.progressError {
-  background: linear-gradient(90deg, var(--color-error) 0%, var(--color-error-light) 100%);
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-}
-
-/* 核对项列表 - 可折叠 */
+/* ========== 核对项列表 ========== */
 .itemsList {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+  transition: max-height var(--transition-slow), opacity var(--transition-normal);
 }
 
 .itemsList.expanded {
   max-height: 2000px;
   opacity: 1;
-  padding: 16px 20px 20px;
 }
 
 .itemsList.collapsed {
   max-height: 0;
   opacity: 0;
-  padding: 0 20px;
 }
 
-/* 列表项动画 */
 .itemWrapper {
   animation: fadeInUp 0.3s ease forwards;
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(10px);
 }
 
+.itemWrapper:not(:last-child) {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ========== 空状态 ========== */
+.emptyState {
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.emptyText {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ========== 动画 ========== */
 @keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-/* 可点击头部 */
-.clickable {
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s ease;
-}
-
-.clickable:hover {
-  background: rgba(59, 130, 246, 0.05);
-}
-
-.clickable:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-
-/* 头部右侧区域 */
-.headerRight {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* 展开/折叠图标 */
-.expandIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--text-tertiary);
-  transition: transform 0.2s ease, color 0.2s ease;
-}
-
-.expandIcon.expanded {
-  transform: rotate(0deg);
-  color: var(--color-primary-light);
-}
-
-/* 空状态 */
-.emptyState {
-  padding: 40px 20px;
-  text-align: center;
-}
-
-.emptyText {
-  font-size: 14px;
-  color: var(--text-tertiary);
-}
-
-/* 响应式调整 */
-@media (max-width: 640px) {
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
   .groupHeader {
-    padding: 14px 16px;
+    padding: var(--space-sm) var(--space-md);
   }
 
   .iconWrapper {
-    width: 38px;
-    height: 38px;
-    font-size: 16px;
-  }
-
-  .groupName {
-    font-size: 15px;
-  }
-
-  .progressText {
-    font-size: 12px;
+    width: 32px;
+    height: 32px;
+    font-size: var(--text-base);
   }
 
   .progressRing {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
   }
 
   .progressPercentage {
-    font-size: 10px;
+    font-size: 9px;
   }
 
-  .itemsList {
-    padding: 12px 16px 16px;
+  .groupName {
+    font-size: var(--text-sm);
+  }
+
+  .progressText {
+    font-size: var(--text-xs);
   }
 }

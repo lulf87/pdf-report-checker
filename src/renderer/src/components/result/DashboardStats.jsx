@@ -1,21 +1,73 @@
-import React from 'react'
-import { motion } from 'framer-motion'
+/**
+ * DashboardStats - 统计仪表盘组件 (重构版)
+ * 使用新的设计系统和CSS变量
+ */
+
+import React, { useMemo } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   AppstoreOutlined,
   PieChartOutlined,
 } from '@ant-design/icons'
-import { StatCard, ProgressBar } from '../ui'
-import './DashboardStats.module.css'
+import styles from './DashboardStats.module.css'
 
 /**
- * 统计仪表盘组件 - 科技感风格
+ * 统计卡片组件
+ */
+function StatCard({ title, value, suffix, icon, type }) {
+  return (
+    <div className={`${styles.statCard} ${styles[type]}`}>
+      <div className={styles.statIcon}>{icon}</div>
+      <div className={styles.statContent}>
+        <div className={styles.statValue}>
+          {value}
+          {suffix && <span className={styles.statSuffix}>{suffix}</span>}
+        </div>
+        <div className={styles.statTitle}>{title}</div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 环形进度条组件
+ */
+function CircularProgress({ percentage, size = 120 }) {
+  const radius = (size - 8) / 2
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (percentage / 100) * circumference
+
+  const colorClass = percentage >= 80 ? styles.success : percentage >= 60 ? styles.warning : styles.error
+
+  return (
+    <div className={styles.circularProgress} style={{ width: size, height: size }}>
+      <svg width={size} height={size} className={styles.circularSvg}>
+        <circle
+          className={styles.circularBg}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+        />
+        <circle
+          className={`${styles.circularFill} ${colorClass}`}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          style={{ strokeDashoffset }}
+        />
+      </svg>
+      <div className={styles.circularText}>
+        <span className={styles.circularValue}>{percentage.toFixed(1)}%</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 统计仪表盘组件
  * @param {Object} props
  * @param {Object} props.result - 核对结果对象
- * @param {number} props.result.total_components - 总字段数
- * @param {number} props.result.passed_components - 通过数
- * @param {number} props.result.failed_components - 失败数
  */
 function DashboardStats({ result }) {
   if (!result) return null
@@ -27,11 +79,11 @@ function DashboardStats({ result }) {
   } = result
 
   const passRate = total_components > 0
-    ? ((passed_components / total_components) * 100).toFixed(1)
+    ? (passed_components / total_components) * 100
     : 0
 
   // 统计数据
-  const stats = [
+  const stats = useMemo(() => [
     {
       title: '总字段',
       value: total_components,
@@ -52,86 +104,38 @@ function DashboardStats({ result }) {
     },
     {
       title: '通过率',
-      value: passRate,
+      value: passRate.toFixed(1),
       suffix: '%',
       icon: <PieChartOutlined />,
-      type: parseFloat(passRate) >= 80 ? 'success' : parseFloat(passRate) >= 60 ? 'warning' : 'error',
+      type: passRate >= 80 ? 'success' : passRate >= 60 ? 'warning' : 'error',
     },
-  ]
+  ], [total_components, passed_components, failed_components, passRate])
 
-  // 动画配置
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2,
-      },
-    },
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: [0.34, 1.56, 0.64, 1],
-      },
-    },
-  }
+  const passRateLabel = useMemo(() => {
+    if (passRate >= 90) return '优秀'
+    if (passRate >= 80) return '良好'
+    if (passRate >= 60) return '一般'
+    return '需要关注'
+  }, [passRate])
 
   return (
-    <motion.div
-      className="dashboard-stats"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
+    <div className={styles.dashboardStats}>
       {/* 左侧：统计卡片网格 */}
-      <div className="dashboard-stats__cards">
+      <div className={styles.statsGrid}>
         {stats.map((stat, index) => (
-          <motion.div key={index} variants={itemVariants}>
-            <StatCard
-              title={stat.title}
-              value={stat.value}
-              suffix={stat.suffix}
-              icon={stat.icon}
-              type={stat.type}
-              delay={index * 100}
-            />
-          </motion.div>
+          <StatCard key={index} {...stat} />
         ))}
       </div>
 
       {/* 右侧：环形进度图 */}
-      <motion.div
-        className="dashboard-stats__progress"
-        variants={itemVariants}
-      >
-        <div className="dashboard-stats__progress-wrapper">
-          <ProgressBar
-            percentage={parseFloat(passRate)}
-            size="xl"
-            color={parseFloat(passRate) >= 80 ? 'success' : parseFloat(passRate) >= 60 ? 'warning' : 'error'}
-          />
-          <div className="dashboard-stats__progress-label">
-            <span className="dashboard-stats__progress-title">总体通过率</span>
-            <span className="dashboard-stats__progress-desc">
-              {parseFloat(passRate) >= 90
-                ? '优秀'
-                : parseFloat(passRate) >= 80
-                  ? '良好'
-                  : parseFloat(passRate) >= 60
-                    ? '一般'
-                    : '需要关注'}
-            </span>
-          </div>
+      <div className={styles.progressSection}>
+        <CircularProgress percentage={passRate} />
+        <div className={styles.progressLabel}>
+          <span className={styles.progressTitle}>总体通过率</span>
+          <span className={styles.progressDesc}>{passRateLabel}</span>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 

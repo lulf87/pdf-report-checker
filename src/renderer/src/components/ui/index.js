@@ -1,16 +1,34 @@
 /**
- * UI Components - 基础组件库 (高性能优化版)
+ * UI Components - 新UI组件库
  * 科技感数据大屏设计系统
+ *
+ * 使用方式:
+ * import { Button, Card, Badge } from '@/components/ui-new'
  */
 
-export { default as GlowCard } from './GlowCard'
-export { default as StatCard } from './StatCard'
-export { default as ProgressBar } from './ProgressBar'
-export { default as StatusBadge } from './StatusBadge'
-export { default as DataTable } from './DataTable'
-export { default as ActionBar } from './ActionBar'
-// ParticleBackground 已移除 - 使用 OptimizedBackground 替代
+// Button 按钮
+export { default as Button } from './Button'
 
-// 高性能优化组件
-export { default as OptimizedBackground, MinimalBackground, SolidBackground } from './OptimizedBackground'
-export { default as OptimizedCard } from './OptimizedCard'
+// Card 卡片
+export { FileCard, StatCard, CheckItemCard } from './Card'
+
+// Table 表格
+export { default as DataTable } from './Table'
+
+// Badge 徽章
+export { default as Badge } from './Badge'
+
+// Progress 进度
+export { ProgressBar, StepBar } from './Progress'
+
+// Upload 上传
+export { UploadZone } from './Upload'
+
+// Layout 布局
+export { PageLayout, Section, Sidebar } from './Layout'
+
+// Feedback 反馈
+export { Alert, Toast, Loading } from './Feedback'
+
+// Background 背景
+export { GridBackground, GradientBackground } from './Background'

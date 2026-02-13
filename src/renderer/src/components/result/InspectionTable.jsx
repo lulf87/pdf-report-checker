@@ -1,6 +1,6 @@
 /**
- * InspectionTable - 检验项目表格 (高性能优化版)
- * 科技感数据大屏设计系统
+ * InspectionTable - 检验项目表格 (重构版)
+ * 使用新的设计系统和CSS变量
  */
 
 import React, { useState, useMemo, useCallback, memo } from 'react'
@@ -44,7 +44,7 @@ const ErrorAlert = memo(function ErrorAlert({ errors }) {
           size="small"
           dataSource={errors}
           renderItem={(error) => (
-            <List.Item style={{ color: 'var(--color-error-light, #f87171)' }}>
+            <List.Item className={styles.errorListItem}>
               {error.message}
             </List.Item>
           )}
@@ -96,14 +96,14 @@ const ExpandedRowContent = memo(function ExpandedRowContent({ record }) {
         <div className={styles.conclusionCell}>
           <div className={styles.conclusionRow}>
             <span className={styles.conclusionLabel}>实际:</span>
-            <Tag className={clause.is_conclusion_correct ? styles.success : styles.error}>
+            <Tag className={clause.is_conclusion_correct ? styles.successTag : styles.errorTag}>
               {clause.conclusion || '/'}
             </Tag>
           </div>
           {!clause.is_conclusion_correct && clause.expected_conclusion && (
             <div className={styles.conclusionRow}>
               <span className={styles.conclusionLabel}>期望:</span>
-              <Tag className={styles.info}>{clause.expected_conclusion}</Tag>
+              <Tag className={styles.infoTag}>{clause.expected_conclusion}</Tag>
             </div>
           )}
         </div>
@@ -134,6 +134,7 @@ const ExpandedRowContent = memo(function ExpandedRowContent({ record }) {
         pagination={false}
         size="small"
         rowClassName={(clause) => !clause.is_conclusion_correct ? styles.rowError : ''}
+        className={styles.nestedTable}
       />
     </div>
   )
@@ -242,7 +243,7 @@ function InspectionTable({ data }) {
         const allCorrect = correctCount === totalCount
 
         return (
-          <Tag className={`${styles.statusTag} ${allCorrect ? styles.success : styles.error}`}>
+          <Tag className={`${styles.statusTag} ${allCorrect ? styles.successTag : styles.errorTag}`}>
             {allCorrect ? (
               <><CheckCircleOutlined /> {correctCount}/{totalCount}</>
             ) : (
@@ -258,7 +259,7 @@ function InspectionTable({ data }) {
       key: 'status',
       width: 100,
       render: (status) => (
-        <Tag className={`${styles.statusTag} ${status === 'pass' ? styles.success : status === 'fail' ? styles.error : styles.warning}`}>
+        <Tag className={`${styles.statusTag} ${status === 'pass' ? styles.successTag : status === 'fail' ? styles.errorTag : styles.warningTag}`}>
           {status === 'pass' ? '通过' : status === 'fail' ? '失败' : '警告'}
         </Tag>
       ),
@@ -295,7 +296,7 @@ function InspectionTable({ data }) {
             <Badge count={`续×${data.cross_page_continuations}`} className={styles.continuationBadge} />
           )}
         </h3>
-        <Tag className={`${styles.statusTag} ${totalErrors === 0 ? styles.success : styles.error}`}>
+        <Tag className={`${styles.statusTag} ${totalErrors === 0 ? styles.successTag : styles.errorTag}`}>
           {totalErrors === 0 ? '全部正确' : `${totalErrors} 处错误`}
         </Tag>
       </div>
@@ -331,7 +332,7 @@ function InspectionTable({ data }) {
         </button>
       </div>
 
-      {/* 表格 - 使用虚拟滚动优化 */}
+      {/* 表格 */}
       <Table
         columns={columns}
         dataSource={filteredItems}

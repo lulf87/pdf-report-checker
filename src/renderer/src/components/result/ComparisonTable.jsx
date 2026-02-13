@@ -1,6 +1,6 @@
 /**
- * ComparisonTable - 字段比对表格
- * 科技感数据大屏设计系统
+ * ComparisonTable - 字段比对表格 (重构版)
+ * 使用新的设计系统和CSS变量
  */
 
 import React from 'react'

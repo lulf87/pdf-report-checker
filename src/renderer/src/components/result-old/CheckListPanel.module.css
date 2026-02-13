@@ -1,0 +1,302 @@
+/* CheckListPanel.module.css - 核对内容清单总面板样式 */
+
+.checkListPanel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+/* 面板头部 */
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panelTitle::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(180deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%);
+  border-radius: 2px;
+}
+
+/* 统计摘要 */
+.statsSummary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statBadge :global(.ant-badge-count) {
+  background: rgba(59, 130, 246, 0.3);
+  color: var(--text-primary);
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px var(--color-bg-primary);
+}
+
+.passBadge :global(.ant-badge-count) {
+  background: var(--color-success);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.failBadge :global(.ant-badge-count) {
+  background: var(--color-error);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.warningBadge :global(.ant-badge-count) {
+  background: var(--color-warning);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.statLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* 筛选区域 */
+.filterSection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filterIcon {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.filterGroup {
+  display: flex;
+}
+
+.filterGroup :global(.ant-radio-button-wrapper) {
+  background: rgba(17, 24, 39, 0.6);
+  border-color: var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 0 12px;
+  height: 32px;
+  line-height: 30px;
+  transition: all 0.2s ease;
+}
+
+.filterGroup :global(.ant-radio-button-wrapper:hover) {
+  color: var(--color-neon-blue-light);
+  border-color: var(--color-neon-blue);
+}
+
+.filterGroup :global(.ant-radio-button-wrapper-checked) {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(6, 182, 212, 0.1) 100%) !important;
+  border-color: var(--color-neon-blue) !important;
+  color: var(--color-neon-blue-light) !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3), inset 0 0 10px rgba(59, 130, 246, 0.1) !important;
+}
+
+.filterGroup :global(.ant-radio-button-wrapper:first-child) {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.filterGroup :global(.ant-radio-button-wrapper:last-child) {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.filterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.filterGroup :global(.ant-radio-button-wrapper-checked) .filterCount {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* 分组容器 */
+.groupsContainer {
+  padding: 20px 24px;
+  min-height: 200px;
+}
+
+/* 分组包装器 - 淡入动画 */
+.groupWrapper {
+  animation: fadeInUp 0.4s ease forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 进度条填充 - CSS过渡替代Framer Motion */
+.progressBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%);
+  border-radius: 3px;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+  transition: width 0.5s ease;
+}
+
+/* 空状态 */
+.emptyContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 40px;
+}
+
+.emptyText {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+/* 面板底部 */
+.panelFooter {
+  padding: 16px 24px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(10, 14, 23, 0.5);
+}
+
+.footerProgress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progressBarBg {
+  flex: 1;
+  height: 6px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%);
+  border-radius: 3px;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+.progressText {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.filteredHint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: normal;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .panelHeader {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerLeft {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .panelTitle {
+    font-size: 16px;
+  }
+
+  .statsSummary {
+    gap: 12px;
+  }
+
+  .filterSection {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .groupsContainer {
+    padding: 16px;
+  }
+
+  .panelFooter {
+    padding: 12px 16px;
+  }
+
+  .footerProgress {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .progressText {
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .filterGroup :global(.ant-radio-button-wrapper) {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .filterCount {
+    display: none;
+  }
+}

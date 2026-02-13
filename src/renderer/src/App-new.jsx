@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, memo } from 'react'
 import { Layout, message, ConfigProvider } from 'antd'
-import { UploadZone } from './components/upload-new'
-import { CheckResult } from './components/result-new'
-import { GridBackground } from './components/ui-new'
+import { UploadZone } from './components/upload'
+import { CheckResult } from './components/result'
+import { GridBackground } from './components/ui'
 import './App.css'
 
 const { Header, Content, Footer } = Layout

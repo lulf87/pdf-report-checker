@@ -1,7 +1,7 @@
 /**
- * CheckItemCard - 单项核对卡片组件 (高性能优化版)
+ * CheckItemCard - 单项核对卡片组件 (重构版)
  * 显示核对项编号、名称、状态、错误/警告计数
- * 科技感数据大屏设计系统
+ * 使用新的设计系统和CSS变量
  */
 
 import React, { useState, useCallback, memo } from 'react'
@@ -190,7 +190,7 @@ function CheckItemCard({
         onToggle={handleToggle}
       />
 
-      {/* 详情区域（可折叠）- CSS过渡替代Framer Motion */}
+      {/* 详情区域（可折叠） */}
       <DetailsSection isExpanded={isExpanded} hasDetails={hasDetails}>
         {children}
       </DetailsSection>
