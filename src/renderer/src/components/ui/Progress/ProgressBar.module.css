@@ -1,0 +1,130 @@
+/* ============================================
+   ProgressBar - 进度条
+   ============================================ */
+
+.progressBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.progressBar__track {
+  flex: 1;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressBar__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-normal);
+  position: relative;
+}
+
+/* ---------- 尺寸变体 ---------- */
+.progressBar--sm .progressBar__track {
+  height: 4px;
+}
+
+.progressBar--sm .progressBar__label {
+  font-size: var(--text-xs);
+  min-width: 28px;
+}
+
+.progressBar--md .progressBar__track {
+  height: 8px;
+}
+
+.progressBar--md .progressBar__label {
+  font-size: var(--text-sm);
+  min-width: 36px;
+}
+
+.progressBar--lg .progressBar__track {
+  height: 12px;
+}
+
+.progressBar--lg .progressBar__label {
+  font-size: var(--text-base);
+  min-width: 44px;
+}
+
+/* ---------- 颜色变体 ---------- */
+.progressBar__fill--blue {
+  background: linear-gradient(90deg, var(--color-neon-blue), var(--color-neon-blue-light));
+  box-shadow: var(--glow-blue);
+}
+
+.progressBar__fill--cyan {
+  background: linear-gradient(90deg, var(--color-neon-cyan), var(--color-neon-cyan-light));
+  box-shadow: var(--glow-cyan);
+}
+
+.progressBar__fill--purple {
+  background: linear-gradient(90deg, var(--color-neon-purple), var(--color-neon-purple-light));
+  box-shadow: var(--glow-purple);
+}
+
+.progressBar__fill--success {
+  background: linear-gradient(90deg, var(--color-success), var(--color-success-light));
+  box-shadow: var(--glow-success);
+}
+
+.progressBar__fill--warning {
+  background: linear-gradient(90deg, var(--color-warning), var(--color-warning-light));
+  box-shadow: var(--glow-warning);
+}
+
+.progressBar__fill--error {
+  background: linear-gradient(90deg, var(--color-error), var(--color-error-light));
+  box-shadow: var(--glow-error);
+}
+
+/* ---------- 条纹效果 ---------- */
+.progressBar__fill--striped {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+}
+
+/* ---------- 条纹动画 ---------- */
+.progressBar__fill--animated {
+  animation: progressStripes 1s linear infinite;
+}
+
+@keyframes progressStripes {
+  from {
+    background-position: 1rem 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* ---------- 标签 ---------- */
+.progressBar__label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: right;
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .progressBar__fill {
+    transition: none;
+  }
+
+  .progressBar__fill--animated {
+    animation: none;
+  }
+}

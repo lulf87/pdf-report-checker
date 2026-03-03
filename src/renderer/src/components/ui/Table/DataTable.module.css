@@ -1,0 +1,213 @@
+/* ============================================
+   DataTable - 数据表格
+   ============================================ */
+
+.dataTable {
+  width: 100%;
+}
+
+.dataTable__container {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+}
+
+.dataTable__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+/* ---------- 表头 ---------- */
+.dataTable__thead {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.dataTable__th {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+
+.dataTable__th--checkbox {
+  width: 40px;
+  text-align: center;
+}
+
+.dataTable__th--sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dataTable__th--sortable:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.dataTable__th--sorted {
+  color: var(--color-neon-blue);
+}
+
+.dataTable__thContent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dataTable__sortIcon {
+  display: flex;
+  align-items: center;
+  color: var(--color-neon-blue);
+}
+
+.dataTable__sortIcon--inactive {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* ---------- 表体 ---------- */
+.dataTable__tbody {
+  background: transparent;
+}
+
+.dataTable__row {
+  border-bottom: 1px solid var(--glass-border);
+  transition: background var(--transition-fast);
+}
+
+.dataTable__row:last-child {
+  border-bottom: none;
+}
+
+.dataTable__row:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.dataTable__row--clickable {
+  cursor: pointer;
+}
+
+.dataTable__row--selected {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.dataTable__row--selected:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+/* 行状态 */
+.dataTable__row--success {
+  border-left: 3px solid var(--color-success);
+}
+
+.dataTable__row--warning {
+  border-left: 3px solid var(--color-warning);
+}
+
+.dataTable__row--error {
+  border-left: 3px solid var(--color-error);
+}
+
+.dataTable__td {
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.dataTable__td--checkbox {
+  text-align: center;
+}
+
+/* ---------- 复选框 ---------- */
+.dataTable__checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-neon-blue);
+}
+
+/* ---------- 空状态 ---------- */
+.dataTable__empty {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+}
+
+/* ---------- 加载状态 ---------- */
+.dataTable__loading {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-secondary);
+}
+
+.dataTable__spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--glass-border);
+  border-top-color: var(--color-neon-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto var(--space-sm);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 分页 ---------- */
+.dataTable__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding: var(--space-sm);
+}
+
+.dataTable__pageBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dataTable__pageBtn:hover:not(:disabled) {
+  border-color: var(--color-neon-blue);
+  color: var(--color-neon-blue-light);
+}
+
+.dataTable__pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dataTable__pageInfo {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .dataTable__spinner {
+    animation: none;
+  }
+
+  .dataTable__row,
+  .dataTable__pageBtn {
+    transition: none;
+  }
+}

@@ -1,0 +1,245 @@
+/**
+ * CheckItemCard - 单项核对卡片组件样式 (重构版)
+ * 使用新的设计系统CSS变量
+ */
+
+.checkItemCard {
+  background: var(--bg-secondary);
+  transition: all var(--transition-fast);
+}
+
+.checkItemCard:hover {
+  background: var(--bg-elevated);
+}
+
+/* 状态样式 */
+.pass {
+  border-left: 3px solid var(--color-success);
+}
+
+.fail {
+  border-left: 3px solid var(--color-error);
+}
+
+.warning {
+  border-left: 3px solid var(--color-warning);
+}
+
+.skip {
+  border-left: 3px solid var(--text-muted);
+}
+
+.checkItemCard.expanded {
+  background: rgba(59, 130, 246, 0.03);
+}
+
+/* ========== 卡片头部 ========== */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* ========== 左侧：编号和图标 ========== */
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.codeBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 24px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.codeBadge.pass {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.codeBadge.fail {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.codeBadge.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.codeBadge.skip {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-muted);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.statusIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-lg);
+}
+
+.statusIcon.pass {
+  color: var(--color-success);
+}
+
+.statusIcon.fail {
+  color: var(--color-error);
+}
+
+.statusIcon.warning {
+  color: var(--color-warning);
+}
+
+.statusIcon.skip {
+  color: var(--text-muted);
+}
+
+/* ========== 中间：名称和描述 ========== */
+.headerCenter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.itemName {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.description {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* ========== 徽章组 ========== */
+.badgeGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.errorBadge {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.warningBadge {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning-light);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+/* ========== 展开/折叠指示器 ========== */
+.expandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.expandIcon.expanded {
+  transform: rotate(90deg);
+}
+
+/* ========== 详情区域 ========== */
+.detailsContainer {
+  overflow: hidden;
+  transition: max-height var(--transition-slow), opacity var(--transition-normal);
+}
+
+.detailsContainer.expanded {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+.detailsContainer.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
+.detailsContent {
+  padding: var(--space-md) var(--space-lg);
+  padding-left: calc(var(--space-lg) + 39px);
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+  .cardHeader {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .codeBadge {
+    min-width: 32px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .statusIcon {
+    font-size: var(--text-base);
+  }
+
+  .itemName {
+    font-size: var(--text-xs);
+  }
+
+  .description {
+    font-size: 10px;
+  }
+
+  .detailsContent {
+    padding: var(--space-sm) var(--space-md);
+    padding-left: calc(var(--space-md) + 35px);
+  }
+}

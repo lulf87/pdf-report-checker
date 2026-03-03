@@ -1,0 +1,196 @@
+/**
+ * PageCheckSection - 页码校验区域样式 (重构版)
+ * 使用新的设计系统CSS变量
+ */
+
+.pageCheckWrapper {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.pageCheckWrapper:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* ========== 头部 ========== */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ========== 统计信息 ========== */
+.pageNumberStats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.statLabel {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.statValue {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* ========== 时间线 ========== */
+.timelineWrapper {
+  padding: var(--space-md) 0;
+}
+
+.pageNumberTimeline {
+  :global(.ant-timeline-item-tail) {
+    border-left-color: var(--border-default);
+  }
+}
+
+.timelineDotSuccess {
+  color: var(--color-success);
+  font-size: 16px;
+}
+
+.timelineDotError {
+  color: var(--color-error);
+  font-size: 16px;
+}
+
+/* ========== 页码项 ========== */
+.pageNumberItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pageNumberHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.pageLabel {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.pageNumberTag {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary-light);
+  border-color: rgba(59, 130, 246, 0.2);
+  font-size: var(--text-xs);
+}
+
+.pageErrors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.pageStatusOk {
+  font-size: var(--text-sm);
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.continuationTag {
+  font-size: var(--text-xs);
+  margin-top: var(--space-xs);
+}
+
+.continuationTag.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary-light);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+/* ========== 标签样式 ========== */
+.errorCountTag {
+  font-size: var(--text-sm);
+}
+
+.errorCountTag.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.errorTag {
+  font-size: var(--text-xs);
+}
+
+.errorTag.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.statusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+}
+
+.statusTag.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success-light);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.statusTag.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+  .pageCheckWrapper {
+    padding: var(--space-md);
+  }
+
+  .pageNumberStats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+}

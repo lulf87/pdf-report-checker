@@ -1,0 +1,23 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+pydantic==2.5.3
+pydantic-settings==2.1.0
+PyMuPDF==1.23.8
+python-docx==1.1.0
+Pillow==10.1.0
+numpy==1.26.3
+opencv-python==4.6.0.66
+paddlepaddle==3.0.0
+paddleocr==2.10.0
+requests==2.31.0
+aiofiles==23.2.1
+
+# LLM集成依赖
+anthropic>=0.40.0
+openai>=1.50.0
+python-dotenv>=1.0.0
+
+# PDF报告生成
+reportlab==4.0.7
+openpyxl==3.1.2

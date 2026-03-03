@@ -1,0 +1,537 @@
+/* ============================================
+   报告核对工具 - 全局样式
+   科技感数据大屏设计系统
+   ============================================ */
+
+/* 引入设计系统样式文件 */
+@import './styles/variables.css';
+@import './styles/design-system.css';
+@import './styles/animations.css';
+@import './styles/glassmorphism.css';
+
+/* ============================================
+   新主题系统 (v2.0 - 医疗科技感)
+   状态：开发中，待测试完成后切换
+   ============================================ */
+/*
+ * 新主题配色方案：
+ * - Primary: #0EA5E9 (天空蓝)
+ * - Secondary: #06B6D4 (青色)
+ * - Success: #10B981 (翠绿)
+ * - Warning: #F59E0B (琥珀)
+ * - Error: #EF4444 (红色)
+ * - Background: #0F172A (深蓝灰)
+ * - Surface: #1E293B (次级背景)
+ * - Text: #F8FAFC (主文字)
+ * - TextMuted: #94A3B8 (次要文字)
+ *
+ * 启用方式：取消下面这行的注释
+ * @import './styles/theme-new.css';
+ */
+
+/* ---------- Base Reset ---------- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ---------- Scrollbar Styles (深色主题) ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 3px;
+  transition: background var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+/* ---------- Selection ---------- */
+::selection {
+  background: rgba(59, 130, 246, 0.4);
+  color: var(--text-primary);
+}
+
+/* ---------- 应用根容器 ---------- */
+#root {
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ============================================
+   高性能背景效果 (替代粒子背景)
+   ============================================ */
+
+/* 背景网格效果 - 高性能CSS实现 */
+.app-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-primary);
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: -2;
+}
+
+/* 静态渐变光晕 - 替代动态粒子效果 */
+.app-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ============================================
+   性能优化工具类
+   ============================================ */
+
+/* 使用 contain 限制渲染范围 */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+/* 动画优化 */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+.will-animate-complete {
+  will-change: auto;
+}
+
+/* 内容可见性优化 - 延迟渲染屏幕外内容 */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* 高性能卡片 */
+.card-optimized {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  contain: layout style;
+}
+
+.card-optimized:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* 折叠动画 - 纯CSS实现 */
+.collapse-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height var(--transition-normal), opacity var(--transition-fast);
+}
+
+.collapse-content.expanded {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-normal) ease forwards;
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .collapse-content {
+    transition: none;
+  }
+}
+
+/* ---------- Utility Classes ---------- */
+
+/* Shimmer Loading Effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0.1) 25%,
+    rgba(59, 130, 246, 0.2) 50%,
+    rgba(59, 130, 246, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Text Gradient */
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ---------- Animation Keyframes ---------- */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ---------- Ant Design Overrides ---------- */
+.ant-layout {
+  background: transparent !important;
+}
+
+.ant-layout-header {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.ant-layout-content {
+  background: transparent !important;
+}
+
+.ant-layout-footer {
+  background: transparent !important;
+}
+
+/* Card Overrides */
+.ant-card {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--glass-border) !important;
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-md) !important;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.ant-card:hover {
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.ant-card-head {
+  border-bottom: 1px solid var(--glass-border) !important;
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-card-body {
+  color: var(--text-primary);
+}
+
+/* Button Overrides */
+.ant-btn {
+  border-radius: var(--radius-md) !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, var(--color-neon-blue) 0%, var(--color-neon-blue-dark) 100%) !important;
+  border: none !important;
+  box-shadow: var(--glow-blue) !important;
+}
+
+.ant-btn-primary:hover {
+  box-shadow: var(--glow-blue-strong) !important;
+  transform: translateY(-1px);
+}
+
+.ant-btn-default {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-btn-default:hover {
+  border-color: var(--color-neon-blue) !important;
+  color: var(--color-neon-blue-light) !important;
+}
+
+/* Table Overrides */
+.ant-table {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+  background: var(--glass-bg) !important;
+}
+
+.ant-table-thead > tr > th {
+  background: rgba(59, 130, 246, 0.1) !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Tag Overrides */
+.ant-tag {
+  border-radius: var(--radius-full) !important;
+  font-weight: 500 !important;
+}
+
+/* Collapse Overrides */
+.ant-collapse {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+.ant-collapse-header {
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+}
+
+/* Input Overrides */
+.ant-input,
+.ant-input-affix-wrapper {
+  border-radius: var(--radius-md) !important;
+  transition: all 0.2s ease !important;
+  background: var(--color-bg-input) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-input::placeholder,
+.ant-input-affix-wrapper input::placeholder {
+  color: var(--text-muted);
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  border-color: var(--color-neon-blue) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), var(--glow-blue) !important;
+}
+
+/* Upload Overrides */
+.ant-upload-drag {
+  border-radius: var(--radius-xl) !important;
+  transition: all 0.3s ease !important;
+  background: transparent !important;
+  border: 2px dashed var(--glass-border) !important;
+}
+
+.ant-upload-drag:hover {
+  border-color: var(--color-neon-blue) !important;
+  background: rgba(59, 130, 246, 0.05) !important;
+}
+
+.ant-upload-drag-hover {
+  border-color: var(--color-neon-cyan) !important;
+  background: rgba(6, 182, 212, 0.05) !important;
+}
+
+/* Radio Overrides */
+.ant-radio-button-wrapper {
+  transition: all 0.2s ease !important;
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-secondary) !important;
+}
+
+.ant-radio-button-wrapper-checked {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: var(--color-neon-blue) !important;
+  color: var(--color-neon-blue-light) !important;
+}
+
+/* Switch Overrides */
+.ant-switch {
+  background: rgba(107, 114, 128, 0.3) !important;
+}
+
+.ant-switch-checked {
+  background: linear-gradient(135deg, var(--color-neon-blue) 0%, var(--color-neon-cyan) 100%) !important;
+  box-shadow: var(--glow-blue) !important;
+}
+
+/* Badge Overrides */
+.ant-badge-count {
+  border-radius: var(--radius-full) !important;
+  box-shadow: 0 0 0 2px var(--color-bg-primary) !important;
+}
+
+/* Tooltip Overrides */
+.ant-tooltip-inner {
+  border-radius: var(--radius-md) !important;
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Modal Overrides */
+.ant-modal-content {
+  border-radius: var(--radius-xl) !important;
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.ant-modal-header {
+  background: transparent !important;
+}
+
+.ant-modal-title {
+  color: var(--text-primary) !important;
+}
+
+.ant-modal-close {
+  color: var(--text-secondary) !important;
+}
+
+.ant-modal-close:hover {
+  color: var(--text-primary) !important;
+}
+
+/* Progress Overrides */
+.ant-progress-inner {
+  border-radius: var(--radius-full) !important;
+}
+
+.ant-progress-text {
+  color: var(--text-primary) !important;
+}
+
+/* Result Overrides */
+.ant-result-title {
+  color: var(--text-primary) !important;
+}
+
+.ant-result-subtitle {
+  color: var(--text-secondary) !important;
+}
+
+/* Dropdown Overrides */
+.ant-dropdown-menu {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.ant-dropdown-menu-item {
+  color: var(--text-primary) !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* ---------- Responsive Utilities ---------- */
+@media (max-width: 768px) {
+  .app-header h1 {
+    font-size: 16px;
+  }
+
+  .content-wrapper {
+    padding: 16px !important;
+  }
+}
+
+/* ---------- Print Styles ---------- */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .app-header,
+  .app-footer,
+  .action-bar {
+    display: none !important;
+  }
+
+  .content-wrapper {
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

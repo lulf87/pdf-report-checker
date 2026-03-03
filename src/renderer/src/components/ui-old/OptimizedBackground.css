@@ -1,0 +1,89 @@
+/* OptimizedBackground - 轻量级高性能背景样式 */
+
+.optimized-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-color: var(--bg-primary, #0a0e17);
+}
+
+/* 网格背景 - 纯 CSS，无 JS 计算 */
+.optimized-background__grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: center top;
+}
+
+/* 静态光晕效果 - 无动画 */
+.optimized-background__glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.03) 0%, transparent 60%);
+}
+
+/* 变体: default - 完整效果 */
+.optimized-background--default {
+  /* 使用默认样式 */
+}
+
+/* 变体: minimal - 仅网格 */
+.optimized-background--minimal {
+  background-color: var(--bg-primary, #0a0e17);
+}
+
+.optimized-background--minimal .optimized-background__grid {
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.02) 1px, transparent 1px);
+}
+
+/* 变体: grid-only - 更淡的网格 */
+.optimized-background--grid-only .optimized-background__grid {
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.015) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* 变体: solid - 纯色背景 */
+.optimized-background--solid {
+  background: linear-gradient(135deg, #0a0e17 0%, #111827 100%);
+}
+
+.optimized-background--solid .optimized-background__grid,
+.optimized-background--solid .optimized-background__glow {
+  display: none;
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .optimized-background__glow {
+    display: none;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .optimized-background__grid {
+    background-image:
+      linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
+  }
+}

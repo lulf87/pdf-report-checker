@@ -1,0 +1,37 @@
+{
+  "name": "report-checker-renderer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@tsparticles/react": "^3.0.0",
+    "@tsparticles/slim": "^3.9.1",
+    "antd": "^5.12.8",
+    "autoprefixer": "^10.4.24",
+    "axios": "^1.6.2",
+    "classnames": "^2.5.1",
+    "framer-motion": "^12.34.0",
+    "lucide-react": "^0.564.0",
+    "postcss": "^8.5.6",
+    "prop-types": "^15.8.1",
+    "react": "^18.2.0",
+    "react-countup": "^6.5.3",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.1",
+    "tailwindcss": "^4.1.18",
+    "tsparticles": "^3.9.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.8"
+  }
+}

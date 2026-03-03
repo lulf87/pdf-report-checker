@@ -1,0 +1,178 @@
+/* ============================================
+   StepBar - 步骤条
+   ============================================ */
+
+.stepBar {
+  display: flex;
+  width: 100%;
+}
+
+/* ---------- 水平方向 ---------- */
+.stepBar--horizontal {
+  flex-direction: row;
+}
+
+.stepBar--horizontal .stepBar__step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+}
+
+.stepBar--horizontal .stepBar__content {
+  margin-top: var(--space-sm);
+}
+
+.stepBar--horizontal .stepBar__line {
+  position: absolute;
+  top: 16px;
+  left: calc(50% + 20px);
+  right: calc(-50% + 20px);
+  height: 2px;
+  background: var(--glass-border);
+}
+
+/* ---------- 垂直方向 ---------- */
+.stepBar--vertical {
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.stepBar--vertical .stepBar__step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  position: relative;
+  padding-left: 40px;
+}
+
+.stepBar--vertical .stepBar__indicator {
+  position: absolute;
+  left: 0;
+}
+
+.stepBar--vertical .stepBar__content {
+  flex: 1;
+  text-align: left;
+}
+
+.stepBar--vertical .stepBar__line {
+  position: absolute;
+  top: 36px;
+  left: 16px;
+  width: 2px;
+  bottom: -24px;
+  background: var(--glass-border);
+}
+
+.stepBar--vertical .stepBar__step:last-child .stepBar__line {
+  display: none;
+}
+
+/* ---------- 步骤指示器 ---------- */
+.stepBar__indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+/* ---------- 状态样式 ---------- */
+.stepBar__step--pending .stepBar__indicator {
+  background: var(--glass-bg);
+  border: 2px solid var(--glass-border);
+  color: var(--text-muted);
+}
+
+.stepBar__step--current .stepBar__indicator {
+  background: var(--color-neon-blue);
+  border: 2px solid var(--color-neon-blue);
+  color: white;
+  box-shadow: var(--glow-blue);
+}
+
+.stepBar__step--completed .stepBar__indicator {
+  background: var(--color-success);
+  border: 2px solid var(--color-success);
+  color: white;
+}
+
+/* 颜色变体 */
+.stepBar__step--cyan.stepBar__step--current .stepBar__indicator {
+  background: var(--color-neon-cyan);
+  border-color: var(--color-neon-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.stepBar__step--purple.stepBar__step--current .stepBar__indicator {
+  background: var(--color-neon-purple);
+  border-color: var(--color-neon-purple);
+  box-shadow: var(--glow-purple);
+}
+
+/* ---------- 内容 ---------- */
+.stepBar__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stepBar__step--pending .stepBar__title {
+  color: var(--text-muted);
+}
+
+.stepBar__description {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.stepBar__step--pending .stepBar__description {
+  color: var(--text-muted);
+}
+
+/* ---------- 连接线 ---------- */
+.stepBar__line {
+  transition: background var(--transition-fast);
+}
+
+.stepBar__line--completed {
+  background: var(--color-success);
+}
+
+/* ---------- 旋转动画 ---------- */
+.stepBar__spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .stepBar__spinner {
+    animation: none;
+  }
+
+  .stepBar__indicator {
+    transition: none;
+  }
+
+  .stepBar__line {
+    transition: none;
+  }
+}

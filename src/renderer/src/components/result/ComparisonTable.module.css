@@ -1,0 +1,139 @@
+/**
+ * ComparisonTable - 字段比对表格样式 (重构版)
+ * 使用新的设计系统CSS变量
+ */
+
+.comparisonTableWrapper {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.comparisonTableWrapper:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+/* ========== 头部 ========== */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.summaryBadges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.summaryBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.summaryBadge.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success-light);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.summaryBadge.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ========== 表格样式 ========== */
+.dataTable {
+  :global(.ant-table) {
+    background: transparent;
+  }
+
+  :global(.ant-table-thead > tr > th) {
+    background: rgba(59, 130, 246, 0.08);
+    color: var(--text-primary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  :global(.ant-table-tbody > tr > td) {
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+  }
+
+  :global(.ant-table-tbody > tr:hover > td) {
+    background: rgba(59, 130, 246, 0.05);
+  }
+}
+
+.fieldName {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rowMismatch {
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.rowMismatch:hover {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+/* ========== 状态标签 ========== */
+.statusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.statusTag.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success-light);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.statusTag.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error-light);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+  .comparisonTableWrapper {
+    padding: var(--space-md);
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .summaryBadges {
+    flex-wrap: wrap;
+  }
+}

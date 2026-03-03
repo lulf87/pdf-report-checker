@@ -1,0 +1,207 @@
+/* PageCheckSection.css - 页码校验区域样式 */
+
+.pageCheckWrapper {
+  background: var(--glass-bg, rgba(17, 24, 39, 0.7));
+  backdrop-filter: blur(var(--glass-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+  border: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+
+/* 头部 */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #f9fafb);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionTitle svg {
+  color: var(--color-neon-blue, #3b82f6);
+}
+
+/* 统计区域 */
+.pageNumberStats {
+  display: flex;
+  gap: 24px;
+  padding: 16px 20px;
+  background: rgba(59, 130, 246, 0.05);
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.1));
+  flex-wrap: wrap;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statLabel {
+  font-size: 13px;
+  color: var(--text-secondary, #d1d5db);
+}
+
+.statValue {
+  font-weight: 600;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  color: var(--text-primary, #f9fafb);
+}
+
+/* 状态标签 */
+.statusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+}
+
+.statusTag.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-light, #34d399);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.statusTag.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.errorCountTag {
+  font-size: 12px;
+}
+
+.errorCountTag.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* 时间线 */
+.timelineWrapper {
+  padding: 20px;
+}
+
+.pageNumberTimeline {
+  margin: 0;
+}
+
+.pageNumberTimeline :global(.ant-timeline-item-head) {
+  background: transparent !important;
+  border: none !important;
+}
+
+.pageNumberTimeline :global(.ant-timeline-item-tail) {
+  border-left: 2px solid var(--glass-border, rgba(59, 130, 246, 0.2)) !important;
+}
+
+.pageNumberTimeline :global(.ant-timeline-item-content) {
+  color: var(--text-primary, #f9fafb);
+}
+
+/* 时间线图标 */
+.timelineDotSuccess {
+  color: var(--color-success, #10b981);
+  font-size: 16px;
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+}
+
+.timelineDotError {
+  color: var(--color-error, #ef4444);
+  font-size: 16px;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+}
+
+/* 页码项 */
+.pageNumberItem {
+  padding: 8px 0;
+}
+
+.pageNumberHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pageLabel {
+  font-weight: 500;
+  color: var(--text-primary, #f9fafb);
+}
+
+.pageNumberTag {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-neon-blue-light, #60a5fa);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* 页码错误 */
+.pageErrors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.errorTag {
+  font-size: 12px;
+}
+
+.errorTag.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* 页码正确 */
+.pageStatusOk {
+  font-size: 13px;
+  color: var(--color-success, #10b981);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 续表标记 */
+.continuationTag {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.continuationTag.info {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--color-neon-cyan, #06b6d4);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .pageNumberStats {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pageNumberHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

@@ -1,0 +1,165 @@
+/* ============================================
+   GradientBackground - 渐变背景
+   ============================================ */
+
+.gradientBackground {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.gradientBackground__glow1,
+.gradientBackground__glow2,
+.gradientBackground__glow3 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.5;
+}
+
+/* ---------- 变体: Blue ---------- */
+.gradientBackground--blue .gradientBackground__glow1 {
+  width: 600px;
+  height: 600px;
+  background: rgba(59, 130, 246, 0.15);
+  top: -200px;
+  left: -100px;
+}
+
+.gradientBackground--blue .gradientBackground__glow2 {
+  width: 400px;
+  height: 400px;
+  background: rgba(37, 99, 235, 0.1);
+  bottom: -100px;
+  right: -100px;
+}
+
+.gradientBackground--blue .gradientBackground__glow3 {
+  display: none;
+}
+
+/* ---------- 变体: Cyan ---------- */
+.gradientBackground--cyan .gradientBackground__glow1 {
+  width: 600px;
+  height: 600px;
+  background: rgba(6, 182, 212, 0.15);
+  top: -200px;
+  right: -100px;
+}
+
+.gradientBackground--cyan .gradientBackground__glow2 {
+  width: 400px;
+  height: 400px;
+  background: rgba(34, 211, 238, 0.1);
+  bottom: -100px;
+  left: -100px;
+}
+
+.gradientBackground--cyan .gradientBackground__glow3 {
+  display: none;
+}
+
+/* ---------- 变体: Purple ---------- */
+.gradientBackground--purple .gradientBackground__glow1 {
+  width: 600px;
+  height: 600px;
+  background: rgba(139, 92, 246, 0.15);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.gradientBackground--purple .gradientBackground__glow2 {
+  width: 400px;
+  height: 400px;
+  background: rgba(167, 139, 250, 0.1);
+  top: -100px;
+  right: -100px;
+}
+
+.gradientBackground--purple .gradientBackground__glow3 {
+  width: 300px;
+  height: 300px;
+  background: rgba(139, 92, 246, 0.08);
+  bottom: -50px;
+  left: -50px;
+}
+
+/* ---------- 变体: Mixed (默认) ---------- */
+.gradientBackground--mixed .gradientBackground__glow1 {
+  width: 600px;
+  height: 600px;
+  background: rgba(59, 130, 246, 0.12);
+  top: -200px;
+  left: 20%;
+}
+
+.gradientBackground--mixed .gradientBackground__glow2 {
+  width: 500px;
+  height: 500px;
+  background: rgba(6, 182, 212, 0.08);
+  bottom: -150px;
+  right: 10%;
+}
+
+.gradientBackground--mixed .gradientBackground__glow3 {
+  width: 400px;
+  height: 400px;
+  background: rgba(139, 92, 246, 0.06);
+  top: 40%;
+  left: -100px;
+}
+
+/* ---------- 动画效果 ---------- */
+.gradientBackground--animated .gradientBackground__glow1 {
+  animation: float1 8s ease-in-out infinite;
+}
+
+.gradientBackground--animated .gradientBackground__glow2 {
+  animation: float2 10s ease-in-out infinite;
+}
+
+.gradientBackground--animated .gradientBackground__glow3 {
+  animation: float3 12s ease-in-out infinite;
+}
+
+@keyframes float1 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(30px, 20px);
+  }
+}
+
+@keyframes float2 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-20px, -30px);
+  }
+}
+
+@keyframes float3 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(20px, -20px);
+  }
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .gradientBackground--animated .gradientBackground__glow1,
+  .gradientBackground--animated .gradientBackground__glow2,
+  .gradientBackground--animated .gradientBackground__glow3 {
+    animation: none;
+  }
+}

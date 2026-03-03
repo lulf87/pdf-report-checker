@@ -1,0 +1,251 @@
+/* OptimizedCard - 轻量级高性能卡片组件样式 */
+
+.optimized-card {
+  position: relative;
+  background: var(--bg-secondary, #111827);
+  border: 1px solid var(--border-subtle, rgba(59, 130, 246, 0.1));
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  contain: layout style paint;
+}
+
+/* 强调色变体 - 左侧边框 */
+.optimized-card--blue {
+  border-left: 3px solid var(--color-primary, #3b82f6);
+  padding-left: calc(var(--space-md, 16px) - 3px);
+}
+
+.optimized-card--cyan {
+  border-left: 3px solid var(--color-secondary, #06b6d4);
+  padding-left: calc(var(--space-md, 16px) - 3px);
+}
+
+.optimized-card--purple {
+  border-left: 3px solid var(--color-accent, #8b5cf6);
+  padding-left: calc(var(--space-md, 16px) - 3px);
+}
+
+.optimized-card--success {
+  border-left: 3px solid var(--color-success, #10b981);
+  padding-left: calc(var(--space-md, 16px) - 3px);
+}
+
+.optimized-card--warning {
+  border-left: 3px solid var(--color-warning, #f59e0b);
+  padding-left: calc(var(--space-md, 16px) - 3px);
+}
+
+.optimized-card--error {
+  border-left: 3px solid var(--color-error, #ef4444);
+  padding-left: calc(var(--space-md, 16px) - 3px);
+}
+
+/* 悬停效果 - 纯 CSS 替代 Framer Motion */
+.optimized-card--hoverable {
+  cursor: pointer;
+}
+
+.optimized-card--hoverable:hover {
+  border-color: var(--border-strong, rgba(59, 130, 246, 0.3));
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+}
+
+.optimized-card--hoverable.optimized-card--blue:hover {
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+}
+
+.optimized-card--hoverable.optimized-card--cyan:hover {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
+}
+
+.optimized-card--hoverable.optimized-card--purple:hover {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+}
+
+.optimized-card--hoverable.optimized-card--success:hover {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+.optimized-card--hoverable.optimized-card--warning:hover {
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+}
+
+.optimized-card--hoverable.optimized-card--error:hover {
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+.optimized-card--hoverable:active {
+  transform: translateY(0);
+}
+
+/* 玻璃效果 */
+.optimized-card--glass {
+  background: var(--bg-card, rgba(17, 24, 39, 0.85));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 入场动画 - 使用 CSS animation 替代 Framer Motion */
+.optimized-card--animated {
+  animation: cardFadeIn 0.3s ease;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 装饰性边角 */
+.optimized-card--corner .optimized-card__corner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.optimized-card--corner .optimized-card__corner::before,
+.optimized-card--corner .optimized-card__corner::after {
+  content: '';
+  position: absolute;
+  background: var(--color-primary, #3b82f6);
+  opacity: 0.4;
+}
+
+/* 颜色变体的边角 */
+.optimized-card--cyan .optimized-card__corner::before,
+.optimized-card--cyan .optimized-card__corner::after {
+  background: var(--color-secondary, #06b6d4);
+}
+
+.optimized-card--purple .optimized-card__corner::before,
+.optimized-card--purple .optimized-card__corner::after {
+  background: var(--color-accent, #8b5cf6);
+}
+
+.optimized-card--success .optimized-card__corner::before,
+.optimized-card--success .optimized-card__corner::after {
+  background: var(--color-success, #10b981);
+}
+
+.optimized-card--warning .optimized-card__corner::before,
+.optimized-card--warning .optimized-card__corner::after {
+  background: var(--color-warning, #f59e0b);
+}
+
+.optimized-card--error .optimized-card__corner::before,
+.optimized-card--error .optimized-card__corner::after {
+  background: var(--color-error, #ef4444);
+}
+
+/* 左上角 */
+.optimized-card__corner--tl {
+  top: 0;
+  left: 0;
+}
+
+.optimized-card__corner--tl::before {
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 2px;
+}
+
+.optimized-card__corner--tl::after {
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 8px;
+}
+
+/* 右上角 */
+.optimized-card__corner--tr {
+  top: 0;
+  right: 0;
+}
+
+.optimized-card__corner--tr::before {
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 2px;
+}
+
+.optimized-card__corner--tr::after {
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 8px;
+}
+
+/* 左下角 */
+.optimized-card__corner--bl {
+  bottom: 0;
+  left: 0;
+}
+
+.optimized-card__corner--bl::before {
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  height: 2px;
+}
+
+.optimized-card__corner--bl::after {
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 8px;
+}
+
+/* 右下角 */
+.optimized-card__corner--br {
+  bottom: 0;
+  right: 0;
+}
+
+.optimized-card__corner--br::before {
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 2px;
+}
+
+.optimized-card__corner--br::after {
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  height: 8px;
+}
+
+/* 内容区域 */
+.optimized-card__content {
+  position: relative;
+  z-index: 1;
+  padding: var(--space-md, 16px);
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .optimized-card--animated {
+    animation: none;
+  }
+
+  .optimized-card--hoverable:hover {
+    transform: none;
+  }
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .optimized-card__content {
+    padding: var(--space-sm, 8px);
+  }
+}

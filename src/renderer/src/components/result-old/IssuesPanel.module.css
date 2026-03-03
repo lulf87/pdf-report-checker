@@ -1,0 +1,200 @@
+/* IssuesPanel.css - 问题汇总面板样式 */
+
+.issuesPanelWrapper {
+  background: var(--glass-bg, rgba(17, 24, 39, 0.7));
+  backdrop-filter: blur(var(--glass-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+  border: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+
+.issuesPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #f9fafb);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badgeGroup {
+  display: flex;
+  gap: 12px;
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.countBadge.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.countBadge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning-light, #fbbf24);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.countBadge.info {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-secondary, #d1d5db);
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+/* Collapse 样式覆盖 */
+.issuesPanel {
+  background: transparent;
+  border: none;
+}
+
+.issuesPanel :global(.ant-collapse-item) {
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.1));
+}
+
+.issuesPanel :global(.ant-collapse-item:last-child) {
+  border-bottom: none;
+}
+
+.issuesPanel :global(.ant-collapse-header) {
+  background: rgba(59, 130, 246, 0.05);
+  color: var(--text-primary, #f9fafb) !important;
+  padding: 12px 20px !important;
+  transition: background-color 0.2s;
+}
+
+.issuesPanel :global(.ant-collapse-header:hover) {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.issuesPanel :global(.ant-collapse-content) {
+  background: transparent;
+  border-top: 1px solid var(--glass-border, rgba(59, 130, 246, 0.1));
+}
+
+.issuesPanel :global(.ant-collapse-content-box) {
+  padding: 0 !important;
+}
+
+/* 面板头部 */
+.issuesPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.issuesPanelTitle {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary, #f9fafb);
+}
+
+.issuesPanelSubtitle {
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 12px;
+}
+
+/* Badge 样式 */
+.errorBadge :global(.ant-badge-count) {
+  background: var(--color-error, #ef4444);
+  box-shadow: var(--glow-error, 0 0 15px rgba(239, 68, 68, 0.5));
+}
+
+.warningBadge :global(.ant-badge-count) {
+  background: var(--color-warning, #f59e0b);
+  box-shadow: var(--glow-warning, 0 0 15px rgba(245, 158, 11, 0.5));
+}
+
+.infoBadge :global(.ant-badge-count) {
+  background: var(--color-info, #6b7280);
+}
+
+/* 空状态 */
+.issuesPanelEmpty {
+  padding: 40px 20px;
+  text-align: center;
+  background: var(--glass-bg, rgba(17, 24, 39, 0.7));
+  backdrop-filter: blur(var(--glass-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+  border: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+  border-radius: var(--radius-lg, 12px);
+}
+
+/* Issue 项 */
+.issueItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 20px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.issueItem:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.issueItem.error {
+  border-left: 3px solid var(--color-error, #ef4444);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.issueItem.warning {
+  border-left: 3px solid var(--color-warning, #f59e0b);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.issueItem.info {
+  border-left: 3px solid var(--color-info, #6b7280);
+  background: rgba(107, 114, 128, 0.05);
+}
+
+.issueItemIcon {
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.issueItemIcon.error {
+  color: var(--color-error, #ef4444);
+}
+
+.issueItemIcon.warning {
+  color: var(--color-warning, #f59e0b);
+}
+
+.issueItemIcon.info {
+  color: var(--color-info, #6b7280);
+}
+
+.issueItemContent {
+  flex: 1;
+}
+
+.issueItemMessage {
+  font-size: 14px;
+  color: var(--text-primary, #f9fafb);
+}
+
+.issueItemMeta {
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--text-tertiary, #9ca3af);
+}

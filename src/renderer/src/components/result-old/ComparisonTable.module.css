@@ -1,0 +1,139 @@
+/* ComparisonTable.css - 字段比对表格样式 */
+
+.comparisonTableWrapper {
+  background: var(--glass-bg, rgba(17, 24, 39, 0.7));
+  backdrop-filter: blur(var(--glass-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+  border: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+
+/* 头部 */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15));
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #f9fafb);
+}
+
+/* 汇总徽章 */
+.summaryBadges {
+  display: flex;
+  gap: 12px;
+}
+
+.summaryBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.summaryBadge.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-light, #34d399);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.summaryBadge.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* 字段名 */
+.fieldName {
+  font-weight: 500;
+  color: var(--color-neon-blue-light, #60a5fa);
+}
+
+/* 状态标签 */
+.statusTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+}
+
+.statusTag.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success-light, #34d399);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.statusTag.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error-light, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* 表格样式 */
+.dataTable {
+  background: transparent !important;
+}
+
+.dataTable :global(.ant-table) {
+  background: transparent !important;
+}
+
+.dataTable :global(.ant-table-thead > tr > th) {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: var(--text-primary, #f9fafb) !important;
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.15)) !important;
+  font-weight: 500;
+}
+
+.dataTable :global(.ant-table-tbody > tr > td) {
+  border-bottom: 1px solid var(--glass-border, rgba(59, 130, 246, 0.1)) !important;
+  color: var(--text-primary, #f9fafb);
+  padding: 12px 16px;
+}
+
+.dataTable :global(.ant-table-tbody > tr:hover > td) {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* 不一致行高亮 */
+.rowMismatch {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.rowMismatch :global(td) {
+  color: var(--color-error-light, #f87171) !important;
+  font-weight: 500;
+}
+
+.rowMismatch:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .summaryBadges {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

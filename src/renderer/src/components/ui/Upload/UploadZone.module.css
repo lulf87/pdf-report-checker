@@ -1,0 +1,379 @@
+/* ============================================
+   UploadZone - 拖拽上传区域
+   ============================================ */
+
+.uploadZone__wrapper {
+  width: 100%;
+}
+
+.uploadZone {
+  position: relative;
+  border: 2px dashed var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: var(--glass-bg);
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.uploadZone:hover:not(.uploadZone--disabled):not(.uploadZone--loading) {
+  border-color: var(--color-neon-blue);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.uploadZone--active {
+  border-color: var(--color-neon-cyan);
+  background: rgba(6, 182, 212, 0.05);
+  box-shadow: var(--glow-cyan);
+}
+
+.uploadZone--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uploadZone--loading {
+  cursor: wait;
+}
+
+/* ---------- 装饰性边角 ---------- */
+.uploadZone__corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.uploadZone__corner::before,
+.uploadZone__corner::after {
+  content: '';
+  position: absolute;
+  background: var(--color-neon-blue);
+  opacity: 0.6;
+  transition: all var(--transition-fast);
+}
+
+.uploadZone:hover .uploadZone__corner::before,
+.uploadZone:hover .uploadZone__corner::after,
+.uploadZone--active .uploadZone__corner::before,
+.uploadZone--active .uploadZone__corner::after {
+  opacity: 1;
+}
+
+.uploadZone__corner--tl {
+  top: 0;
+  left: 0;
+}
+
+.uploadZone__corner--tl::before {
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 2px;
+}
+
+.uploadZone__corner--tl::after {
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 16px;
+}
+
+.uploadZone__corner--tr {
+  top: 0;
+  right: 0;
+}
+
+.uploadZone__corner--tr::before {
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 2px;
+}
+
+.uploadZone__corner--tr::after {
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 16px;
+}
+
+.uploadZone__corner--bl {
+  bottom: 0;
+  left: 0;
+}
+
+.uploadZone__corner--bl::before {
+  bottom: 0;
+  left: 0;
+  width: 16px;
+  height: 2px;
+}
+
+.uploadZone__corner--bl::after {
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 16px;
+}
+
+.uploadZone__corner--br {
+  bottom: 0;
+  right: 0;
+}
+
+.uploadZone__corner--br::before {
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 2px;
+}
+
+.uploadZone__corner--br::after {
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  height: 16px;
+}
+
+/* ---------- 扫描线效果 ---------- */
+.uploadZone__scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-neon-cyan), transparent);
+  animation: scanline 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(300px);
+    opacity: 0;
+  }
+}
+
+/* ---------- 输入框 ---------- */
+.uploadZone__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* ---------- 内容区域 ---------- */
+.uploadZone__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  cursor: pointer;
+  min-height: 200px;
+}
+
+/* ---------- 图标 ---------- */
+.uploadZone__iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.1);
+  margin-bottom: var(--space-md);
+  transition: all var(--transition-fast);
+}
+
+.uploadZone:hover .uploadZone__iconWrapper {
+  background: rgba(59, 130, 246, 0.2);
+  transform: scale(1.05);
+}
+
+.uploadZone__icon {
+  color: var(--color-neon-blue);
+}
+
+/* ---------- 文本 ---------- */
+.uploadZone__title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs);
+}
+
+.uploadZone__hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-xs);
+}
+
+.uploadZone__accept {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ---------- 加载状态 ---------- */
+.uploadZone__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uploadZone__spinner {
+  color: var(--color-neon-cyan);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.uploadZone__progress {
+  width: 200px;
+  height: 4px;
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.uploadZone__progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-neon-blue), var(--color-neon-cyan));
+  border-radius: var(--radius-full);
+  transition: width var(--transition-fast);
+}
+
+.uploadZone__loadingText {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ---------- 文件列表 ---------- */
+.uploadZone__fileList {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.uploadZone__fileItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.uploadZone__fileItem:hover {
+  border-color: var(--border-strong);
+}
+
+.uploadZone__fileIcon {
+  width: 24px;
+  height: 24px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.uploadZone__fileIcon--pdf {
+  color: var(--color-error);
+}
+
+.uploadZone__fileIcon--docx {
+  color: var(--color-neon-blue);
+}
+
+.uploadZone__fileInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.uploadZone__fileName {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.uploadZone__fileSize {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.uploadZone__fileStatus {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.uploadZone__fileRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.uploadZone__fileItem:hover .uploadZone__fileRemove {
+  opacity: 1;
+}
+
+.uploadZone__fileRemove:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+}
+
+/* ---------- 减少动画偏好支持 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .uploadZone__scanline {
+    animation: none;
+  }
+
+  .uploadZone__spinner {
+    animation: none;
+  }
+
+  .uploadZone,
+  .uploadZone__iconWrapper,
+  .uploadZone__corner::before,
+  .uploadZone__corner::after,
+  .uploadZone__progressBar,
+  .uploadZone__fileItem,
+  .uploadZone__fileRemove {
+    transition: none;
+  }
+}

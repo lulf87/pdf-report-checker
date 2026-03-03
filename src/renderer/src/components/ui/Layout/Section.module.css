@@ -1,0 +1,66 @@
+/* ============================================
+   Section - 内容区块
+   ============================================ */
+
+.section {
+  background: var(--glass-bg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.section--bordered {
+  border: 1px solid var(--glass-border);
+}
+
+.section--shadow {
+  box-shadow: var(--shadow-md);
+}
+
+.section:hover {
+  border-color: var(--border-strong);
+}
+
+/* ---------- 内边距变体 ---------- */
+.section--padding-sm .section__header,
+.section--padding-sm .section__content {
+  padding: var(--space-sm);
+}
+
+.section--padding-md .section__header,
+.section--padding-md .section__content {
+  padding: var(--space-md);
+}
+
+.section--padding-lg .section__header,
+.section--padding-lg .section__content {
+  padding: var(--space-lg);
+}
+
+/* ---------- 头部 ---------- */
+.section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.section__title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.section__extra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+/* ---------- 内容 ---------- */
+.section__content {
+  color: var(--text-secondary);
+}

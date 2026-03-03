@@ -1,0 +1,144 @@
+/* ============================================
+   FileCard - 文件信息卡片
+   ============================================ */
+
+.fileCard {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.fileCard:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.fileCard--uploaded {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.fileCard--uploaded:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: var(--glow-success);
+}
+
+.fileCard--clickable {
+  cursor: pointer;
+}
+
+.fileCard--clickable:focus-visible {
+  outline: 2px solid var(--color-neon-blue);
+  outline-offset: 2px;
+}
+
+/* ---------- 内容区域 ---------- */
+.fileCard__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.fileCard__icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  color: var(--text-tertiary);
+}
+
+.fileCard__icon--pdf {
+  color: var(--color-error);
+}
+
+.fileCard__icon--docx {
+  color: var(--color-neon-blue);
+}
+
+.fileCard__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileCard__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileCard__size {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.fileCard__status {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.fileCard__status--success {
+  color: var(--color-success);
+}
+
+/* ---------- 进度条 ---------- */
+.fileCard__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  overflow: hidden;
+}
+
+.fileCard__progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-neon-blue), var(--color-neon-cyan));
+  transition: width var(--transition-fast);
+}
+
+/* ---------- 移除按钮 ---------- */
+.fileCard__remove {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.fileCard:hover .fileCard__remove {
+  opacity: 1;
+}
+
+.fileCard__remove:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+}
+
+.fileCard__remove:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--color-error);
+  outline-offset: 2px;
+}
