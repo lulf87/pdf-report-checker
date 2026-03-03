@@ -1,0 +1,86 @@
+{
+    "name": "report-checker-pro-team",
+    "description": "Report Checker Pro 开发团队 — 医疗器械检验报告综合核对工具的开发团队，负责完成 Phase 3-6 的前后端开发、测试验证和集成交付。",
+    "version": "1.0.0",
+    "metadata": {
+        "industry": "Medical Device Testing / Quality Assurance",
+        "primary_focus": "PDF Parsing, Text Comparison, OCR Integration, Web Application Development",
+        "project_docs": {
+            "claude_md": "CLAUDE.md",
+            "prd": "docs/prd.md",
+            "tasks": "docs/tasks.md"
+        }
+    },
+    "agents": [
+        {
+            "id": "architect-lead",
+            "name": "架构师 Lead",
+            "role": "Team Lead / Architect",
+            "instructions_file": "architect-lead.md",
+            "description": "总技术负责人，负责任务拆解、接口审查、代码 review 和集成验证。不直接写业务代码，专注于协调和质量把关。"
+        },
+        {
+            "id": "backend-engineer",
+            "name": "后端工程师",
+            "role": "Backend Developer",
+            "instructions_file": "backend-engineer.md",
+            "description": "报告自检核对引擎的核心开发者，负责 Phase 4 全部 7 个 Task（OCR 服务、VLM/LLM、C01-C11 核对器、API 路由）。"
+        },
+        {
+            "id": "frontend-engineer",
+            "name": "前端工程师",
+            "role": "Frontend Developer",
+            "instructions_file": "frontend-engineer.md",
+            "description": "PTR 核对页面和报告自检页面的 UI 开发者，负责 Phase 3 和 Phase 5。严格遵循玻璃拟态 + 弹簧物理动效的设计规范。"
+        },
+        {
+            "id": "test-engineer",
+            "name": "测试工程师",
+            "role": "Quality Assurance Engineer",
+            "instructions_file": "test-engineer.md",
+            "description": "质量门禁守护者，负责 pytest 后端测试、Playwright MCP 前端实测、Golden File 管理和回归测试。确保所有测试铁律被严格执行。"
+        },
+        {
+            "id": "integration-engineer",
+            "name": "集成与导出工程师",
+            "role": "Integration / DevOps Engineer",
+            "instructions_file": "integration-engineer.md",
+            "description": "负责 Phase 6 的 PDF 导出服务、端到端集成测试、启动脚本和项目文档。标志着项目的完整交付。"
+        }
+    ],
+    "default_workflow": {
+        "entry_point": "architect-lead",
+        "collaboration_patterns": [
+            {
+                "scenario": "并行开发（Phase 3 + Phase 4）",
+                "flow": [
+                    "architect-lead → 分配任务",
+                    "backend-engineer → Phase 4 (报告自检后端)",
+                    "frontend-engineer → Phase 3 (PTR 核对前端)",
+                    "test-engineer → 持续测试验证"
+                ],
+                "parallel": true,
+                "notes": "后端 Phase 4 和前端 Phase 3 无文件冲突，可完全并行"
+            },
+            {
+                "scenario": "串行开发（Phase 5，依赖 Phase 4 API）",
+                "flow": [
+                    "frontend-engineer → Phase 5 (报告自检前端)",
+                    "test-engineer → Playwright MCP 实测"
+                ],
+                "parallel": false,
+                "notes": "Phase 5 必须等 Phase 4 API 完成后才能开始"
+            },
+            {
+                "scenario": "收尾（Phase 6）",
+                "flow": [
+                    "integration-engineer → PDF 导出 + 端到端测试",
+                    "test-engineer → 全链路验证",
+                    "architect-lead → 最终审查 + 交付确认"
+                ],
+                "parallel": false,
+                "notes": "Phase 6 在 Phase 3-5 全部完成后开始"
+            }
+        ]
+    }
+}

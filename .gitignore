@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# local runtime artifacts
+logs/
+output/
+uploads/
+backend/uploads/
+.playwright-cli/
+*.log
+
+# local environment
+backend/.venv/
+backend/.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+
+# local materials / samples
+素材/
+

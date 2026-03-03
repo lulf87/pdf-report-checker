@@ -1,0 +1,30 @@
+# FastAPI Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# PDF Processing
+PyMuPDF>=1.24.0
+
+# OCR - Note: paddlepaddle requires special handling on macOS ARM64
+# Install manually with: pip install paddlepaddle-paddlepaddle
+# Or use CPU-only version for development
+paddleocr>=2.9.0
+rapidocr_onnxruntime>=1.4.0
+
+# Data Validation
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+
+# Utilities
+python-multipart>=0.0.17
+python-dotenv>=1.0.0
+
+# PDF Generation
+reportlab>=4.2.0
+
+# HTTP Client
+httpx>=0.28.0
+
+# Testing
+pytest>=8.3.0
+pytest-asyncio>=0.24.0

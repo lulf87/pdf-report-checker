@@ -1,0 +1,273 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, RotateCcw, Home, Filter } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { GlassCard } from '../../components/ui/GlassCard';
+import { AnimatedCounter } from '../../components/ui/AnimatedCounter';
+import { ClauseList } from '../../components/ptr';
+import { ExportButton } from '../../components/shared';
+import { SPRING_GENTLE, STAGGER_DELAY } from '../../constants/motion';
+import type { PTRCompareResult, Clause } from '../../types/ptr';
+
+interface PTRResultsProps {
+  result: PTRCompareResult;
+  taskId: string;
+  onBack: () => void;
+  onReupload: () => void;
+  onDashboard: () => void;
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: STAGGER_DELAY,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: SPRING_GENTLE,
+  },
+};
+
+type FilterType = 'all' | 'mismatched';
+
+/**
+ * PTRResults - Display PTR comparison results
+ *
+ * Features:
+ * - Overview stats with animated counters
+ * - Filter buttons (all / mismatched)
+ * - Clause list with expandable cards
+ * - Navigation buttons
+ */
+export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: PTRResultsProps) {
+  const [filter, setFilter] = useState<FilterType>('all');
+
+  // Extract data from backend response structure
+  const summary = result.summary || {
+    total_clauses: 0,
+    matches: 0,
+    differs: 0,
+    missing: 0,
+    excluded: 0,
+    match_rate: 0,
+  };
+
+  const matchPercentage = Math.round(summary.match_rate * 100);
+  const mismatchedCount = summary.differs + summary.missing;
+
+  // Transform clauses to match ClauseList component expectations
+  const transformedClauses: Clause[] = (result.clauses || []).map((clause, index) => ({
+    id: String(index),
+    number: clause.ptr_number || '',
+    title: clause.ptr_text?.substring(0, 50) || '',
+    ptr_text: clause.ptr_text || '',
+    report_text: clause.report_text || '',
+    is_match: clause.result === 'match',
+    diffs: (clause.differences || []).map(d => ({
+      type: (d.type || 'replace') as 'insert' | 'delete' | 'replace' | 'equal',
+      value: d.text || '',
+    })),
+  }));
+
+  // Filter clauses
+  const filteredClauses = filter === 'mismatched'
+    ? transformedClauses.filter(c => !c.is_match)
+    : transformedClauses;
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      style={{
+        width: '100%',
+        maxWidth: '900px',
+        margin: '0 auto',
+        padding: '2rem',
+      }}
+    >
+      {/* Navigation */}
+      <motion.div variants={itemVariants} style={{ marginBottom: '2rem' }}>
+        <Button variant="ghost" onClick={onBack} style={{ gap: '0.5rem' }}>
+          <ArrowLeft size={18} />
+          返回
+        </Button>
+      </motion.div>
+
+      {/* Header */}
+      <motion.div variants={itemVariants} style={{ marginBottom: '2rem', textAlign: 'center' }}>
+        <h1
+          style={{
+            fontSize: '2rem',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            marginBottom: '0.5rem',
+          }}
+        >
+          PTR 条款核对结果
+        </h1>
+        <p style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
+          共核对 {summary.total_clauses} 条款
+        </p>
+      </motion.div>
+
+      {/* Stats Overview */}
+      <motion.div variants={itemVariants} style={{ marginBottom: '2rem' }}>
+        <GlassCard>
+          <div
+            style={{
+              padding: '2rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '2rem',
+            }}
+          >
+            {/* Match Rate */}
+            <div style={{ textAlign: 'center' }}>
+              <p
+                style={{
+                  fontSize: '0.875rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: '0.5rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                一致率
+              </p>
+              <div
+                style={{
+                  fontSize: '3rem',
+                  fontWeight: 600,
+                  color:
+                    matchPercentage >= 90
+                      ? 'var(--color-success)'
+                      : matchPercentage >= 70
+                      ? 'var(--color-warn)'
+                      : 'var(--color-danger)',
+                }}
+              >
+                <AnimatedCounter value={matchPercentage} formatValue={(v) => `${v}%`} />
+              </div>
+            </div>
+
+            {/* Matched */}
+            <div style={{ textAlign: 'center' }}>
+              <p
+                style={{
+                  fontSize: '0.875rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: '0.5rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                一致
+              </p>
+              <div
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 600,
+                  color: 'var(--color-success)',
+                }}
+              >
+                <AnimatedCounter value={summary.matches} />
+              </div>
+            </div>
+
+            {/* Mismatched */}
+            <div style={{ textAlign: 'center' }}>
+              <p
+                style={{
+                  fontSize: '0.875rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: '0.5rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                不一致
+              </p>
+              <div
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 600,
+                  color: 'var(--color-danger)',
+                }}
+              >
+                <AnimatedCounter value={mismatchedCount} />
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+      </motion.div>
+
+      {/* Filter Buttons */}
+      <motion.div variants={itemVariants} style={{ marginBottom: '1.5rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.75rem',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <Button
+            variant={filter === 'all' ? 'primary' : 'secondary'}
+            onClick={() => setFilter('all')}
+            style={{ gap: '0.5rem' }}
+          >
+            <Filter size={16} />
+            全部 ({summary.total_clauses})
+          </Button>
+          <Button
+            variant={filter === 'mismatched' ? 'primary' : 'secondary'}
+            onClick={() => setFilter('mismatched')}
+          >
+            仅不一致 ({mismatchedCount})
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Clause List */}
+      <motion.div variants={itemVariants}>
+        <ClauseList clauses={filteredClauses} filter={filter} />
+      </motion.div>
+
+      {/* Action Buttons */}
+      <motion.div
+        variants={itemVariants}
+        style={{
+          display: 'flex',
+          gap: '1rem',
+          justifyContent: 'center',
+          marginTop: '2rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <ExportButton
+          exportUrl={`/api/ptr/${taskId}/export`}
+          filename={`ptr_comparison_${taskId.slice(0, 8)}.pdf`}
+          buttonText="导出 PDF"
+        />
+        <Button variant="secondary" onClick={onDashboard} style={{ gap: '0.5rem' }}>
+          <Home size={18} />
+          返回首页
+        </Button>
+        <Button variant="primary" onClick={onReupload} style={{ gap: '0.5rem' }}>
+          <RotateCcw size={18} />
+          重新上传
+        </Button>
+      </motion.div>
+    </motion.div>
+  );
+}
