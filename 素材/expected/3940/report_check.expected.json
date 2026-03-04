@@ -1,0 +1,148 @@
+{
+  "checks": {
+    "C01": {
+      "name": "首页与第三页一致性",
+      "results": [
+        {
+          "field_name": "委托方",
+          "message": "委托方一致: 百多力（北京）医疗器械有限公司",
+          "source_a": "百多力（北京）医疗器械有限公司",
+          "source_b": "百多力（北京）医疗器械有限公司",
+          "status": "pass"
+        },
+        {
+          "field_name": "样品名称",
+          "message": "样品名称一致: 植入式心脏起搏器",
+          "source_a": "植入式心脏起搏器",
+          "source_b": "植入式心脏起搏器",
+          "status": "pass"
+        },
+        {
+          "field_name": "型号规格",
+          "message": "型号规格一致: Edora 8 DR-T",
+          "source_a": "Edora 8 DR-T",
+          "source_b": "Edora 8 DR-T",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C02": {
+      "name": "第三页扩展字段",
+      "results": [
+        {
+          "field_name": "型号规格",
+          "message": "未找到与样品名称'植入式心脏起搏器'匹配的中文标签",
+          "source_a": "",
+          "source_b": "",
+          "status": "warning"
+        },
+        {
+          "field_name": "生产日期",
+          "message": "未找到与样品名称'植入式心脏起搏器'匹配的中文标签",
+          "source_a": "",
+          "source_b": "",
+          "status": "warning"
+        },
+        {
+          "field_name": "产品编号/批号",
+          "message": "未找到与样品名称'植入式心脏起搏器'匹配的中文标签",
+          "source_a": "",
+          "source_b": "",
+          "status": "warning"
+        },
+        {
+          "field_name": "委托方",
+          "message": "未找到与样品名称'植入式心脏起搏器'匹配的中文标签",
+          "source_a": "",
+          "source_b": "",
+          "status": "warning"
+        },
+        {
+          "field_name": "委托方地址",
+          "message": "未找到与样品名称'植入式心脏起搏器'匹配的中文标签",
+          "source_a": "",
+          "source_b": "",
+          "status": "warning"
+        }
+      ],
+      "status": "pass"
+    },
+    "C03": {
+      "message": "未找到与样品名称'植入式心脏起搏器'匹配的中文标签，无法核对格式",
+      "name": "生产日期格式与值",
+      "status": "warning"
+    },
+    "C04": {
+      "field_results": [],
+      "message": "",
+      "name": "样品描述表格核对",
+      "status": "warning"
+    },
+    "C05": {
+      "name": "照片覆盖性核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C06": {
+      "name": "中文标签覆盖核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C07": {
+      "error_count": 0,
+      "name": "单项结论核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C08": {
+      "error_count": 0,
+      "name": "非空字段核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C09": {
+      "details": {
+        "duplicate_numbers": [],
+        "first_number": 1,
+        "last_number": 49,
+        "missing_numbers": []
+      },
+      "message": "序号连续完整: 1 ~ 49，共49项",
+      "name": "序号连续性核对",
+      "status": "pass"
+    },
+    "C10": {
+      "details": {
+        "extra_markers": [],
+        "missing_markers": []
+      },
+      "message": "续表标记全部正确",
+      "name": "续表标记核对",
+      "status": "pass"
+    },
+    "C11": {
+      "details": {
+        "duplicate_pages": [],
+        "final_page_mismatch": false,
+        "missing_pages": [],
+        "total_inconsistent": false,
+        "total_pages_checked": 32
+      },
+      "message": "页码连续完整: 第1页 ~ 第32页，共32页",
+      "name": "页码连续性核对",
+      "status": "pass"
+    }
+  },
+  "report_info": {
+    "has_third_page": true,
+    "total_inspection_items": 332
+  },
+  "summary": {
+    "errors": 0,
+    "overall_status": "pass",
+    "passed": 6,
+    "total_checks": 11,
+    "warnings": 3
+  }
+}

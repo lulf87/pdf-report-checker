@@ -1,0 +1,885 @@
+{
+  "checks": {
+    "C01": {
+      "name": "首页与第三页一致性",
+      "results": [
+        {
+          "field_name": "委托方",
+          "message": "委托方一致: 雅培医疗用品（上海）有限公司",
+          "source_a": "雅培医疗用品（上海）有限公司",
+          "source_b": "雅培医疗用品（上海）有限公司",
+          "status": "pass"
+        },
+        {
+          "field_name": "样品名称",
+          "message": "样品名称一致: 心脏脉冲电场消融仪",
+          "source_a": "心脏脉冲电场消融仪",
+          "source_b": "心脏脉冲电场消融仪",
+          "status": "pass"
+        },
+        {
+          "field_name": "型号规格",
+          "message": "型号规格一致: 见“样品描述”栏",
+          "source_a": "见“样品描述”栏",
+          "source_b": "见“样品描述”栏",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C02": {
+      "name": "第三页扩展字段",
+      "results": [
+        {
+          "field_name": "型号规格",
+          "message": "型号规格不一致: 页面='见“样品描述”栏' vs 标签='PFA-GEN-01'",
+          "source_a": "见“样品描述”栏",
+          "source_b": "PFA-GEN-01",
+          "status": "error"
+        },
+        {
+          "field_name": "生产日期",
+          "message": "生产日期不一致: 页面='见“样品描述”栏' vs 标签='2025-04-19'",
+          "source_a": "见“样品描述”栏",
+          "source_b": "2025-04-19",
+          "status": "error"
+        },
+        {
+          "field_name": "产品编号/批号",
+          "message": "产品编号/批号不一致: 页面='见“样品描述”栏' vs 标签='10627717'",
+          "source_a": "见“样品描述”栏",
+          "source_b": "10627717",
+          "status": "error"
+        },
+        {
+          "field_name": "委托方",
+          "message": "委托方不一致: 页面='雅培医疗用品（上海）有限公司' vs 标签=''",
+          "source_a": "雅培医疗用品（上海）有限公司",
+          "source_b": "",
+          "status": "error"
+        },
+        {
+          "field_name": "委托方地址",
+          "message": "委托方地址不一致: 页面='中国（上海）自由贸易试验区泰谷路169 号B 楼四层402 室' vs 标签=''",
+          "source_a": "中国（上海）自由贸易试验区泰谷路169 号B 楼四层402 室",
+          "source_b": "",
+          "status": "error"
+        }
+      ],
+      "status": "error"
+    },
+    "C03": {
+      "message": "生产日期格式不一致: 页面='见“样品描述”栏' (格式:UNKNOWN) vs 标签='2025-04-19' (格式:YYYY-MM-DD)",
+      "name": "生产日期格式与值",
+      "status": "error"
+    },
+    "C04": {
+      "field_results": [
+        {
+          "component_name": "心脏脉冲电场消融仪-主\n机",
+          "field_name": "规格型号",
+          "message": "心脏脉冲电场消融仪-主\n机 - 规格型号: 一致",
+          "source_a": "PFA-GEN-01",
+          "source_b": "PFA-GEN-01",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-主\n机",
+          "field_name": "序列号批号",
+          "message": "心脏脉冲电场消融仪-主\n机 - 序列号批号: 不一致 - 表格='20539798' vs 标签='10627717'",
+          "source_a": "20539798",
+          "source_b": "10627717",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-主\n机",
+          "field_name": "生产日期",
+          "message": "心脏脉冲电场消融仪-主\n机 - 生产日期: 一致",
+          "source_a": "2025-04-19",
+          "source_b": "2025-04-19",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-主\n机",
+          "field_name": "失效日期",
+          "message": "心脏脉冲电场消融仪-主\n机 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "脉冲导管连接电缆（可\n选）",
+          "field_name": "规格型号",
+          "message": "脉冲导管连接电缆（可\n选） - 规格型号: 一致",
+          "source_a": "A-UNI-PF-CBL",
+          "source_b": "A-UNI-PF-CBL",
+          "status": "pass"
+        },
+        {
+          "component_name": "脉冲导管连接电缆（可\n选）",
+          "field_name": "序列号批号",
+          "message": "脉冲导管连接电缆（可\n选） - 序列号批号: 一致",
+          "source_a": "850778817",
+          "source_b": "850778817",
+          "status": "pass"
+        },
+        {
+          "component_name": "脉冲导管连接电缆（可\n选）",
+          "field_name": "生产日期",
+          "message": "脉冲导管连接电缆（可\n选） - 生产日期: 一致",
+          "source_a": "2025-04-10",
+          "source_b": "2025-04-10",
+          "status": "pass"
+        },
+        {
+          "component_name": "脉冲导管连接电缆（可\n选）",
+          "field_name": "失效日期",
+          "message": "脉冲导管连接电缆（可\n选） - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-推\n车",
+          "field_name": "规格型号",
+          "message": "未找到部件'心脏脉冲电场消融仪-推\n车'的中文标签",
+          "source_a": "PFA-GEN-CART",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-推\n车",
+          "field_name": "序列号批号",
+          "message": "未找到部件'心脏脉冲电场消融仪-推\n车'的中文标签",
+          "source_a": "10627717",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-推\n车",
+          "field_name": "生产日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-推\n车'的中文标签",
+          "source_a": "2024-11-26",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-推\n车",
+          "field_name": "失效日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-推\n车'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-\nECG 主线缆",
+          "field_name": "规格型号",
+          "message": "心脏脉冲电场消融仪-\nECG 主线缆 - 规格型号: 一致",
+          "source_a": "PFA-ECG-CBL",
+          "source_b": "PFA-ECG-CBL",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-\nECG 主线缆",
+          "field_name": "序列号批号",
+          "message": "心脏脉冲电场消融仪-\nECG 主线缆 - 序列号批号: 一致",
+          "source_a": "2024070069",
+          "source_b": "2024070069",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-\nECG 主线缆",
+          "field_name": "生产日期",
+          "message": "心脏脉冲电场消融仪-\nECG 主线缆 - 生产日期: 一致",
+          "source_a": "2024-07-13",
+          "source_b": "2024-07-13",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-\nECG 主线缆",
+          "field_name": "失效日期",
+          "message": "心脏脉冲电场消融仪-\nECG 主线缆 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）",
+          "field_name": "规格型号",
+          "message": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选） - 规格型号: 一致",
+          "source_a": "PFA-ECG-RNAM",
+          "source_b": "PFA-ECG-RNAM",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）",
+          "field_name": "序列号批号",
+          "message": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选） - 序列号批号: 一致",
+          "source_a": "2024070063",
+          "source_b": "2024070063",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）",
+          "field_name": "生产日期",
+          "message": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选） - 生产日期: 一致",
+          "source_a": "2024-10-11",
+          "source_b": "2024-10-11",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）",
+          "field_name": "失效日期",
+          "message": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选） - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）",
+          "field_name": "规格型号",
+          "message": "未找到部件'心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）'的中文标签",
+          "source_a": "PFA-ECG-LNAM",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）",
+          "field_name": "序列号批号",
+          "message": "未找到部件'心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）",
+          "field_name": "生产日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）",
+          "field_name": "失效日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-记\n录系统连接线缆",
+          "field_name": "规格型号",
+          "message": "未找到部件'心脏脉冲电场消融仪-记\n录系统连接线缆'的中文标签",
+          "source_a": "GEN-3RD-REC",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-记\n录系统连接线缆",
+          "field_name": "序列号批号",
+          "message": "未找到部件'心脏脉冲电场消融仪-记\n录系统连接线缆'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-记\n录系统连接线缆",
+          "field_name": "生产日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-记\n录系统连接线缆'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-记\n录系统连接线缆",
+          "field_name": "失效日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-记\n录系统连接线缆'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏",
+          "field_name": "规格型号",
+          "message": "心脏脉冲电场消融仪-触\n摸屏 - 规格型号: 一致",
+          "source_a": "PFA-GEN-TS",
+          "source_b": "PFA-GEN-TS",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏",
+          "field_name": "序列号批号",
+          "message": "心脏脉冲电场消融仪-触\n摸屏 - 序列号批号: 一致",
+          "source_a": "C24H006740",
+          "source_b": "C24H006740",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏",
+          "field_name": "生产日期",
+          "message": "心脏脉冲电场消融仪-触\n摸屏 - 生产日期: 一致",
+          "source_a": "2024-10-14",
+          "source_b": "2024-10-14",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏",
+          "field_name": "失效日期",
+          "message": "心脏脉冲电场消融仪-触\n摸屏 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源电缆（可选）",
+          "field_name": "规格型号",
+          "message": "电源电缆（可选） - 规格型号: 一致",
+          "source_a": "GEN-PWR-CH",
+          "source_b": "GEN-PWR-CH",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源电缆（可选）",
+          "field_name": "序列号批号",
+          "message": "电源电缆（可选） - 序列号批号: 一致",
+          "source_a": "10822757",
+          "source_b": "10822757",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源电缆（可选）",
+          "field_name": "生产日期",
+          "message": "电源电缆（可选） - 生产日期: 一致",
+          "source_a": "2017-10-15",
+          "source_b": "2017-10-15",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源电缆（可选）",
+          "field_name": "失效日期",
+          "message": "电源电缆（可选） - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线缆（3m）（可\n选）",
+          "field_name": "规格型号",
+          "message": "等电位线缆（3m）（可\n选） - 规格型号: 一致",
+          "source_a": "S100003",
+          "source_b": "S100003",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线缆（3m）（可\n选）",
+          "field_name": "序列号批号",
+          "message": "等电位线缆（3m）（可\n选） - 序列号批号: 不一致 - 表格='/' vs 标签='见实物'",
+          "source_a": "/",
+          "source_b": "见实物",
+          "status": "error"
+        },
+        {
+          "component_name": "等电位线缆（3m）（可\n选）",
+          "field_name": "生产日期",
+          "message": "等电位线缆（3m）（可\n选） - 生产日期: 不一致 - 表格='/' vs 标签='见实物'",
+          "source_a": "/",
+          "source_b": "见实物",
+          "status": "error"
+        },
+        {
+          "component_name": "等电位线缆（3m）（可\n选）",
+          "field_name": "失效日期",
+          "message": "等电位线缆（3m）（可\n选） - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "光接收器（可选）",
+          "field_name": "规格型号",
+          "message": "光接收器（可选） - 规格型号: 一致",
+          "source_a": "S100018",
+          "source_b": "S100018",
+          "status": "pass"
+        },
+        {
+          "component_name": "光接收器（可选）",
+          "field_name": "序列号批号",
+          "message": "光接收器（可选） - 序列号批号: 不一致 - 表格='/' vs 标签='见实物'",
+          "source_a": "/",
+          "source_b": "见实物",
+          "status": "error"
+        },
+        {
+          "component_name": "光接收器（可选）",
+          "field_name": "生产日期",
+          "message": "光接收器（可选） - 生产日期: 不一致 - 表格='/' vs 标签='见实物'",
+          "source_a": "/",
+          "source_b": "见实物",
+          "status": "error"
+        },
+        {
+          "component_name": "光接收器（可选）",
+          "field_name": "失效日期",
+          "message": "光接收器（可选） - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）",
+          "field_name": "规格型号",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）'的中文标签",
+          "source_a": "PFA-GEN-\nCBL10",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）",
+          "field_name": "序列号批号",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）",
+          "field_name": "生产日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）",
+          "field_name": "失效日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）",
+          "field_name": "规格型号",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）'的中文标签",
+          "source_a": "PFA-GEN-\nCBL15",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）",
+          "field_name": "序列号批号",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）",
+          "field_name": "生产日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）",
+          "field_name": "失效日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）",
+          "field_name": "规格型号",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）'的中文标签",
+          "source_a": "PFA-GEN-\nCBL30",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）",
+          "field_name": "序列号批号",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）",
+          "field_name": "生产日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）",
+          "field_name": "失效日期",
+          "message": "未找到部件'心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "光纤（10m）（可选）",
+          "field_name": "规格型号",
+          "message": "未找到部件'光纤（10m）（可选）'的中文标签",
+          "source_a": "H700179",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "光纤（10m）（可选）",
+          "field_name": "序列号批号",
+          "message": "未找到部件'光纤（10m）（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "光纤（10m）（可选）",
+          "field_name": "生产日期",
+          "message": "未找到部件'光纤（10m）（可选）'的中文标签",
+          "source_a": "/",
+          "source_b": "N/A",
+          "status": "warning"
+        },
+        {
+          "component_name": "光纤（10m）（可选）",
+          "field_name": "失效日期",
+          "message": "未找到部件'光纤（10m）（可选）'的中文标签",
+          "source_a": "",
+          "source_b": "N/A",
+          "status": "warning"
+        }
+      ],
+      "message": "C04 核对完成：5 个错误，28 个警告",
+      "name": "样品描述表格核对",
+      "status": "error"
+    },
+    "C05": {
+      "name": "照片覆盖性核对",
+      "results": [
+        {
+          "component_name": "心脏脉冲电场消融仪-主\n机",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 正面",
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 背面",
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 左面",
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 右面",
+            "心脏脉冲电场消融仪-主机 张",
+            "心脏脉冲电场消融仪-推车 张",
+            "心脏脉冲电场消融仪-触摸屏",
+            "心脏脉冲电场消融仪-触摸屏 张",
+            "心脏脉冲电场消融仪-ECG 主线缆",
+            "心脏脉冲电场消融仪-ECG 主线缆  张",
+            "心脏脉冲电场消融仪-不可透射线ECG 导联线（可选）",
+            "心脏脉冲电场消融仪-不可透射线ECG 导联线（可选） 张",
+            "心脏脉冲电场消融仪-触摸屏电源适配器（可选）",
+            "心脏脉冲电场消融仪-触摸屏电源适配器（可选） 张"
+          ],
+          "message": "心脏脉冲电场消融仪-主\n机: 有 14 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "脉冲导管连接电缆（可\n选）",
+          "matched_captions": [
+            "脉冲导管连接电缆（可选）",
+            "脉冲导管连接电缆（可选） 张"
+          ],
+          "message": "脉冲导管连接电缆（可\n选）: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-推\n车",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 正面",
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 背面",
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 左面",
+            "心脏脉冲电场消融仪-主机及心脏脉冲电场消融仪-推车 右面",
+            "心脏脉冲电场消融仪-推车 张"
+          ],
+          "message": "心脏脉冲电场消融仪-推\n车: 有 5 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-\nECG 主线缆",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-ECG 主线缆",
+            "心脏脉冲电场消融仪-ECG 主线缆  张"
+          ],
+          "message": "心脏脉冲电场消融仪-\nECG 主线缆: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-不可透射线ECG 导联线（可选）",
+            "心脏脉冲电场消融仪-不可透射线ECG 导联线（可选） 张"
+          ],
+          "message": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）: 无照片覆盖",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-记\n录系统连接线缆",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-记\n录系统连接线缆: 无照片覆盖",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-触摸屏",
+            "心脏脉冲电场消融仪-触摸屏 张",
+            "心脏脉冲电场消融仪-触摸屏电源适配器（可选）",
+            "心脏脉冲电场消融仪-触摸屏电源适配器（可选） 张"
+          ],
+          "message": "心脏脉冲电场消融仪-触\n摸屏: 有 4 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源电缆（可选）",
+          "matched_captions": [
+            "电源电缆（可选）",
+            "电源电缆（可选） 张"
+          ],
+          "message": "电源电缆（可选）: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线缆（3m）（可\n选）",
+          "matched_captions": [
+            "等电位线缆 （3m）（可选）",
+            "等电位线缆 （3m）（可选） 张"
+          ],
+          "message": "等电位线缆（3m）（可\n选）: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "光接收器（可选）",
+          "matched_captions": [
+            "光接收器",
+            "光接收器（可选） 张"
+          ],
+          "message": "光接收器（可选）: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-触摸屏"
+          ],
+          "message": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）: 有 1 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-触摸屏"
+          ],
+          "message": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）: 有 1 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）",
+          "matched_captions": [
+            "心脏脉冲电场消融仪-触摸屏",
+            "触摸屏连接线缆（30m）（可选）"
+          ],
+          "message": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "光纤（10m）（可选）",
+          "matched_captions": [],
+          "message": "光纤（10m）（可选）: 无照片覆盖",
+          "status": "error"
+        }
+      ],
+      "status": "error"
+    },
+    "C06": {
+      "name": "中文标签覆盖核对",
+      "results": [
+        {
+          "component_name": "心脏脉冲电场消融仪-主\n机",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-主\n机: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "脉冲导管连接电缆（可\n选）",
+          "matched_captions": [
+            "№26 脉冲导管连接电缆（可选） 中文标签样张"
+          ],
+          "message": "脉冲导管连接电缆（可\n选）: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-推\n车",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-推\n车: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-\nECG 主线缆",
+          "matched_captions": [
+            "№10 心脏脉冲电场消融仪-ECG 主线缆  中文标签样张"
+          ],
+          "message": "心脏脉冲电场消融仪-\nECG 主线缆: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）",
+          "matched_captions": [
+            "№12 心脏脉冲电场消融仪-不可透射线ECG 导联线（可选） 中文标签样张"
+          ],
+          "message": "心脏脉冲电场消融仪-不\n可透射线ECG 导联线（可\n选）: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-可\n透射线ECG 导联线（可\n选）: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-记\n录系统连接线缆",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-记\n录系统连接线缆: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏",
+          "matched_captions": [
+            "№8 心脏脉冲电场消融仪-触摸屏 中文标签样张"
+          ],
+          "message": "心脏脉冲电场消融仪-触\n摸屏: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源电缆（可选）",
+          "matched_captions": [
+            "№18 电源电缆（可选） 中文标签样张"
+          ],
+          "message": "电源电缆（可选）: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线缆（3m）（可\n选）",
+          "matched_captions": [
+            "№20 等电位线缆 （3m）（可选） 中文标签样张"
+          ],
+          "message": "等电位线缆（3m）（可\n选）: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "光接收器（可选）",
+          "matched_captions": [
+            "№16 光接收器（可选） 中文标签样张"
+          ],
+          "message": "光接收器（可选）: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-触\n摸屏连接线缆（10m）\n（可选）: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-触\n摸屏连接线缆（15m）\n（可选）: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）",
+          "matched_captions": [],
+          "message": "心脏脉冲电场消融仪-触\n摸屏连接线缆（30m）\n（可选）: 无中文标签",
+          "status": "error"
+        },
+        {
+          "component_name": "光纤（10m）（可选）",
+          "matched_captions": [],
+          "message": "光纤（10m）（可选）: 无中文标签",
+          "status": "error"
+        }
+      ],
+      "status": "error"
+    },
+    "C07": {
+      "error_count": 1,
+      "name": "单项结论核对",
+      "results": [
+        {
+          "actual_conclusion": "/",
+          "expected_conclusion": "符合",
+          "inspection_project": "基本性能",
+          "message": "序号3 '基本性能': 结论不一致 - 期望'符合'，实际'/'",
+          "sequence_number": "3",
+          "status": "error"
+        }
+      ],
+      "status": "error"
+    },
+    "C08": {
+      "error_count": 0,
+      "name": "非空字段核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C09": {
+      "details": {
+        "duplicate_numbers": [],
+        "first_number": 1,
+        "last_number": 163,
+        "missing_numbers": []
+      },
+      "message": "序号连续完整: 1 ~ 163，共163项",
+      "name": "序号连续性核对",
+      "status": "pass"
+    },
+    "C10": {
+      "details": {
+        "extra_markers": [],
+        "missing_markers": []
+      },
+      "message": "续表标记全部正确",
+      "name": "续表标记核对",
+      "status": "pass"
+    },
+    "C11": {
+      "details": {
+        "duplicate_pages": [],
+        "final_page_mismatch": false,
+        "missing_pages": [],
+        "total_inconsistent": false,
+        "total_pages_checked": 118
+      },
+      "message": "页码连续完整: 第1页 ~ 第118页，共118页",
+      "name": "页码连续性核对",
+      "status": "pass"
+    }
+  },
+  "report_info": {
+    "has_third_page": true,
+    "total_inspection_items": 1052
+  },
+  "summary": {
+    "errors": 6,
+    "overall_status": "error",
+    "passed": 4,
+    "total_checks": 11,
+    "warnings": 0
+  }
+}

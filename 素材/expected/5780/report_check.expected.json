@@ -1,0 +1,399 @@
+{
+  "checks": {
+    "C01": {
+      "name": "首页与第三页一致性",
+      "results": [
+        {
+          "field_name": "委托方",
+          "message": "委托方一致: 苏州元科医疗器械有限公司",
+          "source_a": "苏州元科医疗器械有限公司",
+          "source_b": "苏州元科医疗器械有限公司",
+          "status": "pass"
+        },
+        {
+          "field_name": "样品名称",
+          "message": "样品名称一致: 消化道脉冲电场消融仪",
+          "source_a": "消化道脉冲电场消融仪",
+          "source_b": "消化道脉冲电场消融仪",
+          "status": "pass"
+        },
+        {
+          "field_name": "型号规格",
+          "message": "型号规格一致: RMD01",
+          "source_a": "RMD01",
+          "source_b": "RMD01",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C02": {
+      "name": "第三页扩展字段",
+      "results": [
+        {
+          "field_name": "型号规格",
+          "message": "型号规格一致: RMD01",
+          "source_a": "RMD01",
+          "source_b": "RMD01",
+          "status": "pass"
+        },
+        {
+          "field_name": "生产日期",
+          "message": "生产日期一致: 20251230",
+          "source_a": "20251230",
+          "source_b": "20251230",
+          "status": "pass"
+        },
+        {
+          "field_name": "产品编号/批号",
+          "message": "产品编号/批号一致: RMD251206002",
+          "source_a": "RMD251206002",
+          "source_b": "RMD251206002",
+          "status": "pass"
+        },
+        {
+          "field_name": "委托方",
+          "message": "委托方一致: 苏州元科医疗器械有限公司",
+          "source_a": "苏州元科医疗器械有限公司",
+          "source_b": "苏州元科医疗器城有限公司",
+          "status": "pass"
+        },
+        {
+          "field_name": "委托方地址",
+          "message": "委托方地址一致: 中国（江苏）自由贸易试验区苏州片区苏州工业园区星湖街328 号创意产业园五期A3-403-3 单元",
+          "source_a": "中国（江苏）自由贸易试验区苏州片区苏州工业园区星湖街328 号创意产业园五期A3-403-3 单元",
+          "source_b": "中国（江苏）自由贸易试验区苏州片区苏州工业固区星湖街328号创意产业国五期A3-403-3单元",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C03": {
+      "message": "生产日期一致: 20251230",
+      "name": "生产日期格式与值",
+      "status": "pass"
+    },
+    "C04": {
+      "field_results": [
+        {
+          "component_name": "消化道脉冲电场\n消融仪",
+          "field_name": "规格型号",
+          "message": "消化道脉冲电场\n消融仪 - 规格型号: 一致",
+          "source_a": "RMD01",
+          "source_b": "RMD01",
+          "status": "pass"
+        },
+        {
+          "component_name": "消化道脉冲电场\n消融仪",
+          "field_name": "序列号批号",
+          "message": "消化道脉冲电场\n消融仪 - 序列号批号: 一致",
+          "source_a": "RMD251206002",
+          "source_b": "RMD251206002",
+          "status": "pass"
+        },
+        {
+          "component_name": "消化道脉冲电场\n消融仪",
+          "field_name": "生产日期",
+          "message": "消化道脉冲电场\n消融仪 - 生产日期: 一致",
+          "source_a": "20251230",
+          "source_b": "20251230",
+          "status": "pass"
+        },
+        {
+          "component_name": "消化道脉冲电场\n消融仪",
+          "field_name": "失效日期",
+          "message": "消化道脉冲电场\n消融仪 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线",
+          "field_name": "规格型号",
+          "message": "等电位线 - 规格型号: 一致",
+          "source_a": "HWD06-C3-5M",
+          "source_b": "HWD06-C3-5M",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线",
+          "field_name": "序列号批号",
+          "message": "等电位线 - 序列号批号: 一致",
+          "source_a": "RMD251206002",
+          "source_b": "RMD251206002",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线",
+          "field_name": "生产日期",
+          "message": "等电位线 - 生产日期: 一致",
+          "source_a": "20251230",
+          "source_b": "20251230",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线",
+          "field_name": "失效日期",
+          "message": "等电位线 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源线",
+          "field_name": "规格型号",
+          "message": "电源线 - 规格型号: 一致",
+          "source_a": "6051.2032",
+          "source_b": "6051.2032",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源线",
+          "field_name": "序列号批号",
+          "message": "电源线 - 序列号批号: 一致",
+          "source_a": "RMD251206002",
+          "source_b": "RMD251206002",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源线",
+          "field_name": "生产日期",
+          "message": "电源线 - 生产日期: 一致",
+          "source_a": "20251230",
+          "source_b": "20251230",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源线",
+          "field_name": "失效日期",
+          "message": "电源线 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "脚踏开关",
+          "field_name": "规格型号",
+          "message": "脚踏开关 - 规格型号: 一致",
+          "source_a": "HRF-M5Y-5M-G1",
+          "source_b": "HRF-M5Y-5M-G1",
+          "status": "pass"
+        },
+        {
+          "component_name": "脚踏开关",
+          "field_name": "序列号批号",
+          "message": "脚踏开关 - 序列号批号: 一致",
+          "source_a": "RMD251206002",
+          "source_b": "RMD251206002",
+          "status": "pass"
+        },
+        {
+          "component_name": "脚踏开关",
+          "field_name": "生产日期",
+          "message": "脚踏开关 - 生产日期: 一致",
+          "source_a": "20251230",
+          "source_b": "20251230",
+          "status": "pass"
+        },
+        {
+          "component_name": "脚踏开关",
+          "field_name": "失效日期",
+          "message": "脚踏开关 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        },
+        {
+          "component_name": "尾线",
+          "field_name": "规格型号",
+          "message": "尾线 - 规格型号: 一致",
+          "source_a": "223451",
+          "source_b": "223451",
+          "status": "pass"
+        },
+        {
+          "component_name": "尾线",
+          "field_name": "序列号批号",
+          "message": "尾线 - 序列号批号: 一致",
+          "source_a": "RMD251206002",
+          "source_b": "RMD251206002",
+          "status": "pass"
+        },
+        {
+          "component_name": "尾线",
+          "field_name": "生产日期",
+          "message": "尾线 - 生产日期: 一致",
+          "source_a": "20251230",
+          "source_b": "20251230",
+          "status": "pass"
+        },
+        {
+          "component_name": "尾线",
+          "field_name": "失效日期",
+          "message": "尾线 - 失效日期: 一致",
+          "source_a": "",
+          "source_b": "",
+          "status": "pass"
+        }
+      ],
+      "message": "C04 核对完成：全部一致",
+      "name": "样品描述表格核对",
+      "status": "pass"
+    },
+    "C05": {
+      "name": "照片覆盖性核对",
+      "results": [
+        {
+          "component_name": "消化道脉冲电场\n消融仪",
+          "matched_captions": [
+            "消化道脉冲电场消融仪",
+            "消化道脉冲电场消融仪 主机正面",
+            "消化道脉冲电场消融仪 主机背面",
+            "消化道脉冲电场消融仪 主机侧面",
+            "消化道脉冲电场消融仪 主机"
+          ],
+          "message": "消化道脉冲电场\n消融仪: 有 5 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线",
+          "matched_captions": [
+            "等电位线",
+            "等电位线"
+          ],
+          "message": "等电位线: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源线",
+          "matched_captions": [
+            "电源线",
+            "电源线"
+          ],
+          "message": "电源线: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "脚踏开关",
+          "matched_captions": [
+            "脚踏开关",
+            "脚踏开关"
+          ],
+          "message": "脚踏开关: 有 2 张照片覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "尾线",
+          "matched_captions": [
+            "尾线",
+            "尾线"
+          ],
+          "message": "尾线: 有 2 张照片覆盖",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C06": {
+      "name": "中文标签覆盖核对",
+      "results": [
+        {
+          "component_name": "消化道脉冲电场\n消融仪",
+          "matched_captions": [
+            "№5 消化道脉冲电场消融仪 主机中文标签"
+          ],
+          "message": "消化道脉冲电场\n消融仪: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "等电位线",
+          "matched_captions": [
+            "№13 等电位线 中文标签"
+          ],
+          "message": "等电位线: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "电源线",
+          "matched_captions": [
+            "№11 电源线 中文标签"
+          ],
+          "message": "电源线: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "脚踏开关",
+          "matched_captions": [
+            "№9 脚踏开关 中文标签"
+          ],
+          "message": "脚踏开关: 有中文标签覆盖",
+          "status": "pass"
+        },
+        {
+          "component_name": "尾线",
+          "matched_captions": [
+            "№7 尾线 中文标签"
+          ],
+          "message": "尾线: 有中文标签覆盖",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C07": {
+      "error_count": 0,
+      "name": "单项结论核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C08": {
+      "error_count": 0,
+      "name": "非空字段核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C09": {
+      "details": {
+        "duplicate_numbers": [],
+        "first_number": 1,
+        "last_number": 164,
+        "missing_numbers": []
+      },
+      "message": "序号连续完整: 1 ~ 164，共164项",
+      "name": "序号连续性核对",
+      "status": "pass"
+    },
+    "C10": {
+      "details": {
+        "extra_markers": [],
+        "missing_markers": []
+      },
+      "message": "续表标记全部正确",
+      "name": "续表标记核对",
+      "status": "pass"
+    },
+    "C11": {
+      "details": {
+        "duplicate_pages": [],
+        "final_page_mismatch": false,
+        "missing_pages": [],
+        "total_inconsistent": false,
+        "total_pages_checked": 105
+      },
+      "message": "页码连续完整: 第1页 ~ 第105页，共105页",
+      "name": "页码连续性核对",
+      "status": "pass"
+    }
+  },
+  "report_info": {
+    "has_third_page": true,
+    "total_inspection_items": 1070
+  },
+  "summary": {
+    "errors": 0,
+    "overall_status": "pass",
+    "passed": 9,
+    "total_checks": 11,
+    "warnings": 0
+  }
+}

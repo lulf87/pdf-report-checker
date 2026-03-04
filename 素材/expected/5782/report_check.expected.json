@@ -1,0 +1,148 @@
+{
+  "checks": {
+    "C01": {
+      "name": "首页与第三页一致性",
+      "results": [
+        {
+          "field_name": "委托方",
+          "message": "委托方一致: 苏州元科医疗器械有限公司",
+          "source_a": "苏州元科医疗器械有限公司",
+          "source_b": "苏州元科医疗器械有限公司",
+          "status": "pass"
+        },
+        {
+          "field_name": "样品名称",
+          "message": "样品名称一致: 一次性使用消化道脉冲电场消融导管",
+          "source_a": "一次性使用消化道脉冲电场消融导管",
+          "source_b": "一次性使用消化道脉冲电场消融导管",
+          "status": "pass"
+        },
+        {
+          "field_name": "型号规格",
+          "message": "型号规格一致: RMC01",
+          "source_a": "RMC01",
+          "source_b": "RMC01",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C02": {
+      "name": "第三页扩展字段",
+      "results": [
+        {
+          "field_name": "型号规格",
+          "message": "型号规格一致: RMC01",
+          "source_a": "RMC01",
+          "source_b": "RMCO1",
+          "status": "pass"
+        },
+        {
+          "field_name": "生产日期",
+          "message": "生产日期一致: 20251210",
+          "source_a": "20251210",
+          "source_b": "20251210",
+          "status": "pass"
+        },
+        {
+          "field_name": "产品编号/批号",
+          "message": "产品编号/批号一致: RMC251201",
+          "source_a": "RMC251201",
+          "source_b": "RMC251201",
+          "status": "pass"
+        },
+        {
+          "field_name": "委托方",
+          "message": "委托方一致: 苏州元科医疗器械有限公司",
+          "source_a": "苏州元科医疗器械有限公司",
+          "source_b": "苏州元科医疗器械有限公司",
+          "status": "pass"
+        },
+        {
+          "field_name": "委托方地址",
+          "message": "委托方地址一致: 中国（江苏）自由贸易试验区苏州片区苏州工业园区星湖街328 号创意产业园五期A3-403-3 单元",
+          "source_a": "中国（江苏）自由贸易试验区苏州片区苏州工业园区星湖街328 号创意产业园五期A3-403-3 单元",
+          "source_b": "中国（江苏）自由贸易试验区苏州片区苏州工业园区星湖街328号创意产业园五期A3-403-3单元",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "C03": {
+      "message": "生产日期一致: 20251210",
+      "name": "生产日期格式与值",
+      "status": "pass"
+    },
+    "C04": {
+      "field_results": [],
+      "message": "",
+      "name": "样品描述表格核对",
+      "status": "warning"
+    },
+    "C05": {
+      "name": "照片覆盖性核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C06": {
+      "name": "中文标签覆盖核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C07": {
+      "error_count": 0,
+      "name": "单项结论核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C08": {
+      "error_count": 0,
+      "name": "非空字段核对",
+      "results": [],
+      "status": "pass"
+    },
+    "C09": {
+      "details": {
+        "duplicate_numbers": [],
+        "first_number": 1,
+        "last_number": 163,
+        "missing_numbers": []
+      },
+      "message": "序号连续完整: 1 ~ 163，共163项",
+      "name": "序号连续性核对",
+      "status": "pass"
+    },
+    "C10": {
+      "details": {
+        "extra_markers": [],
+        "missing_markers": []
+      },
+      "message": "续表标记全部正确",
+      "name": "续表标记核对",
+      "status": "pass"
+    },
+    "C11": {
+      "details": {
+        "duplicate_pages": [],
+        "final_page_mismatch": false,
+        "missing_pages": [],
+        "total_inconsistent": false,
+        "total_pages_checked": 96
+      },
+      "message": "页码连续完整: 第1页 ~ 第96页，共96页",
+      "name": "页码连续性核对",
+      "status": "pass"
+    }
+  },
+  "report_info": {
+    "has_third_page": true,
+    "total_inspection_items": 1064
+  },
+  "summary": {
+    "errors": 0,
+    "overall_status": "pass",
+    "passed": 8,
+    "total_checks": 11,
+    "warnings": 1
+  }
+}

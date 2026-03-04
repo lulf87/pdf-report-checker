@@ -18,4 +18,6 @@ __pycache__/
 *.pyc
 
 # local materials / samples
-素材/
+素材/*
+!素材/expected/
+!素材/expected/**
