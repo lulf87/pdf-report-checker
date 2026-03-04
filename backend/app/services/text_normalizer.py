@@ -159,6 +159,9 @@ class TextNormalizer:
         # Remove spaces after Chinese punctuation (except quotes)
         text = re.sub(r"([，。！？；：])\s+(?![\"'»»])", r"\1", text)
 
+        # Heading style noise: "通用要求:应符合..." == "通用要求应符合..."
+        text = re.sub(r"(?<=[\u4e00-\u9fffA-Za-z0-9\)])[:：](?=应符合)", "", text)
+
         return text
 
     def _normalize_cjk_spacing(self, text: str) -> str:

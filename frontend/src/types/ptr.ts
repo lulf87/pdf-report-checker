@@ -27,6 +27,7 @@ export interface ResultResponse {
 // Summary statistics from backend
 export interface ComparisonSummary {
   total_clauses: number;
+  evaluated_clauses?: number;
   matches: number;
   differs: number;
   missing: number;
@@ -37,6 +38,18 @@ export interface ComparisonSummary {
 // Backend response structure
 export interface PTRCompareResult {
   summary: ComparisonSummary;
+  warnings?: {
+    out_of_scope?: {
+      count: number;
+      clauses: string[];
+      message: string;
+    };
+    missing_in_scope?: {
+      count: number;
+      clauses: string[];
+      message: string;
+    };
+  };
   clauses: ClauseResult[];  // Raw backend clause data
   tables: TableResult[];
   ptr_info?: {
@@ -55,7 +68,18 @@ export interface ClauseResult {
   report_text: string;
   result: string;  // 'match' | 'differ' | 'missing' | 'excluded'
   similarity: number;
+  match_reason?: string;
   differences?: Difference[];
+  table_expansions?: ClauseTableExpansion[];
+}
+
+export interface ClauseTableExpansion {
+  table_number: number;
+  found: boolean;
+  total_parameters: number;
+  matches: number;
+  match_rate: number;
+  parameters?: TableParameter[];
 }
 
 export interface Difference {
@@ -71,11 +95,14 @@ export interface Clause {
   ptr_text: string;
   report_text: string;
   is_match: boolean;
+  match_reason?: string;
   diffs: DiffItem[];
+  table_expansions?: ClauseTableExpansion[];
 }
 
 export interface TableResult {
   table_number: number;
+  clause_number?: string;
   found: boolean;
   total_parameters: number;
   matches: number;

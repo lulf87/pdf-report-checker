@@ -109,6 +109,17 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                 {clause.is_match ? '一致' : '不一致'}
               </Badge>
             </div>
+            {clause.is_match && clause.match_reason === 'table_parameter_equivalent' && (
+              <p
+                style={{
+                  marginTop: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--color-warn)',
+                }}
+              >
+                参数条款按“应符合表中数值”判定一致，展开后可查看表格参数明细。
+              </p>
+            )}
 
             {/* Expanded Content */}
             <AnimatePresence mode="wait">
@@ -165,6 +176,89 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                     </p>
                     <DiffViewer diffs={clause.diffs} fallbackText={clause.report_text} />
                   </div>
+
+                  {/* Table Expansion Details */}
+                  {(clause.table_expansions && clause.table_expansions.length > 0) && (
+                    <div>
+                      <p
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: 'var(--text-muted)',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        表格参数核对
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {clause.table_expansions.map((table, tableIndex) => (
+                          <div
+                            key={`${clause.number}-table-${table.table_number}-${tableIndex}`}
+                            style={{
+                              border: '1px solid var(--glass-border)',
+                              borderRadius: 'var(--radius-sm)',
+                              padding: '0.75rem',
+                              background: 'rgba(255, 255, 255, 0.02)',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: '0.5rem',
+                                gap: '0.5rem',
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                                表{table.table_number}：匹配 {table.matches}/{table.total_parameters}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: table.found ? 'var(--text-muted)' : 'var(--color-danger)',
+                                }}
+                              >
+                                {table.found ? `一致率 ${Math.round(table.match_rate * 100)}%` : 'PTR 中未找到该表'}
+                              </span>
+                            </div>
+
+                            {(table.parameters && table.parameters.length > 0) ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                {table.parameters.map((param, paramIndex) => (
+                                  <div
+                                    key={`${clause.number}-table-${table.table_number}-param-${paramIndex}`}
+                                    style={{
+                                      display: 'flex',
+                                      flexWrap: 'wrap',
+                                      gap: '0.35rem 0.75rem',
+                                      alignItems: 'start',
+                                      fontSize: '0.78rem',
+                                      lineHeight: 1.4,
+                                    }}
+                                  >
+                                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{param.name || '-'}</span>
+                                    <span style={{ color: 'var(--text-secondary)' }}>PTR={param.ptr_value || '-'}</span>
+                                    <span style={{ color: 'var(--text-secondary)' }}>报告={param.report_value || '-'}</span>
+                                    <span style={{ color: param.matches ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                      {param.matches ? '一致' : '不一致'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                未提取到可展示的参数项。
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

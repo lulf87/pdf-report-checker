@@ -432,12 +432,64 @@ def build_comparison_result(
     differs = sum(1 for r in comparison_results if r.result == ComparisonResult.DIFFER)
     missing = sum(1 for r in comparison_results if r.result == ComparisonResult.MISSING)
     excluded = sum(1 for r in comparison_results if r.result == ComparisonResult.EXCLUDED)
+    evaluated_clauses = max(total_clauses - excluded, 0)
+    out_of_scope_clauses = [
+        str(r.ptr_clause.number)
+        for r in comparison_results
+        if r.result == ComparisonResult.EXCLUDED and r.ptr_clause is not None
+    ]
+    missing_in_scope = [
+        str(r.ptr_clause.number)
+        for r in comparison_results
+        if r.result == ComparisonResult.MISSING and r.ptr_clause is not None
+    ]
+
+    # Build table details and clause->table mapping
+    tables = []
+    table_by_clause: dict[str, list[dict[str, Any]]] = {}
+    for table_result in table_results:
+        table_data = {
+            "table_number": table_result.table_number,
+            "clause_number": table_result.clause_number,
+            "found": table_result.table_found,
+            "total_parameters": table_result.total_parameters,
+            "matches": table_result.total_matches,
+            "match_rate": table_result.match_rate,
+        }
+
+        table_parameters = []
+        if table_result.parameters:
+            table_parameters = [
+                {
+                    "name": p.parameter_name,
+                    "ptr_value": p.ptr_value,
+                    "report_value": p.report_value,
+                    "matches": p.matches,
+                }
+                for p in table_result.parameters
+            ]
+            table_data["parameters"] = table_parameters
+
+        tables.append(table_data)
+
+        if table_result.clause_number:
+            table_by_clause.setdefault(table_result.clause_number, []).append(
+                {
+                    "table_number": table_result.table_number,
+                    "found": table_result.table_found,
+                    "total_parameters": table_result.total_parameters,
+                    "matches": table_result.total_matches,
+                    "match_rate": table_result.match_rate,
+                    "parameters": table_parameters,
+                }
+            )
 
     # Build clause details
     clauses = []
     for detail in comparison_results:
+        clause_number = str(detail.ptr_clause.number) if detail.ptr_clause else ""
         clause_data = {
-            "ptr_number": str(detail.ptr_clause.number) if detail.ptr_clause else "",
+            "ptr_number": clause_number,
             "ptr_text": detail.ptr_clause.text_content if detail.ptr_clause else "",
             "report_text": (
                 detail.report_text_for_display
@@ -446,6 +498,7 @@ def build_comparison_result(
             ),
             "result": detail.result.value,
             "similarity": detail.similarity,
+            "match_reason": detail.match_reason,
         }
 
         if detail.has_differences:
@@ -457,40 +510,33 @@ def build_comparison_result(
                 for d in detail.differences
             ]
 
+        related_tables = table_by_clause.get(clause_number, [])
+        if related_tables:
+            clause_data["table_expansions"] = related_tables
+
         clauses.append(clause_data)
-
-    # Build table details
-    tables = []
-    for table_result in table_results:
-        table_data = {
-            "table_number": table_result.table_number,
-            "found": table_result.table_found,
-            "total_parameters": table_result.total_parameters,
-            "matches": table_result.total_matches,
-            "match_rate": table_result.match_rate,
-        }
-
-        if table_result.parameters:
-            table_data["parameters"] = [
-                {
-                    "name": p.parameter_name,
-                    "ptr_value": p.ptr_value,
-                    "report_value": p.report_value,
-                    "matches": p.matches,
-                }
-                for p in table_result.parameters
-            ]
-
-        tables.append(table_data)
 
     return {
         "summary": {
             "total_clauses": total_clauses,
+            "evaluated_clauses": evaluated_clauses,
             "matches": matches,
             "differs": differs,
             "missing": missing,
             "excluded": excluded,
-            "match_rate": matches / total_clauses if total_clauses > 0 else 0.0,
+            "match_rate": matches / evaluated_clauses if evaluated_clauses > 0 else 0.0,
+        },
+        "warnings": {
+            "out_of_scope": {
+                "count": len(out_of_scope_clauses),
+                "clauses": out_of_scope_clauses,
+                "message": "以下条款不在第三页检验项目范围内，已从正文一致性判定中排除。",
+            },
+            "missing_in_scope": {
+                "count": len(missing_in_scope),
+                "clauses": missing_in_scope,
+                "message": "以下条款在第三页检验项目范围内，但未在报告正文检验表中提取到对应条款。",
+            },
         },
         "clauses": clauses,
         "tables": tables,

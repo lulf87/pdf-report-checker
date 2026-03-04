@@ -8,6 +8,7 @@ import pytest
 
 from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument
 from app.models.report_models import InspectionItem, InspectionTable, ReportDocument
+from app.models.report_models import ThirdPageFields
 from app.services.comparator import (
     ClauseComparator,
     ComparisonResult,
@@ -260,6 +261,181 @@ class TestCompareDocuments:
 
         assert len(results) == 1
         assert results[0].result == ComparisonResult.MISSING
+
+    def test_third_page_inspection_scope_should_exclude_out_of_scope_clauses(self):
+        """Third-page inspection items define clause scope for PTR comparison."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.extend(
+            [
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.2"),
+                    full_text="2.1.2 参数A",
+                    text_content="参数A应符合表1中的数值。",
+                    level=3,
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.3"),
+                    full_text="2.1.3 参数B",
+                    text_content="参数B应符合表1中的数值。",
+                    level=3,
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.2.1"),
+                    full_text="2.2.1 参数C",
+                    text_content="参数C应满足要求。",
+                    level=3,
+                ),
+            ]
+        )
+
+        report_doc = ReportDocument(
+            third_page_fields=ThirdPageFields(
+                inspection_items=["2.1.2～2.1.3"],
+            )
+        )
+        table = InspectionTable()
+        table.items.extend(
+            [
+                InspectionItem(
+                    sequence_number="1",
+                    standard_clause="2.1.2",
+                    standard_requirement="参数A应符合表1中的数值。",
+                ),
+                InspectionItem(
+                    sequence_number="2",
+                    standard_clause="2.1.3",
+                    standard_requirement="参数B应符合表1中的数值。",
+                ),
+            ]
+        )
+        report_doc.inspection_table = table
+
+        results = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)
+        result_map = {str(r.ptr_clause.number): r for r in results}
+        assert result_map["2.1.2"].result == ComparisonResult.MATCH
+        assert result_map["2.1.3"].result == ComparisonResult.MATCH
+        assert result_map["2.2.1"].result == ComparisonResult.EXCLUDED
+
+    def test_parameter_table_clause_equivalence_should_match(self):
+        """Base '符合表1中的数值' requirement should match report rows with detail matrix."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.3"),
+                full_text="2.1.3 脉冲宽度",
+                text_content="脉冲宽度(ms):脉冲宽度应符合表1中的数值。",
+                level=3,
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="39",
+                standard_clause="2.1.3",
+                standard_requirement=(
+                    "脉冲宽度应符合表1中的数值。"
+                    "脉冲宽度(ms)常规数值:0.1...0.5...1.5 标准设置:0.4 允许误差:±20μs"
+                ),
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+
+    def test_parameter_table_clause_equivalence_should_not_match_wrong_topic(self):
+        """Do not over-match unrelated topics even when both mention 表1数值."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.3"),
+                full_text="2.1.3 脉冲宽度",
+                text_content="脉冲宽度(ms):脉冲宽度应符合表1中的数值。",
+                level=3,
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="39",
+                standard_clause="2.1.3",
+                standard_requirement=(
+                    "基础频率应符合表1中的数值。"
+                    "基础频率(bpm)常规数值:30...100...200 标准设置:60"
+                ),
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.DIFFER
+
+    def test_parameter_table_clause_equivalence_should_use_rhs_topic_after_colon(self):
+        """When PTR uses 'A:B应符合表1...', matcher should compare topic B."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.7"),
+                full_text="2.1.7 灵敏度",
+                text_content="灵敏度(mV):心房感知灵敏度和心室感知灵敏度应符合表1中的数值。",
+                level=3,
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="42",
+                standard_clause="2.1.7",
+                standard_requirement=(
+                    "心房感知灵敏度和心室感知灵敏度应符合表1中的数值。"
+                    "心房感知灵敏度(mV)常规数值:AUTO..."
+                ),
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+
+    def test_should_not_fallback_to_wrong_clause_when_clause_column_exists(self):
+        """If report has parseable clause column, missing target should not hijack nearby clause."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.6"),
+                full_text="2.1.6 干扰转复频率",
+                text_content="干扰转复频率应符合表1中的数值。",
+                level=3,
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.extend(
+            [
+                InspectionItem(
+                    sequence_number="40",
+                    standard_clause="2.1.4",
+                    standard_requirement="基础频率应符合表1中的数值。",
+                ),
+                InspectionItem(
+                    sequence_number="42",
+                    standard_clause="2.1.7",
+                    standard_requirement="灵敏度应符合表1中的数值。",
+                ),
+            ]
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MISSING
+        assert result.report_item is None
 
     def test_sequence_index_should_not_hijack_clause_prefix_match(self):
         """Clause 2.1.1.1 should not match report row sequence '2' by prefix."""

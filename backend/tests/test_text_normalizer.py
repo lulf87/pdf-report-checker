@@ -235,3 +235,10 @@ class TestEdgeCases:
         text = "质量浓度为ρ (Pb2+ )=1 µg/mL 的标准对照液。"
         normalized = normalizer.normalize(text)
         assert "p(Pb2+)=1μg/mL" in normalized
+
+    def test_normalize_heading_colon_before_requirement(self):
+        """Heading colon before '应符合' should not create false mismatches."""
+        normalizer = TextNormalizer()
+        assert normalizer.normalize("通用要求:应符合GB16174.1-2024的要求。") == (
+            "通用要求应符合GB16174.1-2024的要求。"
+        )

@@ -65,6 +65,7 @@ class ComparisonDetail:
     normalized_report: str = ""
     report_text_for_display: str = ""
     similarity: float = 0.0
+    match_reason: str = ""
 
     @property
     def has_differences(self) -> bool:
@@ -113,11 +114,21 @@ class ClauseComparator:
 
         # Get excluded sequences from report
         excluded_numbers = report_doc.get_excluded_sequences() if report_doc.third_page_fields else []
+        inspection_scope = self._parse_inspection_scope_from_third_page(report_doc)
 
         # Compare each PTR clause
         for ptr_clause in ptr_doc.clauses:
             # Chapter heading "2" is section title, not a standalone requirement.
             if str(ptr_clause.number) == "2":
+                continue
+            if inspection_scope and not self._is_clause_in_scope(
+                str(ptr_clause.number),
+                inspection_scope,
+            ):
+                detail = ComparisonDetail(ptr_clause=ptr_clause)
+                detail.result = ComparisonResult.EXCLUDED
+                detail.match_reason = "out_of_scope_third_page"
+                results.append(detail)
                 continue
             detail = self._compare_clause(ptr_clause, report_doc, excluded_numbers)
             results.append(detail)
@@ -156,6 +167,7 @@ class ClauseComparator:
         clause_num_str = str(ptr_clause.number)
         if clause_num_str in excluded_numbers:
             detail.result = ComparisonResult.EXCLUDED
+            detail.match_reason = "excluded_by_standard_content"
             return detail
 
         # Find matching report item
@@ -203,6 +215,7 @@ class ClauseComparator:
         if detail.normalized_ptr == detail.normalized_report or ptr_compact == report_compact:
             detail.result = ComparisonResult.MATCH
             detail.similarity = 1.0
+            detail.match_reason = "exact_normalized_match"
         elif self._is_short_heading_match(
             ptr_clause.text_content,
             report_item,
@@ -210,16 +223,27 @@ class ClauseComparator:
         ):
             detail.result = ComparisonResult.MATCH
             detail.similarity = max(detail.similarity, 0.95)
+            detail.match_reason = "short_heading_equivalent"
         elif self._is_table_reference_clause_equivalent(
             ptr_clause.text_content,
             report_text,
         ):
             detail.result = ComparisonResult.MATCH
             detail.similarity = max(detail.similarity, 0.9)
+            detail.match_reason = "table_reference_equivalent"
+        elif self._is_table_parameter_clause_equivalent(
+            ptr_clause.text_content,
+            report_text,
+        ):
+            detail.result = ComparisonResult.MATCH
+            detail.similarity = max(detail.similarity, 0.9)
+            detail.match_reason = "table_parameter_equivalent"
         elif not self.strict_mode and detail.similarity >= self.soft_match_similarity_threshold:
             detail.result = ComparisonResult.MATCH
+            detail.match_reason = "lenient_similarity_match"
         else:
             detail.result = ComparisonResult.DIFFER
+            detail.match_reason = "text_mismatch"
             detail.differences = self._compute_diff(
                 detail.normalized_ptr,
                 detail.normalized_report,
@@ -388,6 +412,133 @@ class ClauseComparator:
             return False
         return ptr_head in report_head or report_head in ptr_head
 
+    def _is_table_parameter_clause_equivalent(
+        self,
+        ptr_text: str,
+        report_text: str,
+    ) -> bool:
+        """Treat parameter rows as equivalent when core '表X数值符合' statement matches.
+
+        Many reports append detailed parameter matrices after the base sentence
+        (e.g. “XXX应符合表1中的数值”), which should not force a strict mismatch.
+        """
+        ptr_norm = self.normalizer.normalize(ptr_text or "")
+        report_norm = self.normalizer.normalize(report_text or "")
+        key_phrase = "应符合表1中的数值"
+        if key_phrase not in ptr_norm or key_phrase not in report_norm:
+            return False
+
+        def _topic_prefix(text: str) -> str:
+            cleaned = re.sub(r"^\d+(?:\.\d+)+(?:[\.．、]|\s)*", "", text).strip()
+            prefix = cleaned.split(key_phrase, 1)[0]
+            if "：" in prefix or ":" in prefix:
+                # Prefer rhs when text is in form "参数名: 具体项目应符合表1..."
+                colon_split = re.split(r"[：:]", prefix, maxsplit=1)
+                if len(colon_split) == 2 and colon_split[1].strip():
+                    prefix = colon_split[1]
+                else:
+                    prefix = colon_split[0]
+            prefix = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9()（）/]+", "", prefix)
+            return prefix
+
+        ptr_topic = _topic_prefix(ptr_norm)
+        report_topic = _topic_prefix(report_norm)
+        if not ptr_topic or not report_topic:
+            return False
+        return ptr_topic in report_topic or report_topic in ptr_topic
+
+    def _parse_inspection_scope_from_third_page(
+        self,
+        report_doc: ReportDocument,
+    ) -> list[tuple[tuple[int, ...], tuple[int, ...]]]:
+        """Parse clause scope from third-page inspection items.
+
+        Example source values:
+        - "2.1.2～2.1.9"
+        - "2.10（除 ...）"
+        """
+        third = report_doc.third_page_fields
+        if not third or not third.inspection_items:
+            return []
+
+        scope: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+        range_re = re.compile(r"(\d+(?:\.\d+)+)\s*[~～\-至到]+\s*(\d+(?:\.\d+)+)")
+        number_re = re.compile(r"\d+(?:\.\d+)+")
+
+        for raw_item in third.inspection_items:
+            text = (raw_item or "").strip()
+            if not text:
+                continue
+            for m in range_re.finditer(text):
+                start = self._parse_clause_number(m.group(1))
+                end = self._parse_clause_number(m.group(2))
+                if start and end:
+                    if start > end:
+                        start, end = end, start
+                    scope.append((start, end))
+            # Also capture standalone clause numbers (single item scope).
+            # Keep after range parsing to include isolated items like "2.10（除...）".
+            for token in number_re.findall(text):
+                num = self._parse_clause_number(token)
+                if num:
+                    scope.append((num, num))
+
+        # Deduplicate while preserving stable order.
+        seen: set[tuple[tuple[int, ...], tuple[int, ...]]] = set()
+        deduped: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+        for item in scope:
+            if item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+        return deduped
+
+    def _parse_clause_number(self, value: str) -> tuple[int, ...]:
+        """Parse dotted clause number into integer tuple."""
+        parts = []
+        for token in (value or "").split("."):
+            token = token.strip()
+            if not token:
+                continue
+            if not token.isdigit():
+                return tuple()
+            parts.append(int(token))
+        return tuple(parts)
+
+    def _is_clause_in_scope(
+        self,
+        clause_number: str,
+        scope: list[tuple[tuple[int, ...], tuple[int, ...]]],
+    ) -> bool:
+        """Check whether clause number falls into parsed third-page scope."""
+        clause = self._parse_clause_number(clause_number)
+        if not clause:
+            return True
+
+        for start, end in scope:
+            if not start or not end:
+                continue
+            # Treat single-point scope as "this clause and descendants".
+            if start == end:
+                if clause[:len(start)] == start:
+                    return True
+                continue
+
+            # Compare at the range depth and include descendants.
+            depth = min(len(start), len(end), len(clause))
+            clause_prefix = clause[:depth]
+            start_prefix = start[:depth]
+            end_prefix = end[:depth]
+            if start_prefix <= clause_prefix <= end_prefix:
+                # Ensure shared parent segments for hierarchical ranges.
+                parent_depth = max(0, depth - 1)
+                if parent_depth == 0 or (
+                    clause[:parent_depth] == start[:parent_depth] == end[:parent_depth]
+                ):
+                    return True
+
+        return False
+
     def _find_matching_item(
         self,
         ptr_clause: PTRClause,
@@ -459,8 +610,21 @@ class ClauseComparator:
         ptr_text = self.normalizer.normalize(ptr_clause.text_content)
         best_item: InspectionItem | None = None
         best_score = 0.0
+        has_parseable_clause_column = any(
+            bool(self._extract_clause_number(item.standard_clause))
+            for item in report_doc.inspection_table.items
+        )
+        similarity_candidates = (
+            [
+                item
+                for item in report_doc.inspection_table.items
+                if not self._extract_clause_number(item.standard_clause)
+            ]
+            if has_parseable_clause_column
+            else report_doc.inspection_table.items
+        )
 
-        for item in report_doc.inspection_table.items:
+        for item in similarity_candidates:
             candidate_text = self.normalizer.normalize(
                 self._compose_row_requirement_text(item) or item.inspection_project
             )

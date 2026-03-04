@@ -222,6 +222,7 @@ class TestTableReferenceComparison:
 
         assert result.table_number == 1
         assert result.table_found is False
+        assert result.clause_number == "2.1"
 
     def test_compare_table_reference_found(self):
         """Test when referenced table is found."""
@@ -261,6 +262,7 @@ class TestTableReferenceComparison:
         assert result.table_number == 1
         assert result.table_found is True
         assert result.total_parameters >= 0
+        assert result.clause_number == "2.1"
 
 
 class TestConvenienceFunctions:

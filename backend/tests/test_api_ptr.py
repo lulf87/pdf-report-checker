@@ -238,9 +238,103 @@ class TestBackgroundProcessing:
         )
 
         assert "summary" in result
+        assert "warnings" in result
         assert "clauses" in result
         assert "tables" in result
         assert result["summary"]["total_clauses"] == 0
+        assert result["summary"]["evaluated_clauses"] == 0
+
+    def test_build_comparison_result_match_rate_excludes_out_of_scope(self):
+        """Match rate denominator should exclude out-of-scope clauses."""
+        from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument
+        from app.models.report_models import ReportDocument
+        from app.routers.ptr_compare import build_comparison_result
+        from app.services.comparator import ComparisonDetail, ComparisonResult
+
+        ptr_doc = PTRDocument()
+        report_doc = ReportDocument()
+
+        clause_211 = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.1"),
+            full_text="2.1.1 A",
+            text_content="A",
+            level=4,
+        )
+        clause_212 = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.2"),
+            full_text="2.1.2 B",
+            text_content="B",
+            level=4,
+        )
+        clause_213 = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 C",
+            text_content="C",
+            level=4,
+        )
+
+        details = [
+            ComparisonDetail(ptr_clause=clause_211, result=ComparisonResult.MATCH),
+            ComparisonDetail(ptr_clause=clause_212, result=ComparisonResult.DIFFER),
+            ComparisonDetail(ptr_clause=clause_213, result=ComparisonResult.EXCLUDED),
+        ]
+
+        result = build_comparison_result(ptr_doc, report_doc, details, [])
+
+        assert result["summary"]["total_clauses"] == 3
+        assert result["summary"]["evaluated_clauses"] == 2
+        assert result["summary"]["matches"] == 1
+        assert result["summary"]["excluded"] == 1
+        assert result["summary"]["match_rate"] == 0.5
+
+    def test_build_comparison_result_includes_clause_table_expansions(self):
+        """Clause payload should include related table parameter details."""
+        from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument
+        from app.models.report_models import ReportDocument
+        from app.routers.ptr_compare import build_comparison_result
+        from app.services.comparator import ComparisonDetail, ComparisonResult
+        from app.services.table_comparator import ParameterComparison, TableExpansionResult
+
+        ptr_doc = PTRDocument()
+        report_doc = ReportDocument()
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度应符合表1中的数值。",
+            text_content="脉冲宽度应符合表1中的数值。",
+            level=4,
+        )
+
+        details = [
+            ComparisonDetail(
+                ptr_clause=clause,
+                result=ComparisonResult.MATCH,
+                match_reason="table_parameter_equivalent",
+            )
+        ]
+        table_results = [
+            TableExpansionResult(
+                table_number=1,
+                clause_number="2.1.3",
+                table_found=True,
+                total_parameters=1,
+                total_matches=1,
+                parameters=[
+                    ParameterComparison(
+                        parameter_name="脉冲宽度",
+                        ptr_value="20",
+                        report_value="20",
+                        matches=True,
+                        is_expanded=True,
+                    )
+                ],
+            )
+        ]
+
+        result = build_comparison_result(ptr_doc, report_doc, details, table_results)
+        clause_data = result["clauses"][0]
+        assert "table_expansions" in clause_data
+        assert clause_data["table_expansions"][0]["table_number"] == 1
+        assert clause_data["table_expansions"][0]["parameters"][0]["name"] == "脉冲宽度"
 
 
 class TestAPIRoutes:

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RotateCcw, Home, Filter } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Home, Filter, TriangleAlert } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { AnimatedCounter } from '../../components/ui/AnimatedCounter';
@@ -54,6 +54,7 @@ export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: 
   // Extract data from backend response structure
   const summary = result.summary || {
     total_clauses: 0,
+    evaluated_clauses: 0,
     matches: 0,
     differs: 0,
     missing: 0,
@@ -61,22 +62,33 @@ export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: 
     match_rate: 0,
   };
 
-  const matchPercentage = Math.round(summary.match_rate * 100);
+  const evaluatedClauseCount = summary.evaluated_clauses ?? Math.max(summary.total_clauses - summary.excluded, 0);
+  const matchPercentage = evaluatedClauseCount > 0
+    ? Math.round((summary.matches / evaluatedClauseCount) * 100)
+    : 0;
   const mismatchedCount = summary.differs + summary.missing;
+  const outOfScopeWarning = result.warnings?.out_of_scope;
+  const missingInScopeWarning = result.warnings?.missing_in_scope;
 
   // Transform clauses to match ClauseList component expectations
-  const transformedClauses: Clause[] = (result.clauses || []).map((clause, index) => ({
-    id: String(index),
-    number: clause.ptr_number || '',
-    title: clause.ptr_text?.substring(0, 50) || '',
-    ptr_text: clause.ptr_text || '',
-    report_text: clause.report_text || '',
-    is_match: clause.result === 'match',
-    diffs: (clause.differences || []).map(d => ({
-      type: (d.type || 'replace') as 'insert' | 'delete' | 'replace' | 'equal',
-      value: d.text || '',
-    })),
-  }));
+  const transformedClauses: Clause[] = (result.clauses || [])
+    .filter(clause => clause.result !== 'excluded')
+    .map((clause, index) => ({
+      id: String(index),
+      number: clause.ptr_number || '',
+      title: clause.ptr_text?.substring(0, 50) || '',
+      ptr_text: clause.ptr_text || '',
+      report_text: clause.report_text || '',
+      is_match: clause.result === 'match',
+      match_reason: clause.match_reason,
+      table_expansions: clause.table_expansions || [],
+      diffs: (clause.differences || []).map(d => ({
+        type: (d.type || 'replace') as 'insert' | 'delete' | 'replace' | 'equal',
+        value: d.text || '',
+      })),
+    }));
+
+  const visibleClauseCount = transformedClauses.length;
 
   // Filter clauses
   const filteredClauses = filter === 'mismatched'
@@ -116,7 +128,7 @@ export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: 
           PTR 条款核对结果
         </h1>
         <p style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
-          共核对 {summary.total_clauses} 条款
+          共核对 {visibleClauseCount} 条款（范围外 {summary.excluded} 条以警告展示）
         </p>
       </motion.div>
 
@@ -211,6 +223,40 @@ export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: 
         </GlassCard>
       </motion.div>
 
+      {(outOfScopeWarning?.count || missingInScopeWarning?.count) ? (
+        <motion.div variants={itemVariants} style={{ marginBottom: '1.5rem' }}>
+          <GlassCard>
+            <div
+              style={{
+                padding: '1rem 1.25rem',
+                border: '1px solid rgba(196, 167, 108, 0.55)',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(196, 167, 108, 0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <TriangleAlert size={16} color="var(--color-warn)" />
+                <span style={{ fontSize: '0.875rem', color: 'var(--color-warn)', fontWeight: 600 }}>
+                  范围与缺失告警
+                </span>
+              </div>
+              {outOfScopeWarning?.count ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '0.5rem' }}>
+                  {outOfScopeWarning.message}
+                  {' '}({outOfScopeWarning.count} 条)：{outOfScopeWarning.clauses.join('、')}
+                </p>
+              ) : null}
+              {missingInScopeWarning?.count ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-danger)', lineHeight: 1.6 }}>
+                  {missingInScopeWarning.message}
+                  {' '}({missingInScopeWarning.count} 条)：{missingInScopeWarning.clauses.join('、')}
+                </p>
+              ) : null}
+            </div>
+          </GlassCard>
+        </motion.div>
+      ) : null}
+
       {/* Filter Buttons */}
       <motion.div variants={itemVariants} style={{ marginBottom: '1.5rem' }}>
         <div
@@ -227,7 +273,7 @@ export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: 
             style={{ gap: '0.5rem' }}
           >
             <Filter size={16} />
-            全部 ({summary.total_clauses})
+            全部 ({visibleClauseCount})
           </Button>
           <Button
             variant={filter === 'mismatched' ? 'primary' : 'secondary'}

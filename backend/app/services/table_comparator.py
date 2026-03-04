@@ -42,6 +42,7 @@ class TableExpansionResult:
     Attributes:
         table_number: Table number that was expanded
         table_found: Whether the table was found in PTR
+        clause_number: PTR clause number that references this table
         parameters: List of parameter comparisons
         total_matches: Number of matching parameters
         total_parameters: Total number of parameters
@@ -52,6 +53,7 @@ class TableExpansionResult:
     parameters: list[ParameterComparison] = field(default_factory=list)
     total_matches: int = 0
     total_parameters: int = 0
+    clause_number: str = ""
 
     @property
     def all_match(self) -> bool:
@@ -133,6 +135,7 @@ class TableComparator:
         result = TableExpansionResult(
             table_number=table_number,
             table_found=False,
+            clause_number=str(clause.number),
         )
 
         # Find table in PTR
