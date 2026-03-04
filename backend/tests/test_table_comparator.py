@@ -128,6 +128,21 @@ class TestTableComparator:
         # Extra whitespace should be normalized
         assert comparator._compare_values("Test  Value", "Test Value") is True
 
+    def test_compare_values_numeric_constraints(self):
+        """Comparator/range/tolerance expressions should be semantically evaluated."""
+        comparator = TableComparator()
+
+        assert comparator._compare_values("≤2.0mL", "1.1mL") is True
+        assert comparator._compare_values("≤2.0mL", "2.5mL") is False
+
+        assert comparator._compare_values("20~350", "180") is True
+        assert comparator._compare_values("20-350", "10") is False
+
+        assert comparator._compare_values("100±20%", "120") is True
+        assert comparator._compare_values("100±20%", "130") is False
+
+        assert comparator._compare_values("/", "——") is True
+
     def test_extract_parameter_value(self):
         """Test parameter value extraction."""
         comparator = TableComparator()
@@ -145,6 +160,13 @@ class TestTableComparator:
             "电压 220V"
         )
         assert "220V" in result or "220" in result
+
+    def test_extract_parameter_value_multiline(self):
+        """Parameter value can appear on the next line."""
+        comparator = TableComparator()
+        text = "频率\n100Hz\n电压\n220V"
+        result = comparator._extract_parameter_value("电压", text)
+        assert "220" in result
 
     def test_extract_parameter_value_not_found(self):
         """Test when parameter is not found."""

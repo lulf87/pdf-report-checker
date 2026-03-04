@@ -689,6 +689,11 @@ class TestEdgeCases:
         is_match, _, _ = compare_texts(lhs, rhs)
         assert is_match is True
 
+        lhs = "电阻值<=10Ω,电流>=0.5A。"
+        rhs = "电阻值≦10Ω，电流≥0.5A。"
+        is_match, _, _ = compare_texts(lhs, rhs)
+        assert is_match is True
+
 
 class TestDiffTypes:
     """Test different types of diffs."""

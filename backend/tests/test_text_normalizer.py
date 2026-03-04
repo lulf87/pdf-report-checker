@@ -213,6 +213,7 @@ class TestEdgeCases:
         normalizer = TextNormalizer()
         assert normalizer.normalize("绝缘电阻>5MQ") == "绝缘电阻>5MΩ"
         assert normalizer.normalize("绝缘电阻>5M Q") == "绝缘电阻>5MΩ"
+        assert normalizer.normalize("电阻值≦10Ω，电流≥0.5A") == "电阻值<=10Ω,电流>=0.5A"
 
     def test_normalize_inch_quote_variants(self):
         """OCR quote variants in inch specs should be normalized."""
@@ -235,6 +236,18 @@ class TestEdgeCases:
         text = "质量浓度为ρ (Pb2+ )=1 µg/mL 的标准对照液。"
         normalized = normalizer.normalize(text)
         assert "p(Pb2+)=1μg/mL" in normalized
+
+    def test_normalize_superscript_subscript_symbols(self):
+        """Superscript/subscript digits and signs should be normalized."""
+        normalizer = TextNormalizer()
+        assert normalizer.normalize("Pb²⁺") == "Pb2+"
+        assert normalizer.normalize("KMnO₄") == "KMnO4"
+
+    def test_normalize_plusminus_and_micro_u_variants(self):
+        """Numeric '士' and ASCII u-units should be normalized."""
+        normalizer = TextNormalizer()
+        assert "100±20%" in normalizer.normalize("允许误差: 100士20%")
+        assert "1μg/mL" in normalizer.normalize("浓度=1 ug/mL")
 
     def test_normalize_heading_colon_before_requirement(self):
         """Heading colon before '应符合' should not create false mismatches."""

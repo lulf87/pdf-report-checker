@@ -40,6 +40,19 @@ FULL_WIDTH_TO_HALF = {
     "\uff5d": "}", "\uff5e": "~",
 }
 
+# Superscript/subscript and OCR-variant symbol mappings
+SCRIPT_SYMBOL_MAP = {
+    "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4",
+    "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
+    "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
+    "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+    "⁺": "+", "⁻": "-",
+    "×": "x",
+    "－": "-", "–": "-", "—": "-", "−": "-",
+    "＜": "<", "＞": ">",
+    "≤": "<=", "≦": "<=", "≥": ">=", "≧": ">=",
+}
+
 # Pattern for natural line breaks (lines ending without terminal punctuation)
 NATURAL_BREAK_PATTERN = re.compile(
     r"([^\n。！？；：\.\!\?;:])\n(?=[^\n\d])",
@@ -175,6 +188,12 @@ class TextNormalizer:
     def _normalize_ocr_symbol_variants(self, text: str) -> str:
         """Normalize common OCR symbol confusions."""
         normalized = text.replace("Ω", "Ω")
+        for src, dst in SCRIPT_SYMBOL_MAP.items():
+            normalized = normalized.replace(src, dst)
+
+        # OCR may misread ± as Chinese "士" in numeric contexts.
+        normalized = re.sub(r"(?<=\d)\s*士\s*(?=\d)", "±", normalized)
+
         # OCR may output 'MQ' while intended unit is MΩ.
         normalized = re.sub(r"(?<=\d)MQ\b", "MΩ", normalized)
         normalized = re.sub(r"(?<=\d)M Q\b", "MΩ", normalized)
@@ -206,9 +225,16 @@ class TextNormalizer:
         normalized = re.sub(r"\s*\)", ")", normalized)
         normalized = re.sub(r"\s*=\s*", "=", normalized)
         normalized = re.sub(r"μ+\s*μ*\s*g\s*/\s*m\s*L", "μg/mL", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\bu\s*g\s*/\s*m\s*L\b", "μg/mL", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\bu\s*L\b", "μL", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(\d)\s+μg/mL", r"\1μg/mL", normalized)
         normalized = re.sub(r"(?<=\d)\s*ml\b", "mL", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"\bml\b", "mL", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(?<=\d)\s*ms\b", "ms", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\bms\b", "ms", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(?<=\d)\s*Hz\b", "Hz", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(?<=\d)\s*V\b", "V", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(?<=\d)\s*A\b", "A", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=[A-Za-z0-9μΩ/\]\)\+\-])\s+(?=[\u4e00-\u9fff])", "", normalized)
 
         # Targeted OCR drift in this domain: subscript digit split into nearby phrase.
