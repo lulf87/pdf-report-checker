@@ -18,6 +18,9 @@ from typing import Any
 import fitz
 from paddleocr import PaddleOCR
 
+from app.config import settings
+from app.services.llm_vision_service import VLMService, create_vlm_service
+
 logger = logging.getLogger(__name__)
 
 # Field extraction regex patterns for Chinese labels
@@ -139,6 +142,7 @@ class OCRService:
         self.language = language
         self._ocr_engine: PaddleOCR | None = None
         self._rapid_ocr_engine: Any = None
+        self._vlm_services: dict[str, VLMService] = {}
 
     @property
     def ocr_engine(self) -> PaddleOCR:
@@ -592,14 +596,14 @@ class OCRService:
     ) -> LabelOCRResult | None:
         """Extract label fields from a parsed PDF page.
 
-        This method is designed for report-check pipeline usage where page-level
-        text is already available from PDF parsing. OCR image-level extraction can
-        be integrated later when page image crops are available.
+        This method first uses page text/image OCR extraction. When enabled, a
+        VLM correction pass can be triggered in controlled conditions, while
+        final downstream decision logic remains deterministic.
 
         Args:
             page: Parsed PDF page object, expected to expose `raw_text`
             pdf_path: Optional source PDF path for image-level OCR extraction
-            enable_llm: Reserved flag for future VLM enhancement
+            enable_llm: Whether to enable controlled VLM enhancement
 
         Returns:
             LabelOCRResult parsed from page text
@@ -620,50 +624,311 @@ class OCRService:
         )
 
         image_result: LabelOCRResult | None = None
+        vlm_raw: dict[str, Any] | None = None
         tmp_image_path: str | None = None
         page_number = int(getattr(page, "page_number", 0) or 0)
 
-        if pdf_path and page_number > 0:
-            try:
-                with fitz.open(str(pdf_path)) as pdf_doc:
-                    page_index = page_number - 1
-                    if 0 <= page_index < pdf_doc.page_count:
-                        fitz_page = pdf_doc[page_index]
-                        pix = fitz_page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
-                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                            tmp_image_path = tmp.name
-                        pix.save(tmp_image_path)
-                        image_result = self.process_image(tmp_image_path, extract_fields=True)
-            except Exception as e:
-                logger.warning(
-                    f"Image-level OCR failed for page {page_number}: {e}"
+        try:
+            if pdf_path and page_number > 0:
+                try:
+                    with fitz.open(str(pdf_path)) as pdf_doc:
+                        page_index = page_number - 1
+                        if 0 <= page_index < pdf_doc.page_count:
+                            fitz_page = pdf_doc[page_index]
+                            pix = fitz_page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
+                            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                                tmp_image_path = tmp.name
+                            pix.save(tmp_image_path)
+                            image_result = self.process_image(tmp_image_path, extract_fields=True)
+                except Exception as e:
+                    logger.warning(f"Image-level OCR failed for page {page_number}: {e}")
+
+            # Prefer image OCR fields when available; fallback to text extraction.
+            result = text_result
+            if image_result and image_result.success:
+                merged_fields = dict(text_result.fields)
+                merged_fields.update(image_result.fields)
+                result = LabelOCRResult(
+                    raw_text=image_result.raw_text or text_result.raw_text,
+                    fields=merged_fields,
+                    confidence=image_result.confidence,
+                    warnings=[*text_result.warnings, *image_result.warnings],
+                    success=True,
                 )
-            finally:
+
+            if enable_llm:
+                llm_mode = self._effective_llm_mode()
+                if llm_mode == "disabled":
+                    result.warnings.append("LLM增强跳过：llm_mode=disabled")
+                elif not tmp_image_path:
+                    result.warnings.append("LLM增强跳过：未生成可用页面图像")
+                elif self._should_use_vlm_correction(result, llm_mode):
+                    vlm_raw = await self._extract_fields_with_vlm(
+                        image_path=tmp_image_path,
+                        base_text=result.raw_text,
+                    )
+                    if vlm_raw.get("error"):
+                        result.warnings.append(f"LLM增强失败: {vlm_raw['error']}")
+                    else:
+                        llm_fields = vlm_raw.get("fields", {})
+                        if isinstance(llm_fields, dict):
+                            result.fields = self._merge_with_vlm_fields(
+                                base_fields=result.fields,
+                                llm_fields={k: str(v or "").strip() for k, v in llm_fields.items()},
+                            )
+                        llm_text = str(vlm_raw.get("raw_text", "") or "").strip()
+                        if llm_text and len(llm_text) >= len(result.raw_text or "") * 0.6:
+                            result.raw_text = llm_text
+                        routing = str(vlm_raw.get("routing", "") or "").strip()
+                        warning_text = (
+                            f"LLM增强已应用(provider={vlm_raw.get('provider', 'unknown')}, "
+                            f"model={vlm_raw.get('model', 'unknown')})"
+                        )
+                        if routing:
+                            warning_text += f", route={routing}"
+                        result.warnings.append(warning_text)
+                else:
+                    result.warnings.append("LLM增强跳过：当前OCR质量满足fallback阈值")
+
+            return result
+        finally:
+            try:
                 if tmp_image_path and os.path.exists(tmp_image_path):
-                    try:
-                        os.unlink(tmp_image_path)
-                    except OSError:
-                        pass
+                    os.unlink(tmp_image_path)
+            except OSError:
+                pass
 
-        # Prefer image OCR fields when available; fallback to text extraction.
-        result = text_result
-        if image_result and image_result.success:
-            merged_fields = dict(text_result.fields)
-            merged_fields.update(image_result.fields)
-            result = LabelOCRResult(
-                raw_text=image_result.raw_text or text_result.raw_text,
-                fields=merged_fields,
-                confidence=image_result.confidence,
-                warnings=[*text_result.warnings, *image_result.warnings],
-                success=True,
+    def _effective_llm_mode(self) -> str:
+        """Resolve effective LLM mode; default to fallback for report-check API."""
+        mode = str(getattr(settings, "llm_mode", "fallback") or "fallback").lower()
+        if mode in {"enhance", "fallback", "disabled"}:
+            return mode
+        return "fallback"
+
+    def _should_use_vlm_correction(self, result: LabelOCRResult, llm_mode: str) -> bool:
+        """Decide if VLM correction is worth invoking."""
+        if llm_mode == "enhance":
+            return True
+        if not result.success:
+            return True
+        if result.confidence < 0.82:
+            return True
+
+        core_fields = ["model_spec", "production_date", "serial_number", "registrant"]
+        present_core = sum(
+            1 for field_name in core_fields if str(result.fields.get(field_name, "")).strip()
+        )
+        if present_core <= 1:
+            return True
+
+        date_value = str(result.fields.get("production_date", "") or "")
+        if date_value and not re.fullmatch(r"(20\d{2}[-/.年]?\d{1,2}[-/.月]?\d{1,2}日?)|\d{8}", date_value):
+            return True
+        return False
+
+    async def _extract_fields_with_vlm(
+        self,
+        image_path: str,
+        base_text: str,
+    ) -> dict[str, Any]:
+        """Run staged VLM extraction for structured field correction."""
+        primary_model = self._get_primary_vlm_model()
+        secondary_model = self._get_secondary_vlm_model(primary_model)
+        primary_result = await self._extract_fields_with_vlm_model(
+            image_path=image_path,
+            base_text=base_text,
+            model_name=primary_model,
+        )
+        if primary_result.get("error"):
+            if not secondary_model:
+                return primary_result
+            secondary_result = await self._extract_fields_with_vlm_model(
+                image_path=image_path,
+                base_text=base_text,
+                model_name=secondary_model,
             )
+            if secondary_result.get("error"):
+                return primary_result
+            secondary_result["routing"] = f"{primary_model} -> {secondary_model}(fallback-on-error)"
+            return secondary_result
 
-        if enable_llm:
-            # Placeholder to preserve interface behavior until VLM page extraction
-            # is introduced.
-            result.warnings.append("LLM增强暂未用于页面级文本提取，当前使用规则提取")
+        if not secondary_model or not self._should_escalate_secondary_vlm(primary_result):
+            primary_result["routing"] = f"{primary_model}(primary-only)"
+            return primary_result
 
-        return result
+        secondary_result = await self._extract_fields_with_vlm_model(
+            image_path=image_path,
+            base_text=base_text,
+            model_name=secondary_model,
+        )
+        if secondary_result.get("error"):
+            primary_result["routing"] = f"{primary_model}(secondary-error)"
+            return primary_result
+
+        if self._vlm_result_score(secondary_result) >= self._vlm_result_score(primary_result):
+            secondary_result["routing"] = f"{primary_model} -> {secondary_model}(escalated)"
+            return secondary_result
+        primary_result["routing"] = f"{primary_model} -> {secondary_model}(primary-kept)"
+        return primary_result
+
+    async def _extract_fields_with_vlm_model(
+        self,
+        image_path: str,
+        base_text: str,
+        model_name: str,
+    ) -> dict[str, Any]:
+        service = self._get_vlm_service(model_name=model_name)
+        if service is None:
+            return {"error": "VLM未配置（缺少API密钥）", "model": model_name}
+        try:
+            return await service.extract_label_fields_from_image(
+                image_path=image_path,
+                base_text=base_text,
+            )
+        except Exception as e:
+            logger.warning(f"VLM extraction failed: {e}")
+            return {"error": str(e), "model": model_name}
+
+    def _get_vlm_service(self, model_name: str | None = None) -> VLMService | None:
+        resolved_model = str(model_name or self._get_primary_vlm_model()).strip()
+        cache_key = resolved_model or "__default__"
+        if cache_key in self._vlm_services:
+            return self._vlm_services[cache_key]
+        service = create_vlm_service(model_override=resolved_model or None)
+        if service is not None:
+            self._vlm_services[cache_key] = service
+        return service
+
+    def _get_primary_vlm_model(self) -> str:
+        primary = str(getattr(settings, "vlm_primary_model", "") or "").strip()
+        if primary:
+            return primary
+        return str(getattr(settings, "llm_model", "") or "qwen/qwen3-vl-8b-instruct").strip()
+
+    def _get_secondary_vlm_model(self, primary_model: str) -> str:
+        secondary = str(getattr(settings, "vlm_secondary_model", "") or "").strip()
+        if secondary and secondary != primary_model:
+            return secondary
+        return ""
+
+    def _should_escalate_secondary_vlm(self, result: dict[str, Any]) -> bool:
+        if result.get("error"):
+            return True
+        fields = result.get("fields", {})
+        if not isinstance(fields, dict):
+            return True
+        confidence_threshold = float(getattr(settings, "vlm_secondary_trigger_confidence", 0.75))
+        confidence = 0.0
+        try:
+            confidence = float(result.get("confidence", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < confidence_threshold:
+            return True
+
+        core_fields = ["model_spec", "production_date", "serial_number", "registrant"]
+        core_present = sum(1 for name in core_fields if str(fields.get(name, "")).strip())
+        if core_present <= 1:
+            return True
+
+        date_value = str(fields.get("production_date", "") or "")
+        date_digits = re.sub(r"\D", "", date_value)
+        if date_value and not re.fullmatch(r"20\d{6}", date_digits):
+            return True
+
+        uncertain_fields = result.get("uncertain_fields", [])
+        if isinstance(uncertain_fields, list) and uncertain_fields:
+            return True
+        return False
+
+    def _vlm_result_score(self, result: dict[str, Any]) -> float:
+        if result.get("error"):
+            return -999.0
+        fields = result.get("fields", {})
+        if not isinstance(fields, dict):
+            return -500.0
+
+        score = 0.0
+        for name in ["model_spec", "production_date", "serial_number", "registrant"]:
+            if str(fields.get(name, "")).strip():
+                score += 10.0
+        for value in fields.values():
+            if str(value or "").strip():
+                score += 1.0
+
+        date_digits = re.sub(r"\D", "", str(fields.get("production_date", "") or ""))
+        if re.fullmatch(r"20\d{6}", date_digits):
+            score += 6.0
+
+        try:
+            score += float(result.get("confidence", 0.0) or 0.0) * 5.0
+        except (TypeError, ValueError):
+            pass
+
+        uncertain_fields = result.get("uncertain_fields", [])
+        if isinstance(uncertain_fields, list):
+            score -= float(len(uncertain_fields)) * 2.0
+        return score
+
+    def _merge_with_vlm_fields(
+        self,
+        base_fields: dict[str, str],
+        llm_fields: dict[str, str],
+    ) -> dict[str, str]:
+        """Merge deterministic OCR fields with conservative VLM corrections."""
+        merged = dict(base_fields)
+        for key, llm_value in llm_fields.items():
+            candidate = str(llm_value or "").strip()
+            if not candidate:
+                continue
+            current = str(merged.get(key, "") or "").strip()
+            merged[key] = self._prefer_llm_value(key, current, candidate)
+        return merged
+
+    def _prefer_llm_value(self, field_name: str, base_value: str, llm_value: str) -> str:
+        """Pick corrected value while guarding against hallucinated overrides."""
+        if not base_value:
+            return llm_value
+
+        normalized_base = self._normalize_field_for_compare(field_name, base_value)
+        normalized_llm = self._normalize_field_for_compare(field_name, llm_value)
+        if normalized_base == normalized_llm:
+            return base_value
+
+        if field_name == "production_date":
+            llm_digits = re.sub(r"\D", "", llm_value)
+            base_digits = re.sub(r"\D", "", base_value)
+            if re.fullmatch(r"20\d{6}", llm_digits) and not re.fullmatch(r"20\d{6}", base_digits):
+                return llm_digits
+            return base_value
+
+        if field_name in {"model_spec", "serial_number", "batch_number"}:
+            llm_compact = re.sub(r"\s+", "", llm_value)
+            base_compact = re.sub(r"\s+", "", base_value)
+            if re.fullmatch(r"[A-Za-z0-9.\-_/]+", llm_compact) and not re.fullmatch(
+                r"[A-Za-z0-9.\-_/]+", base_compact
+            ):
+                return llm_compact
+            return base_value
+
+        if field_name == "registrant_address":
+            if len(llm_value) > len(base_value) + 6:
+                return llm_value
+            return base_value
+
+        if field_name == "registrant":
+            if "公司" in llm_value and "公司" not in base_value:
+                return llm_value
+            return base_value
+
+        return base_value
+
+    def _normalize_field_for_compare(self, field_name: str, value: str) -> str:
+        normalized = str(value or "").strip()
+        if field_name == "production_date":
+            digits = re.sub(r"\D", "", normalized)
+            return digits or normalized
+        return re.sub(r"\s+", "", normalized)
 
     def _is_chinese_label(self, text: str) -> bool:
         """Check if text indicates a Chinese label.

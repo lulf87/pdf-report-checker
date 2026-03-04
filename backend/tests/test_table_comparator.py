@@ -286,6 +286,50 @@ class TestTableReferenceComparison:
         assert result.total_parameters >= 0
         assert result.clause_number == "2.1"
 
+    def test_compare_table_reference_should_select_best_candidate_when_duplicate_number(self):
+        """When duplicate table numbers exist, should pick parameter table not narrative table."""
+        ptr_doc = PTRDocument()
+        ptr_doc.tables.extend(
+            [
+                PTRTable(
+                    table_number=1,
+                    headers=["该产品和植入式系统属于磁共振安全医疗器械..."],
+                    rows=[["器械类型", "植入式心脏起搏器"]],
+                    page=2,
+                ),
+                PTRTable(
+                    table_number=1,
+                    headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                    rows=[["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"]],
+                    page=3,
+                ),
+            ]
+        )
+
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+            table_references=[PTRTableReference(table_number=1)],
+        )
+        ptr_doc.clauses.append(clause)
+
+        report_items = [
+            InspectionItem(
+                sequence_number="39",
+                standard_clause="2.1.3",
+                test_result="脉冲宽度(ms) 0.4",
+            )
+        ]
+
+        comparator = TableComparator()
+        result = comparator._compare_table_reference(1, clause, ptr_doc, report_items)
+        assert result.table_found is True
+        assert result.total_parameters >= 1
+        # If narrative table was selected, parameter name would not be 脉冲宽度.
+        assert any("脉冲宽度" in p.parameter_name for p in result.parameters)
+
 
 class TestConvenienceFunctions:
     """Test convenience functions."""
@@ -424,3 +468,43 @@ class TestEdgeCases:
 
         if results and results[0].table_found:
             assert results[0].total_parameters == 3
+
+    def test_pick_ptr_value_should_prefer_standard_setting_column(self):
+        """For 5-column parameter tables, value should prioritize 标准设置 over 型号."""
+        comparator = TableComparator()
+        headers = ["参数", "型号", "常规数值", "标准设置", "允许误差"]
+        row = ["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"]
+
+        picked = comparator._pick_ptr_value_from_row(row, headers=headers)
+        assert picked == "0.4"
+
+    def test_compare_table_parameters_should_filter_rows_by_clause_topic(self):
+        """Only parameter rows related to clause topic should be compared."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"],
+                ["基础频率(bpm)", "全部型号", "30...200", "60", "±20ms"],
+            ],
+        )
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            test_result="脉冲宽度(ms) 标准设置 0.4",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].parameter_name.startswith("脉冲宽度")

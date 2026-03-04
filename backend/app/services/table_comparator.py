@@ -139,24 +139,36 @@ class TableComparator:
             clause_number=str(clause.number),
         )
 
-        # Find table in PTR
-        ptr_table = ptr_doc.get_table_by_number(table_number)
-        if not ptr_table:
-            logger.warning(f"Table {table_number} not found in PTR document")
-            return result
-
-        result.table_found = True
-
-        # Find matching report item
+        # Find matching report item first (used for selecting best table candidate).
         report_item = self._find_matching_report_item(clause, report_items)
         if not report_item:
             logger.info(f"No matching report item for clause {clause.number}")
             return result
 
+        # Find table in PTR (support duplicate-number candidates).
+        table_candidates = ptr_doc.get_tables_by_number(table_number)
+        if not table_candidates:
+            logger.warning(f"Table {table_number} not found in PTR document")
+            return result
+
+        ptr_table = self._select_best_ptr_table(
+            candidates=table_candidates,
+            clause=clause,
+            report_item=report_item,
+        )
+        if not ptr_table:
+            logger.warning(
+                f"Table {table_number} candidates exist but no suitable table selected"
+            )
+            return result
+
+        result.table_found = True
+
         # Compare parameters
         result.parameters = self._compare_table_parameters(
             ptr_table,
             report_item,
+            clause=clause,
         )
 
         # Calculate statistics
@@ -164,6 +176,105 @@ class TableComparator:
         result.total_matches = sum(1 for p in result.parameters if p.matches)
 
         return result
+
+    def _select_best_ptr_table(
+        self,
+        candidates: list[PTRTable],
+        clause: PTRClause,
+        report_item: InspectionItem,
+    ) -> PTRTable | None:
+        """Select the most plausible table when table numbers are duplicated."""
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+
+        clause_text = self.normalizer.normalize(clause.text_content or "")
+        report_text = self.normalizer.normalize(
+            "\n".join(
+                part
+                for part in [
+                    report_item.standard_requirement or "",
+                    report_item.test_result or "",
+                    report_item.inspection_project or "",
+                ]
+                if part and part.strip()
+            )
+        )
+
+        best_score = float("-inf")
+        best_table: PTRTable | None = None
+        for table in candidates:
+            score = self._score_table_candidate(table, clause_text, report_text)
+            if score > best_score:
+                best_score = score
+                best_table = table
+
+        if best_table and len(candidates) > 1:
+            logger.info(
+                "Selected table candidate for 表%s: page=%s score=%.2f",
+                best_table.table_number,
+                best_table.page,
+                best_score,
+            )
+        return best_table
+
+    def _score_table_candidate(
+        self,
+        table: PTRTable,
+        clause_text: str,
+        report_text: str,
+    ) -> float:
+        """Score a table candidate for clause-specific matching."""
+        headers_compact = self._compact(" ".join(table.headers or []))
+        row_count = len(table.rows or [])
+        col_count = max(
+            len(table.headers or []),
+            max((len(r) for r in (table.rows or [])), default=0),
+        )
+
+        score = 0.0
+        score += float(row_count) * 0.12
+        score += float(col_count) * 0.4
+
+        if self._is_parameter_table(table):
+            score += 12.0
+        if "符合表1中的数值" in clause_text and self._is_parameter_table(table):
+            score += 8.0
+
+        if len(table.headers) <= 2 and len(headers_compact) > 40:
+            # Penalize narrative/requirement tables with long sentence-like headers.
+            score -= 10.0
+
+        # Overlap between report text and table row labels.
+        row_label_text = self._compact(" ".join((row[0] if row else "") for row in table.rows[:60]))
+        if row_label_text and report_text:
+            overlap = self._token_overlap_ratio(row_label_text, self._compact(report_text))
+            score += overlap * 10.0
+
+        # Prefer table with richer parameter rows over title-only fragments.
+        non_empty_rows = sum(1 for row in table.rows if any(str(cell or "").strip() for cell in row))
+        score += float(non_empty_rows) * 0.08
+        return score
+
+    def _is_parameter_table(self, table: PTRTable) -> bool:
+        headers = self._compact(" ".join(table.headers or []))
+        return (
+            "参数" in headers
+            and ("型号" in headers or "标准设置" in headers or "允许误差" in headers or "常规数值" in headers)
+        )
+
+    def _compact(self, text: str) -> str:
+        return re.sub(r"\s+", "", self.normalizer.normalize(text or ""))
+
+    def _token_overlap_ratio(self, text_a: str, text_b: str) -> float:
+        if not text_a or not text_b:
+            return 0.0
+        tokens = [token for token in re.findall(r"[\u4e00-\u9fffA-Za-z0-9]+", text_a) if len(token) >= 2]
+        if not tokens:
+            return 0.0
+        matched = sum(1 for token in tokens if token in text_b)
+        return matched / len(tokens)
 
     def _find_matching_report_item(
         self,
@@ -219,6 +330,7 @@ class TableComparator:
         self,
         ptr_table: PTRTable,
         report_item: InspectionItem,
+        clause: PTRClause | None = None,
     ) -> list[ParameterComparison]:
         """Compare parameters from PTR table with report item.
 
@@ -242,20 +354,51 @@ class TableComparator:
             if part and part.strip()
         )
 
+        clause_topics = self._extract_clause_topics(clause.text_content if clause else "")
+
         # Compare each row in PTR table
+        param_col_idx = self._find_column_index(
+            ptr_table.headers,
+            ["参数", "参数名称"],
+            default=0,
+        )
+        model_col_idx = self._find_column_index(
+            ptr_table.headers,
+            ["型号"],
+            default=1 if len(ptr_table.headers) > 1 else 0,
+        )
+        candidate_rows: list[list[str]] = []
+        fallback_rows: list[list[str]] = []
         for row in ptr_table.rows:
+            if not row or self._is_header_like_row(row, ptr_table.headers):
+                continue
+            fallback_rows.append(row)
+            param_name = row[param_col_idx] if param_col_idx < len(row) else (row[0] if row else "")
+            if clause_topics and not self._row_matches_clause_topics(param_name, clause_topics):
+                continue
+            candidate_rows.append(row)
+
+        rows_to_compare = candidate_rows if candidate_rows else fallback_rows
+        for row in rows_to_compare:
             if not row:
                 continue
 
             # First column is typically parameter name
-            param_name = row[0] if row else ""
-            ptr_value = self._pick_ptr_value_from_row(row)
+            param_name = row[param_col_idx] if param_col_idx < len(row) else (row[0] if row else "")
+            ptr_value = self._pick_ptr_value_from_row(row, ptr_table.headers)
 
             if not param_name:
                 continue
 
             # Try to find this parameter in report text
             report_value = self._extract_parameter_value(param_name, report_text)
+            if not report_value:
+                model_text = row[model_col_idx] if model_col_idx < len(row) else ""
+                if model_text and model_text.strip() and model_text.strip() != "全部型号":
+                    report_value = self._extract_parameter_value(
+                        f"{param_name} {model_text}",
+                        report_text,
+                    )
 
             # Compare values
             matches = self._compare_values(ptr_value, report_value)
@@ -270,6 +413,86 @@ class TableComparator:
             comparisons.append(comparison)
 
         return comparisons
+
+    def _extract_clause_topics(self, clause_text: str) -> list[str]:
+        """Extract likely parameter topics from clause text."""
+        text = self.normalizer.normalize(clause_text or "")
+        if not text:
+            return []
+
+        candidates: list[str] = []
+        # Priority: heading before colon.
+        heading = re.split(r"[:：]", text, maxsplit=1)[0].strip()
+        if heading and self._looks_like_parameter_topic(heading):
+            candidates.append(heading)
+
+        # Extract domain terms ending with common parameter suffixes.
+        suffixes = "频率|灵敏度|不应期|间期|阻抗|空白期|模式|幅度|宽度|保护"
+        regex = re.compile(rf"[\u4e00-\u9fffA-Za-z0-9/（）()]+(?:{suffixes})")
+        candidates.extend(regex.findall(text))
+
+        normalized_terms: list[str] = []
+        seen: set[str] = set()
+        for raw in candidates:
+            normalized = self._normalize_topic_label(raw)
+            if len(normalized) < 2:
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            normalized_terms.append(normalized)
+        return normalized_terms
+
+    def _looks_like_parameter_topic(self, text: str) -> bool:
+        compact = self._normalize_topic_label(text)
+        if not compact:
+            return False
+        keywords = ["频率", "灵敏度", "不应期", "间期", "阻抗", "空白期", "模式", "幅度", "宽度", "保护"]
+        if any(keyword in compact for keyword in keywords):
+            return True
+        # Unit-bearing labels such as "脉冲宽度(ms)".
+        if re.search(r"[（(].*(ms|mV|bpm|Hz|V|A|Ω|KΩ|ppm).*[）)]", text, re.IGNORECASE):
+            return True
+        return False
+
+    def _normalize_topic_label(self, text: str) -> str:
+        normalized = self._compact(text)
+        # Remove bracketed unit fragments and footnote markers.
+        normalized = re.sub(r"[（(][^）)]*[）)]", "", normalized)
+        normalized = re.sub(r"[①②③④⑤⑥⑦⑧⑨⑩0-9]+$", "", normalized)
+        normalized = normalized.replace("/", "")
+        return normalized
+
+    def _row_matches_clause_topics(self, param_name: str, topics: list[str]) -> bool:
+        param_norm = self._normalize_topic_label(param_name)
+        if not param_norm:
+            return False
+        for topic in topics:
+            if topic in param_norm or param_norm in topic:
+                return True
+        return False
+
+    def _find_column_index(
+        self,
+        headers: list[str],
+        keywords: list[str],
+        default: int = 0,
+    ) -> int:
+        for idx, header in enumerate(headers or []):
+            merged = self.normalizer.normalize(header or "")
+            if any(keyword in merged for keyword in keywords):
+                return idx
+        return default
+
+    def _is_header_like_row(self, row: list[str], headers: list[str]) -> bool:
+        if not row:
+            return False
+        row_norm = [self._compact(cell) for cell in row]
+        header_norm = [self._compact(cell) for cell in headers or []]
+        if header_norm and row_norm[: len(header_norm)] == header_norm[: len(row_norm)]:
+            return True
+        merged = "".join(row_norm)
+        return all(keyword in merged for keyword in ["参数", "型号"]) and ("标准设置" in merged or "允许误差" in merged)
 
     def _extract_parameter_value(
         self,
@@ -396,12 +619,34 @@ class TableComparator:
 
         return norm1 == norm2
 
-    def _pick_ptr_value_from_row(self, row: list[str]) -> str:
+    def _pick_ptr_value_from_row(self, row: list[str], headers: list[str] | None = None) -> str:
         """Pick PTR expected value from table row."""
         if not row or len(row) < 2:
             return ""
-        for cell in row[1:]:
+
+        normalized_headers = [self.normalizer.normalize(h or "") for h in (headers or [])]
+        preferred_columns: list[int] = []
+        for keywords in [["标准设置"], ["常规数值"], ["允许误差"]]:
+            for idx, header in enumerate(normalized_headers):
+                if any(keyword in header for keyword in keywords):
+                    preferred_columns.append(idx)
+                    break
+
+        seen: set[int] = set()
+        ordered_candidates: list[int] = []
+        for idx in preferred_columns + list(range(1, len(row))):
+            if idx not in seen and idx < len(row):
+                seen.add(idx)
+                ordered_candidates.append(idx)
+
+        for idx in ordered_candidates:
+            cell = row[idx]
             value = (cell or "").strip()
+            if not value:
+                continue
+            # Avoid model-name column as comparison value.
+            if idx == 1 and re.search(r"(Edora|SR|DR|全部型号)", value, re.IGNORECASE):
+                continue
             if value:
                 return value
         return ""

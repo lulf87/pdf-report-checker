@@ -4,6 +4,10 @@ Tests for OCR Service module.
 Tests Chinese label recognition, field extraction, and Caption parsing.
 """
 
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import pytest
 
 from app.services.ocr_service import (
@@ -242,3 +246,206 @@ class TestEdgeCases:
         assert info is not None
         assert info.is_chinese_label is True
         assert "中文标签" in info.raw_caption
+
+
+class TestLLMEnhancement:
+    """Test controlled VLM enhancement path for page-level label extraction."""
+
+    @staticmethod
+    def _patch_fake_fitz_open(monkeypatch):
+        class _FakePixmap:
+            def save(self, path: str):
+                Path(path).write_bytes(b"fake-image")
+
+        class _FakePage:
+            def get_pixmap(self, matrix=None, alpha=False):
+                return _FakePixmap()
+
+        class _FakeDoc:
+            page_count = 1
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def __getitem__(self, index):
+                return _FakePage()
+
+        monkeypatch.setattr("app.services.ocr_service.fitz.open", lambda _: _FakeDoc())
+
+    @pytest.mark.asyncio
+    async def test_extract_label_from_page_applies_vlm_fix_when_needed(self, monkeypatch):
+        service = OCRService()
+        self._patch_fake_fitz_open(monkeypatch)
+        monkeypatch.setattr("app.services.ocr_service.settings.llm_mode", "fallback")
+
+        monkeypatch.setattr(
+            service,
+            "process_image",
+            lambda image_path, extract_fields=True: LabelOCRResult(
+                raw_text="规格型号：RMD01\n生产日期：2025?230",
+                fields={"model_spec": "RMD01", "production_date": "2025?230"},
+                confidence=0.61,
+                success=True,
+            ),
+        )
+        monkeypatch.setattr(
+            service,
+            "_extract_fields_with_vlm",
+            AsyncMock(
+                return_value={
+                    "raw_text": "规格型号：RMD01\n生产日期：20251230",
+                    "fields": {"model_spec": "RMD01", "production_date": "20251230"},
+                    "provider": "openai",
+                    "model": "gpt-4o-mini",
+                }
+            ),
+        )
+
+        page = SimpleNamespace(raw_text="生产日期：2025?230", text_blocks=None, page_number=1)
+        result = await service.extract_label_from_page(
+            page=page,
+            pdf_path="/tmp/fake-report.pdf",
+            enable_llm=True,
+        )
+
+        assert result is not None
+        assert result.fields.get("production_date") == "20251230"
+        assert any("LLM增强已应用" in warning for warning in result.warnings)
+
+    @pytest.mark.asyncio
+    async def test_extract_label_from_page_skips_vlm_when_quality_high(self, monkeypatch):
+        service = OCRService()
+        self._patch_fake_fitz_open(monkeypatch)
+        monkeypatch.setattr("app.services.ocr_service.settings.llm_mode", "fallback")
+
+        monkeypatch.setattr(
+            service,
+            "process_image",
+            lambda image_path, extract_fields=True: LabelOCRResult(
+                raw_text=(
+                    "规格型号：RMD01\n生产日期：20251230\n"
+                    "序列号：RMD251206002\n注册人：苏州元科医疗器械有限公司"
+                ),
+                fields={
+                    "model_spec": "RMD01",
+                    "production_date": "20251230",
+                    "serial_number": "RMD251206002",
+                    "registrant": "苏州元科医疗器械有限公司",
+                },
+                confidence=0.96,
+                success=True,
+            ),
+        )
+        llm_mock = AsyncMock(return_value={"fields": {"production_date": "20251230"}})
+        monkeypatch.setattr(service, "_extract_fields_with_vlm", llm_mock)
+
+        page = SimpleNamespace(raw_text="规格型号：RMD01", text_blocks=None, page_number=1)
+        result = await service.extract_label_from_page(
+            page=page,
+            pdf_path="/tmp/fake-report.pdf",
+            enable_llm=True,
+        )
+
+        assert result is not None
+        assert result.fields.get("production_date") == "20251230"
+        assert any("LLM增强跳过" in warning for warning in result.warnings)
+        llm_mock.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_extract_label_from_page_respects_disabled_mode(self, monkeypatch):
+        service = OCRService()
+        self._patch_fake_fitz_open(monkeypatch)
+        monkeypatch.setattr("app.services.ocr_service.settings.llm_mode", "disabled")
+
+        monkeypatch.setattr(
+            service,
+            "process_image",
+            lambda image_path, extract_fields=True: LabelOCRResult(
+                raw_text="规格型号：RMD01\n生产日期：20251230",
+                fields={"model_spec": "RMD01", "production_date": "20251230"},
+                confidence=0.55,
+                success=True,
+            ),
+        )
+        llm_mock = AsyncMock(return_value={"fields": {"production_date": "20251230"}})
+        monkeypatch.setattr(service, "_extract_fields_with_vlm", llm_mock)
+
+        page = SimpleNamespace(raw_text="规格型号：RMD01", text_blocks=None, page_number=1)
+        result = await service.extract_label_from_page(
+            page=page,
+            pdf_path="/tmp/fake-report.pdf",
+            enable_llm=True,
+        )
+
+        assert result is not None
+        assert any("llm_mode=disabled" in warning for warning in result.warnings)
+        llm_mock.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_staged_vlm_routing_escalates_on_low_confidence(self, monkeypatch):
+        service = OCRService()
+        monkeypatch.setattr(service, "_get_primary_vlm_model", lambda: "qwen/qwen3-vl-8b-instruct")
+        monkeypatch.setattr(service, "_get_secondary_vlm_model", lambda primary: "qwen/qwen3-vl-30b-a3b-instruct")
+
+        async def fake_extract(image_path: str, base_text: str, model_name: str):
+            if "8b" in model_name:
+                return {
+                    "fields": {"model_spec": "RMD01"},
+                    "confidence": 0.45,
+                    "uncertain_fields": ["production_date"],
+                    "model": model_name,
+                    "provider": "openrouter",
+                }
+            return {
+                "fields": {
+                    "model_spec": "RMD01",
+                    "production_date": "20251230",
+                    "serial_number": "RMD251206002",
+                    "registrant": "苏州元科医疗器械有限公司",
+                },
+                "confidence": 0.93,
+                "uncertain_fields": [],
+                "model": model_name,
+                "provider": "openrouter",
+            }
+
+        monkeypatch.setattr(service, "_extract_fields_with_vlm_model", fake_extract)
+        result = await service._extract_fields_with_vlm("/tmp/fake.png", "base text")
+        assert result.get("model") == "qwen/qwen3-vl-30b-a3b-instruct"
+        assert "escalated" in str(result.get("routing", ""))
+
+    @pytest.mark.asyncio
+    async def test_staged_vlm_routing_keeps_primary_when_stronger(self, monkeypatch):
+        service = OCRService()
+        monkeypatch.setattr(service, "_get_primary_vlm_model", lambda: "qwen/qwen3-vl-8b-instruct")
+        monkeypatch.setattr(service, "_get_secondary_vlm_model", lambda primary: "qwen/qwen3-vl-30b-a3b-instruct")
+
+        async def fake_extract(image_path: str, base_text: str, model_name: str):
+            if "8b" in model_name:
+                return {
+                    "fields": {
+                        "model_spec": "RMD01",
+                        "production_date": "20251230",
+                        "serial_number": "RMD251206002",
+                        "registrant": "苏州元科医疗器械有限公司",
+                    },
+                    "confidence": 0.96,
+                    "uncertain_fields": [],
+                    "model": model_name,
+                    "provider": "openrouter",
+                }
+            return {
+                "fields": {"model_spec": "RMD01"},
+                "confidence": 0.21,
+                "uncertain_fields": ["production_date", "serial_number"],
+                "model": model_name,
+                "provider": "openrouter",
+            }
+
+        monkeypatch.setattr(service, "_extract_fields_with_vlm_model", fake_extract)
+        result = await service._extract_fields_with_vlm("/tmp/fake.png", "base text")
+        assert result.get("model") == "qwen/qwen3-vl-8b-instruct"
+        assert "primary-only" in str(result.get("routing", ""))

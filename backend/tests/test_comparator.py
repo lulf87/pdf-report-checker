@@ -345,6 +345,35 @@ class TestCompareDocuments:
         result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
         assert result.result == ComparisonResult.MATCH
 
+    def test_parameter_table_clause_equivalence_should_tolerate_table_spacing(self):
+        """Should treat '表 1 中的数值' equivalent to '表1中的数值'."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.3"),
+                full_text="2.1.3 脉冲宽度",
+                text_content="脉冲宽度(ms)：脉冲宽度应符合表 1 中的数值。",
+                level=3,
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="39",
+                standard_clause="2.1.3",
+                standard_requirement=(
+                    "脉冲宽度应符合表1中的数值。"
+                    "脉冲宽度(ms)常规数值:0.1...0.5...1.5 标准设置:0.4 允许误差:±20μs"
+                ),
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+
     def test_parameter_table_clause_equivalence_should_not_match_wrong_topic(self):
         """Do not over-match unrelated topics even when both mention 表1数值."""
         ptr_doc = PTRDocument()

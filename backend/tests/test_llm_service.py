@@ -312,6 +312,31 @@ class TestCreateVLMService:
             result = create_vlm_service()
             assert result is None
 
+    def test_create_with_model_override(self):
+        """Test creating service with explicit model override."""
+        with patch("app.services.llm_vision_service.settings") as mock_settings:
+            mock_settings.openrouter_api_key = "test-openrouter"
+            mock_settings.openai_api_key = ""
+            mock_settings.deepseek_api_key = ""
+            mock_settings.llm_provider = "openai"
+            mock_settings.llm_model = "default-model"
+            result = create_vlm_service(model_override="qwen/qwen3-vl-8b-instruct")
+            assert result is not None
+            assert result.config.model == "qwen/qwen3-vl-8b-instruct"
+            assert result.config.provider == "openrouter"
+
+    def test_create_with_provider_override(self):
+        """Test provider override uses preferred provider when key exists."""
+        with patch("app.services.llm_vision_service.settings") as mock_settings:
+            mock_settings.openrouter_api_key = "test-openrouter"
+            mock_settings.openai_api_key = "test-openai"
+            mock_settings.deepseek_api_key = ""
+            mock_settings.llm_provider = "openrouter"
+            mock_settings.llm_model = "default-model"
+            result = create_vlm_service(provider_override="openai")
+            assert result is not None
+            assert result.config.provider == "openai"
+
 
 class TestExtractTextWithVLM:
     """Tests for extract_text_with_vlm convenience function."""

@@ -454,6 +454,54 @@ class TestTableReferenceExtraction:
         extractor._extract_table_references(clause, "见表1和表3")
         assert len(clause.table_references) >= 1
 
+    def test_extract_table_references_with_spaces(self):
+        """Should detect spaced variants like '见表 1' and '表 1-2'."""
+        extractor = PTRExtractor()
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1"),
+            full_text="2.1 Test",
+            text_content="Test",
+            level=2,
+        )
+
+        extractor._extract_table_references(clause, "参数应符合见表 1 中的数值，详见表 1-2。")
+        refs = [ref.table_number for ref in clause.table_references]
+        assert 1 in refs
+
+
+class TestTableContinuationMerge:
+    """Test cross-page continuation merge for complex PTR tables."""
+
+    def test_merge_continuation_tables_should_keep_header_context(self):
+        extractor = PTRExtractor()
+
+        base = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                ["房室间期(ms)", "Edora 8 SR", "不适用", "", ""],
+            ],
+            page=3,
+            position=(0, 100),
+        )
+        continuation = PTRTable(
+            table_number=None,
+            headers=["", "Edora 8 DR", "", "", ""],
+            rows=[
+                ["", "Edora 8 DR", "20...(5)...350", "180-170-160", "±20"],
+            ],
+            page=4,
+            position=(0, 80),
+        )
+
+        merged = extractor._merge_continuation_tables([base, continuation])
+        assert len(merged) == 1
+        assert merged[0].table_number == 1
+        assert len(merged[0].rows) >= 3
+        # Continuation row should inherit parameter column context.
+        assert merged[0].rows[-1][0] == "房室间期(ms)"
+
 
 class TestSubItemExtraction:
     """Test sub-item extraction logic."""

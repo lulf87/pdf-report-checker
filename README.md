@@ -98,13 +98,33 @@ npm install
 
 4. **配置环境变量（可选）**
 
-创建 `backend/.env` 文件以启用 LLM 增强功能：
+创建 `backend/.env` 文件以启用 OCR 的受控 LLM/VLM 增强（最终比对逻辑仍为规则判定）：
 ```env
-OPENROUTER_API_KEY=your-api-key
-LLM_MODEL=google/gemini-2.0-flash-exp
-ENABLE_LLM_COMPARISON=true
-LLM_COMPARISON_MODE=fallback
+# 基础配置
+LLM_MODE=fallback              # enhance / fallback / disabled
+LLM_PROVIDER=openai            # openai / deepseek
+LLM_MODEL=gpt-4o-mini
+
+# OCR受控双层路由（推荐）
+VLM_PRIMARY_MODEL=qwen/qwen3-vl-8b-instruct
+VLM_SECONDARY_MODEL=qwen/qwen3-vl-30b-a3b-instruct
+VLM_SECONDARY_TRIGGER_CONFIDENCE=0.75
+
+# PTR复杂参数表可选VLM补强（默认关闭）
+PTR_TABLE_VLM_ENABLED=false
+PTR_TABLE_VLM_MIN_ROWS=20
+PTR_TABLE_VLM_MAX_PAGES=4
+
+# 按 provider 配置其一
+OPENAI_API_KEY=your-openai-key
+DEEPSEEK_API_KEY=your-deepseek-key
+
+# 若使用 OpenRouter 视觉模型，可单独配置
+OPENROUTER_API_KEY=your-openrouter-key
 ```
+
+上传报告时通过 `enable_llm=true` 开启本次任务的增强提取。
+PTR 条款核对中的复杂跨页参数表，使用 `PTR_TABLE_VLM_ENABLED=true` 后会自动触发可选 VLM 补强（失败自动回退，不影响主流程）。
 
 ### 启动服务
 

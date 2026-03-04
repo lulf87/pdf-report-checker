@@ -174,7 +174,9 @@ class PTRTable:
         headers: Column headers
         rows: Table rows (list of lists)
         page: Page number
+        page_end: End page number for merged multi-page table
         position: Position on page
+        bbox: Bounding box on source page (x0, y0, x1, y1)
     """
 
     table_number: int | None = None
@@ -182,7 +184,9 @@ class PTRTable:
     headers: list[str] = field(default_factory=list)
     rows: list[list[str]] = field(default_factory=list)
     page: int = 1
+    page_end: int | None = None
     position: tuple[int, int] | None = None
+    bbox: tuple[float, float, float, float] | None = None
 
     @property
     def num_rows(self) -> int:
@@ -246,6 +250,10 @@ class PTRDocument:
             if table.table_number == table_number:
                 return table
         return None
+
+    def get_tables_by_number(self, table_number: int) -> list[PTRTable]:
+        """Find all tables by number (for multi-fragment/duplicate-number tables)."""
+        return [table for table in self.tables if table.table_number == table_number]
 
     def get_clauses_at_level(self, level: int) -> list[PTRClause]:
         """Get all clauses at a specific hierarchy level."""

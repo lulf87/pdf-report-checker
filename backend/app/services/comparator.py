@@ -424,13 +424,18 @@ class ClauseComparator:
         """
         ptr_norm = self.normalizer.normalize(ptr_text or "")
         report_norm = self.normalizer.normalize(report_text or "")
+        ptr_compact = re.sub(r"\s+", "", ptr_norm)
+        report_compact = re.sub(r"\s+", "", report_norm)
         key_phrase = "应符合表1中的数值"
-        if key_phrase not in ptr_norm or key_phrase not in report_norm:
+        if key_phrase not in ptr_compact or key_phrase not in report_compact:
             return False
+
+        phrase_re = re.compile(r"应符合表\s*1\s*中的数值")
 
         def _topic_prefix(text: str) -> str:
             cleaned = re.sub(r"^\d+(?:\.\d+)+(?:[\.．、]|\s)*", "", text).strip()
-            prefix = cleaned.split(key_phrase, 1)[0]
+            parts = phrase_re.split(cleaned, maxsplit=1)
+            prefix = parts[0] if parts else cleaned
             if "：" in prefix or ":" in prefix:
                 # Prefer rhs when text is in form "参数名: 具体项目应符合表1..."
                 colon_split = re.split(r"[：:]", prefix, maxsplit=1)

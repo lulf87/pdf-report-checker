@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # LLM Configuration
     llm_mode: Literal["enhance", "fallback", "disabled"] = Field(
-        default="disabled",
+        default="fallback",
         description="LLM processing mode: enhance (always use), fallback (OCR only on error), disabled (OCR only)",
     )
     llm_provider: Literal["openai", "deepseek"] = Field(
@@ -29,9 +29,37 @@ class Settings(BaseSettings):
         default="",
         description="DeepSeek API key for LLM enhancement",
     )
+    openrouter_api_key: str = Field(
+        default="",
+        description="OpenRouter API key for vision-based LLM enhancement",
+    )
     llm_model: str = Field(
         default="gpt-4o-mini",
         description="LLM model identifier",
+    )
+    vlm_primary_model: str = Field(
+        default="qwen/qwen3-vl-8b-instruct",
+        description="Primary (low-cost) VLM model for OCR correction",
+    )
+    vlm_secondary_model: str = Field(
+        default="qwen/qwen3-vl-30b-a3b-instruct",
+        description="Secondary (higher-accuracy) VLM model for OCR correction fallback",
+    )
+    vlm_secondary_trigger_confidence: float = Field(
+        default=0.75,
+        description="Trigger secondary VLM when primary confidence is below this threshold",
+    )
+    ptr_table_vlm_enabled: bool = Field(
+        default=False,
+        description="Enable VLM enhancement for complex PTR parameter tables",
+    )
+    ptr_table_vlm_min_rows: int = Field(
+        default=20,
+        description="Minimum row count to consider VLM enhancement for PTR tables",
+    )
+    ptr_table_vlm_max_pages: int = Field(
+        default=4,
+        description="Maximum pages to send for one PTR table VLM enhancement",
     )
 
     # Server Configuration
