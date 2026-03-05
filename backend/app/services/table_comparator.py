@@ -150,6 +150,14 @@ class TableComparator:
         if not table_candidates:
             logger.warning(f"Table {table_number} not found in PTR document")
             return result
+        scoped_candidates = self._scope_table_candidates_for_clause(
+            ptr_doc=ptr_doc,
+            clause=clause,
+            candidates=table_candidates,
+            report_item=report_item,
+        )
+        if scoped_candidates:
+            table_candidates = scoped_candidates
 
         ptr_table = self._select_best_ptr_table(
             candidates=table_candidates,
@@ -218,6 +226,113 @@ class TableComparator:
                 best_score,
             )
         return best_table
+
+    def _scope_table_candidates_for_clause(
+        self,
+        ptr_doc: PTRDocument,
+        clause: PTRClause,
+        candidates: list[PTRTable],
+        report_item: InspectionItem,
+    ) -> list[PTRTable]:
+        """Scope duplicate-number table candidates with chapter-2-first strategy.
+
+        Rule:
+        1) For Chapter-2 clauses, first search same-number tables inside Chapter 2 page range.
+        2) If any in-range table name/topic matches clause text, use only those in-range matches.
+        3) If in-range tables exist but none name-matches, fallback to all candidates.
+        """
+        if not candidates:
+            return []
+        if not clause.number.parts or clause.number.parts[0] != 2:
+            return candidates
+
+        start_page = int(ptr_doc.chapter2_start or 0)
+        end_page = int(ptr_doc.chapter2_end or 0)
+        if start_page <= 0 or end_page <= 0 or end_page < start_page:
+            return candidates
+
+        chapter2_candidates = [
+            table
+            for table in candidates
+            if self._table_in_page_range(table, start_page, end_page)
+        ]
+        if not chapter2_candidates:
+            return candidates
+
+        name_matched = [
+            table
+            for table in chapter2_candidates
+            if self._table_name_matches_clause(table, clause, report_item)
+        ]
+        if name_matched:
+            logger.info(
+                "Table scoping for clause %s: using %s chapter-2 name-matched candidates (total=%s)",
+                clause.number,
+                len(name_matched),
+                len(candidates),
+            )
+            return name_matched
+
+        logger.info(
+            "Table scoping for clause %s: no chapter-2 name match, fallback to all candidates (chapter2=%s total=%s)",
+            clause.number,
+            len(chapter2_candidates),
+            len(candidates),
+        )
+        return candidates
+
+    def _table_in_page_range(self, table: PTRTable, start_page: int, end_page: int) -> bool:
+        """Whether table overlaps with target page range."""
+        table_start = int(table.page or 0)
+        table_end = int(table.page_end or table.page or 0)
+        if table_start <= 0:
+            return False
+        if table_end < table_start:
+            table_end = table_start
+        return not (table_end < start_page or table_start > end_page)
+
+    def _table_name_matches_clause(
+        self,
+        table: PTRTable,
+        clause: PTRClause,
+        report_item: InspectionItem,
+    ) -> bool:
+        """Whether table content/caption appears relevant to the clause topic name."""
+        clause_topics = self._extract_clause_topics(clause.text_content or "")
+        if not clause_topics:
+            # For generic table-reference sentence, keep parameter tables as valid name matches.
+            return self._is_parameter_table(table)
+
+        table_text = self._compact(
+            " ".join(
+                [
+                    table.caption or "",
+                    " ".join(table.headers or []),
+                    " ".join((row[0] if row else "") for row in table.rows[:80]),
+                ]
+            )
+        )
+        report_text = self._compact(
+            " ".join(
+                part
+                for part in [
+                    report_item.inspection_project or "",
+                    report_item.standard_requirement or "",
+                ]
+                if part and part.strip()
+            )
+        )
+
+        for topic in clause_topics:
+            if not topic:
+                continue
+            if topic in table_text:
+                return True
+            if report_text and topic in report_text:
+                # Topic aligns with report; allow parameter table fallback.
+                if self._is_parameter_table(table):
+                    return True
+        return False
 
     def _score_table_candidate(
         self,

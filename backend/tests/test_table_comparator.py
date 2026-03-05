@@ -330,6 +330,52 @@ class TestTableReferenceComparison:
         # If narrative table was selected, parameter name would not be 脉冲宽度.
         assert any("脉冲宽度" in p.parameter_name for p in result.parameters)
 
+    def test_compare_table_reference_should_prefer_chapter2_table_then_fallback(self):
+        """For duplicated 表1 across chapters, should prioritize chapter-2 table candidates."""
+        ptr_doc = PTRDocument(chapter2_start=4, chapter2_end=10)
+        ptr_doc.tables.extend(
+            [
+                # Chapter 1 table 1 (same number, wrong context)
+                PTRTable(
+                    table_number=1,
+                    headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                    rows=[["脉冲宽度(ms)", "全部型号", "0.1...1.5", "9.9", "±20μs"]],
+                    page=2,
+                ),
+                # Chapter 2 table 1 (target)
+                PTRTable(
+                    table_number=1,
+                    headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                    rows=[["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"]],
+                    page=5,
+                ),
+            ]
+        )
+
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+            table_references=[PTRTableReference(table_number=1)],
+        )
+        ptr_doc.clauses.append(clause)
+
+        report_items = [
+            InspectionItem(
+                sequence_number="39",
+                standard_clause="2.1.3",
+                test_result="脉冲宽度(ms) 标准设置 0.4",
+            )
+        ]
+
+        comparator = TableComparator()
+        result = comparator._compare_table_reference(1, clause, ptr_doc, report_items)
+        assert result.table_found is True
+        assert result.parameters
+        # Should come from chapter-2 table candidate.
+        assert any(p.ptr_value == "0.4" for p in result.parameters)
+
 
 class TestConvenienceFunctions:
     """Test convenience functions."""
