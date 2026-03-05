@@ -206,11 +206,11 @@ class ClauseComparator:
 
         detail.normalized_ptr = self.normalizer.normalize(ptr_text)
         detail.normalized_report = self.normalizer.normalize(report_text)
-        ptr_compact = re.sub(r"\s+", "", detail.normalized_ptr)
-        report_compact = re.sub(r"\s+", "", detail.normalized_report)
+        ptr_compact = self._compact_for_compare(detail.normalized_ptr)
+        report_compact = self._compact_for_compare(detail.normalized_report)
         detail.similarity = self._compute_similarity(
-            detail.normalized_ptr,
-            detail.normalized_report,
+            ptr_compact,
+            report_compact,
         )
 
         # Perform comparison
@@ -247,11 +247,15 @@ class ClauseComparator:
             detail.result = ComparisonResult.DIFFER
             detail.match_reason = "text_mismatch"
             detail.differences = self._compute_diff(
-                detail.normalized_ptr,
-                detail.normalized_report,
+                ptr_compact,
+                report_compact,
             )
 
         return detail
+
+    def _compact_for_compare(self, text: str) -> str:
+        """Remove all whitespace so comparison ignores spacing/newline noise."""
+        return re.sub(r"\s+", "", text or "")
 
     def _extract_clause_specific_text(
         self,
@@ -831,12 +835,14 @@ def compare_texts(text1: str, text2: str) -> tuple[bool, float, list[DiffFragmen
 
     norm1 = normalizer.normalize(text1)
     norm2 = normalizer.normalize(text2)
+    compact1 = comparator._compact_for_compare(norm1)
+    compact2 = comparator._compact_for_compare(norm2)
 
-    is_match = norm1 == norm2
-    similarity = comparator._compute_similarity(norm1, norm2)
+    is_match = compact1 == compact2
+    similarity = comparator._compute_similarity(compact1, compact2)
 
     if not is_match:
-        differences = comparator._compute_diff(norm1, norm2)
+        differences = comparator._compute_diff(compact1, compact2)
     else:
         differences = []
 

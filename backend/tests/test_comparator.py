@@ -95,6 +95,11 @@ class TestClauseComparator:
         is_match, _, _ = compare_texts("Test text", "Test  text")
         assert is_match is True  # Extra whitespace should be normalized
 
+    def test_compare_with_newline_difference(self):
+        """Texts should still match when only line breaks differ."""
+        is_match, _, _ = compare_texts("导管外观\n应无杂质。", "导管外观 应无杂质。")
+        assert is_match is True
+
     def test_compute_similarity(self):
         """Test similarity computation."""
         comparator = ClauseComparator()
@@ -206,6 +211,33 @@ class TestCompareDocuments:
 
         assert len(results) == 1
         assert results[0].is_match is True
+
+    def test_compare_single_clause_match_when_ptr_has_spaces_and_newlines(self):
+        """PTR text spacing/newline noise should be ignored like report side."""
+        ptr_doc = PTRDocument()
+        ptr_clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1"),
+            full_text="2.1 Test Clause",
+            text_content="相间间隔\n相间间隔>=1 μ s 且<=100 μ s，误差不超过±10%。",
+            level=2,
+        )
+        ptr_doc.clauses.append(ptr_clause)
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        item = InspectionItem(
+            sequence_number="2.1",
+            standard_requirement="相间间隔 相间间隔>=1μs且<=100μs，误差不超过±10%。",
+        )
+        table.items.append(item)
+        report_doc.inspection_table = table
+
+        comparator = ClauseComparator()
+        results = comparator.compare_documents(ptr_doc, report_doc)
+
+        assert len(results) == 1
+        assert results[0].is_match is True
+        assert results[0].result == ComparisonResult.MATCH
 
     def test_compare_single_clause_differ(self):
         """Test comparing a single differing clause."""
