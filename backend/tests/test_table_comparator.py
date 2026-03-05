@@ -554,3 +554,118 @@ class TestEdgeCases:
         )
         assert len(comparisons) == 1
         assert comparisons[0].parameter_name.startswith("脉冲宽度")
+
+    def test_compare_table_parameters_should_use_coverage_mode_with_extra_report_content(self):
+        """Report may contain extra formulas/details; core PTR row content appearing should pass."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...0.5...(0.25)...1.5", "0.4", "±20μs或±10%中取较大值"],
+            ],
+        )
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            standard_requirement=(
+                "脉冲宽度应符合表1中的数值。"
+                "脉冲宽度(ms)（心房）常规数值：0.1 ...(0.1) ... 0.5 ...(0.25) ... 1.5；"
+                "标准设置：0.4；允许误差：±20μs 或 ±10%中取较大值；"
+                "并给出@240Ω/@500Ω/@2000Ω等附加测试结果。"
+            ),
+            test_result="符合要求",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].matches is True
+
+    def test_compare_table_parameters_should_merge_continuation_rows_by_same_sequence(self):
+        """Continuation rows under same sequence should be included in report text for coverage."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...0.5...(0.25)...1.5", "0.4", "±20μs"]],
+        )
+        head_row = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            standard_requirement="脉冲宽度应符合表1中的数值。",
+            test_result="符合",
+            inspection_project="脉冲宽度(ms)",
+        )
+        continuation_row = InspectionItem(
+            sequence_number="",
+            standard_clause="",
+            standard_requirement="常规数值：0.1 ...(0.1) ... 0.5 ...(0.25) ... 1.5",
+            test_result="标准设置：0.4；允许误差：±20μs",
+            inspection_project="",
+        )
+        next_item = InspectionItem(
+            sequence_number="40",
+            standard_clause="2.1.4",
+            standard_requirement="基础频率应符合表1中的数值。",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=head_row,
+            clause=clause,
+            report_items=[head_row, continuation_row, next_item],
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].matches is True
+
+    def test_compare_table_parameters_should_prefer_report_topic_over_noisy_clause_text(self):
+        """Noisy OCR text in PTR clause should not pull unrelated parameter rows."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲幅度(V)③", "全部型号", "0.2...(0.2)...6.0...(0.5)...7.5", "3.0", "±50mV"],
+                ["Vs 后远场保护(ms)", "Edora 8 DR", "100...(10)...220", "100", "±20"],
+            ],
+        )
+        report_item = InspectionItem(
+            sequence_number="38",
+            standard_clause="2.1.2",
+            inspection_project="脉冲幅度(V)",
+            standard_requirement="脉冲幅度应符合表1中的数值。",
+            test_result="脉冲幅度(V) 常规数值 0.2...(0.2)...6.0...(0.5)...7.5 标准设置 3.0",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.2"),
+            full_text="2.1.2 脉冲幅度",
+            # Simulate OCR pollution from nearby rows.
+            text_content="脉冲幅度(V)：脉冲幅度应符合表1中的数值。Vs后远场保护(ms) Edora 8 DR",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].parameter_name.startswith("脉冲幅度")

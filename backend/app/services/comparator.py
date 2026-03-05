@@ -115,6 +115,7 @@ class ClauseComparator:
         # Get excluded sequences from report
         excluded_numbers = report_doc.get_excluded_sequences() if report_doc.third_page_fields else []
         inspection_scope = self._parse_inspection_scope_from_third_page(report_doc)
+        report_clause_set = self._collect_report_clause_numbers(report_doc)
 
         # Compare each PTR clause
         for ptr_clause in ptr_doc.clauses:
@@ -124,6 +125,7 @@ class ClauseComparator:
             if inspection_scope and not self._is_clause_in_scope(
                 str(ptr_clause.number),
                 inspection_scope,
+                report_clause_set,
             ):
                 detail = ComparisonDetail(ptr_clause=ptr_clause)
                 detail.result = ComparisonResult.EXCLUDED
@@ -514,8 +516,17 @@ class ClauseComparator:
         self,
         clause_number: str,
         scope: list[tuple[tuple[int, ...], tuple[int, ...]]],
+        report_clause_set: set[str] | None = None,
     ) -> bool:
         """Check whether clause number falls into parsed third-page scope."""
+        # If report正文明确存在该条款（或其父级条款），优先认定在范围内。
+        if report_clause_set:
+            if clause_number in report_clause_set:
+                return True
+            for report_clause in report_clause_set:
+                if clause_number.startswith(report_clause + ".") or report_clause.startswith(clause_number + "."):
+                    return True
+
         clause = self._parse_clause_number(clause_number)
         if not clause:
             return True
@@ -543,6 +554,17 @@ class ClauseComparator:
                     return True
 
         return False
+
+    def _collect_report_clause_numbers(self, report_doc: ReportDocument) -> set[str]:
+        """Collect parseable clause numbers from report inspection table."""
+        if not report_doc.inspection_table:
+            return set()
+        clause_numbers: set[str] = set()
+        for item in report_doc.inspection_table.items:
+            clause = self._extract_clause_number(item.standard_clause)
+            if clause:
+                clause_numbers.add(clause)
+        return clause_numbers
 
     def _find_matching_item(
         self,

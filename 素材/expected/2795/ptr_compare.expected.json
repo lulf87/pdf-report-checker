@@ -4,15 +4,15 @@
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.3.2",
       "ptr_text": "LivePoint\n该功能可以为用户提供一次性使用磁电定位压力监测球囊脉冲电场消融\n导管上各电极的组织接近状态。",
-      "report_text": "LivePoint\n该功能可以为用户提供一次性使用磁电定位压\n力监测球囊脉冲电场消融导管上各电极的组织\n接近状态。",
+      "report_text": "LivePoint \n该功能可以为用户提供一次性使用磁电定位压\n力监测球囊脉冲电场消融导管上各电极的组织\n接近状态。",
       "result": "match",
       "similarity": 1.0
     },
     {
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.3.3",
-      "ptr_text": "R 波检测\n该功能允许消融仪接收和显示ECG 测量值以及指示检测到的R 波的标\n记。",
-      "report_text": "R 波检测\n该功能允许消融仪接收和显示ECG 测量值以及\n指示检测到的R 波的标记。",
+      "ptr_text": "R 波检测\n该功能允许消融仪接收和显示 ECG 测量值以及指示检测到的 R 波的标\n记。",
+      "report_text": "R 波检测 \n该功能允许消融仪接收和显示 ECG 测量值以及\n指示检测到的 R 波的标记。",
       "result": "match",
       "similarity": 1.0
     },
@@ -51,8 +51,8 @@
     {
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.4.2",
-      "ptr_text": "接口\n      心脏脉冲电场消融仪应有一个通过USB 2.0 协议传输数据的USB 接口。",
-      "report_text": "接口\n心脏脉冲电场消融仪应有一个通过USB 2.0 协\n议传输数据的USB 接口。",
+      "ptr_text": "接口\n      心脏脉冲电场消融仪应有一个通过 USB 2.0 协议传输数据的 USB 接口。",
+      "report_text": "接口 \n心脏脉冲电场消融仪应有一个通过 USB 2.0 协\n议传输数据的 USB 接口。",
       "result": "match",
       "similarity": 1.0
     },
@@ -60,15 +60,15 @@
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.4.3",
       "ptr_text": "存储\n      心脏脉冲电场消融仪可以在非治疗模式下将病历文件和审计日志导出到\n外部介质。",
-      "report_text": "存储\n心脏脉冲电场消融仪可以在非治疗模式下将病\n历文件和审计日志导出到外部介质。",
+      "report_text": "存储 \n心脏脉冲电场消融仪可以在非治疗模式下将病\n历文件和审计日志导出到外部介质。",
       "result": "match",
       "similarity": 1.0
     },
     {
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.5",
-      "ptr_text": "连接电缆绝缘电阻\n      连接电缆任意两芯脚之间的绝缘电阻应不小于5MΩ.",
-      "report_text": "连接电缆绝缘电阻 连接电缆任意两芯脚之间的绝缘电阻应不小于\n5MΩ.\n单位：GΩ",
+      "ptr_text": "连接电缆绝缘电阻\n      连接电缆任意两芯脚之间的绝缘电阻应不小于 5MΩ.",
+      "report_text": "连接电缆绝缘电阻 连接电缆任意两芯脚之间的绝缘电阻应不小于\n5MΩ. \n单位：GΩ",
       "result": "match",
       "similarity": 1.0
     },
@@ -76,31 +76,31 @@
       "match_reason": "short_heading_equivalent",
       "ptr_number": "2.6",
       "ptr_text": "安全要求",
-      "report_text": "安全要求 1 通用安全要求应符合GB 9706.1-2020 的\n相关要求。电气安全特征见附录A。",
+      "report_text": "安全要求 1\n 通用安全要求应符合\n GB 9706.1-2020\n 的\n相关要求。电气安全特征见附录\n A\n。",
       "result": "match",
       "similarity": 0.95
     },
     {
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.6.1",
-      "ptr_text": "通用安全要求应符合GB 9706.1-2020 的相关要求。电气安全特征见附录\nA。",
-      "report_text": "通用安全要求应符合GB 9706.1-2020 的\n相关要求。电气安全特征见附录A。",
+      "ptr_text": "通用安全要求应符合 GB 9706.1-2020 的相关要求。电气安全特征见附录\nA。",
+      "report_text": "通用安全要求应符合\n GB 9706.1-2020\n 的\n相关要求。电气安全特征见附录\n A\n。",
       "result": "match",
       "similarity": 1.0
     },
     {
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.6.2",
-      "ptr_text": "专用安全要求应符合GB 9706.202-2021 的相关要求。",
-      "report_text": "专用安全要求应符合GB 9706.202-2021\n的相关要求。",
+      "ptr_text": "专用安全要求应符合 GB 9706.202-2021 的相关要求。",
+      "report_text": "专用安全要求应符合\n GB 9706.202-2021\n的相关要求。",
       "result": "match",
       "similarity": 1.0
     },
     {
       "match_reason": "exact_normalized_match",
       "ptr_number": "2.7",
-      "ptr_text": "电磁兼容性\n应符合YY 9706.102-2021 及GB 9706.202-2021 中202 的要求。",
-      "report_text": "电磁兼容性 应符合YY 9706.102-2021 及GB 9706.202-\n2021 中202 的要求。",
+      "ptr_text": "电磁兼容性\n应符合 YY 9706.102-2021 及 GB 9706.202-2021 中 202 的要求。",
+      "report_text": "电磁兼容性 应符合\n YY 9706.102-2021\n 及\n GB 9706.202-\n2021\n 中\n 202\n 的要求。",
       "result": "match",
       "similarity": 1.0
     }

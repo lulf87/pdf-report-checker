@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from app.models.common_models import PDFDocument
+from app.models.common_models import PDFDocument, PDFPage
 from app.models.ptr_models import (
     PTRClause,
     PTRClauseNumber,
@@ -420,6 +420,31 @@ class TestPTRExtractor:
         numbers = [str(c.number) for c in deduped]
         assert numbers == ["2", "2.1"]
         assert deduped[0].text_content == "性能指标"
+
+    def test_find_chapter2_pages_should_detect_deep_clause_lines(self):
+        """Should detect chapter-2 page even when clause marker is not in top lines."""
+        extractor = PTRExtractor()
+        pdf_doc = PDFDocument(
+            pages=[
+                PDFPage(
+                    page_number=1,
+                    width=595.0,
+                    height=842.0,
+                    raw_text="\n".join(["封面信息"] * 30),
+                ),
+                PDFPage(
+                    page_number=2,
+                    width=595.0,
+                    height=842.0,
+                    raw_text="\n".join(
+                        ["表格内容"] * 25
+                        + ["2.1.2 脉冲幅度(V)：脉冲幅度应符合表1中的数值。"]
+                    ),
+                ),
+            ]
+        )
+        chapter2_pages = extractor._find_chapter2_pages(pdf_doc)
+        assert 2 in chapter2_pages
 
 
 class TestTableReferenceExtraction:

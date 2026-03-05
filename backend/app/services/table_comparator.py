@@ -177,6 +177,7 @@ class TableComparator:
             ptr_table,
             report_item,
             clause=clause,
+            report_items=report_items,
         )
 
         # Calculate statistics
@@ -446,6 +447,7 @@ class TableComparator:
         ptr_table: PTRTable,
         report_item: InspectionItem,
         clause: PTRClause | None = None,
+        report_items: list[InspectionItem] | None = None,
     ) -> list[ParameterComparison]:
         """Compare parameters from PTR table with report item.
 
@@ -458,18 +460,24 @@ class TableComparator:
         """
         comparisons: list[ParameterComparison] = []
 
-        # Use multiple report columns to improve extraction robustness.
-        report_text = "\n".join(
-            part
-            for part in [
-                report_item.test_result or "",
-                report_item.standard_requirement or "",
-                report_item.inspection_project or "",
-            ]
-            if part and part.strip()
+        # Merge grouped continuation rows with same sequence block.
+        report_text = self._build_grouped_report_text(
+            report_item=report_item,
+            report_items=report_items or [],
         )
+        if not report_text:
+            report_text = "\n".join(
+                part
+                for part in [
+                    report_item.standard_requirement or "",
+                    report_item.test_result or "",
+                    report_item.inspection_project or "",
+                ]
+                if part and part.strip()
+            )
 
-        clause_topics = self._extract_clause_topics(clause.text_content if clause else "")
+        # Prefer report-row topic (inspection_project) to avoid OCR noise from PTR clause body.
+        clause_topics = self._resolve_row_filter_topics(report_item=report_item, clause=clause)
 
         # Compare each row in PTR table
         param_col_idx = self._find_column_index(
@@ -505,18 +513,29 @@ class TableComparator:
             if not param_name:
                 continue
 
-            # Try to find this parameter in report text
-            report_value = self._extract_parameter_value(param_name, report_text)
-            if not report_value:
-                model_text = row[model_col_idx] if model_col_idx < len(row) else ""
-                if model_text and model_text.strip() and model_text.strip() != "全部型号":
-                    report_value = self._extract_parameter_value(
-                        f"{param_name} {model_text}",
-                        report_text,
-                    )
+            # Coverage-style comparison: report can contain extra content,
+            # but should include all core content for corresponding PTR row.
+            covered, evidence = self._is_ptr_row_covered_in_report(
+                row=row,
+                headers=ptr_table.headers,
+                report_text=report_text,
+                param_col_idx=param_col_idx,
+                model_col_idx=model_col_idx,
+            )
 
-            # Compare values
-            matches = self._compare_values(ptr_value, report_value)
+            report_value = evidence
+            matches = covered
+            if not matches:
+                # Fallback to legacy single-value extraction for backward compatibility.
+                report_value = self._extract_parameter_value(param_name, report_text)
+                if not report_value:
+                    model_text = row[model_col_idx] if model_col_idx < len(row) else ""
+                    if model_text and model_text.strip() and model_text.strip() != "全部型号":
+                        report_value = self._extract_parameter_value(
+                            f"{param_name} {model_text}",
+                            report_text,
+                        )
+                matches = self._compare_values(ptr_value, report_value)
 
             comparison = ParameterComparison(
                 parameter_name=param_name,
@@ -528,6 +547,218 @@ class TableComparator:
             comparisons.append(comparison)
 
         return comparisons
+
+    def _resolve_row_filter_topics(
+        self,
+        report_item: InspectionItem,
+        clause: PTRClause | None,
+    ) -> list[str]:
+        """Resolve parameter topics for row filtering.
+
+        Priority:
+        1) Report inspection project/requirement heading (usually cleaner and clause-specific).
+        2) PTR clause text fallback.
+        """
+        report_topics = self._extract_report_item_topics(report_item)
+        if report_topics:
+            return report_topics
+        return self._extract_clause_topics(clause.text_content if clause else "")
+
+    def _extract_report_item_topics(self, report_item: InspectionItem) -> list[str]:
+        """Extract clause topic from report row fields with minimal noise."""
+        candidates: list[str] = []
+
+        project = str(report_item.inspection_project or "").strip()
+        if project:
+            normalized = self._normalize_topic_label(project)
+            if normalized and len(normalized) >= 2:
+                candidates.append(normalized)
+            candidates.extend(self._extract_clause_topics(project))
+
+        requirement = str(report_item.standard_requirement or "").strip()
+        if requirement:
+            first_line = requirement.splitlines()[0].strip()
+            first_segment = re.split(r"[。；;]", first_line, maxsplit=1)[0].strip()
+            if first_segment:
+                candidates.extend(self._extract_clause_topics(first_segment))
+
+        topics: list[str] = []
+        seen: set[str] = set()
+        for topic in candidates:
+            normalized = self._normalize_topic_label(topic)
+            if len(normalized) < 2:
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            topics.append(normalized)
+        return topics
+
+    def _build_grouped_report_text(
+        self,
+        report_item: InspectionItem,
+        report_items: list[InspectionItem],
+    ) -> str:
+        """Build merged text for one logical sequence group in report table."""
+        if not report_items:
+            return ""
+        try:
+            start_idx = next(i for i, item in enumerate(report_items) if item is report_item)
+        except StopIteration:
+            start_idx = -1
+        if start_idx < 0:
+            return ""
+
+        base_seq = self._extract_sequence_index(report_item.sequence_number)
+        parts: list[str] = []
+        seen: set[str] = set()
+
+        for idx in range(start_idx, len(report_items)):
+            item = report_items[idx]
+            if idx > start_idx:
+                seq = self._extract_sequence_index(item.sequence_number)
+                if base_seq and seq and seq != base_seq:
+                    break
+                if not base_seq and seq:
+                    break
+
+            for raw in [
+                item.standard_requirement,
+                item.test_result,
+                item.inspection_project,
+                item.sequence_number if self._looks_like_shifted_text(item.sequence_number) else "",
+            ]:
+                text = str(raw or "").strip()
+                if not text:
+                    continue
+                key = self._compact(text)
+                if key in seen:
+                    continue
+                seen.add(key)
+                parts.append(text)
+
+        return "\n".join(parts).strip()
+
+    def _extract_sequence_index(self, sequence: str | None) -> str:
+        """Extract numeric row index from sequence column like '39' or '续39'."""
+        text = re.sub(r"\s+", "", str(sequence or "")).replace("续", "")
+        match = re.fullmatch(r"(\d+)", text)
+        return match.group(1) if match else ""
+
+    def _looks_like_shifted_text(self, value: str | None) -> bool:
+        """Whether sequence column likely contains shifted requirement text."""
+        text = str(value or "").strip()
+        if not text:
+            return False
+        if self._extract_sequence_index(text):
+            return False
+        compact = re.sub(r"\s+", "", text)
+        if re.fullmatch(r"\d+(?:\.\d+)+", compact):
+            return False
+        if len(text) >= 8 and ("\n" in text or "。" in text or "：" in text or "；" in text):
+            return True
+        if re.search(r"\d+(?:\.\d+)+", text) and len(text) > 10:
+            return True
+        return False
+
+    def _is_ptr_row_covered_in_report(
+        self,
+        row: list[str],
+        headers: list[str],
+        report_text: str,
+        param_col_idx: int,
+        model_col_idx: int,
+    ) -> tuple[bool, str]:
+        """Whether report text covers all core cells from one PTR parameter row."""
+        if not report_text:
+            return False, ""
+
+        report_compact = self._coverage_compact(report_text)
+        if not report_compact:
+            return False, ""
+
+        required_cells: list[str] = []
+        for idx, raw_cell in enumerate(row):
+            cell = str(raw_cell or "").strip()
+            if not cell or self._is_placeholder(cell):
+                continue
+            # Model column is metadata in most parameter rows; don't enforce strict presence.
+            if idx == model_col_idx:
+                continue
+            header = headers[idx] if idx < len(headers) else ""
+            header_compact = self._compact(header)
+            if "型号" in header_compact:
+                continue
+            if self._looks_like_model_value(cell):
+                continue
+            required_cells.append(cell)
+
+        if not required_cells:
+            return False, ""
+
+        for cell in required_cells:
+            if not self._cell_is_covered(cell, report_compact):
+                return False, ""
+
+        param_name = row[param_col_idx] if param_col_idx < len(row) else (row[0] if row else "")
+        evidence = self._extract_parameter_value(str(param_name or ""), report_text)
+        return True, evidence or "已覆盖"
+
+    def _cell_is_covered(self, cell_text: str, report_compact: str) -> bool:
+        """Check if one PTR cell content is present in report text (allows formatting variance)."""
+        cell_compact = self._coverage_compact(cell_text)
+        if not cell_compact:
+            return True
+        if cell_compact in report_compact:
+            return True
+
+        tokens = re.findall(r"[\u4e00-\u9fff]+|[A-Za-z]{2,}", cell_compact)
+        for token in tokens:
+            if token not in report_compact:
+                return False
+
+        numbers = self._extract_all_numbers(cell_compact)
+        if numbers and not self._numbers_in_order(numbers, report_compact):
+            return False
+
+        # When there is at least some semantic token overlap and numbers align, treat as covered.
+        return bool(tokens or numbers)
+
+    def _numbers_in_order(self, numbers: list[str], text: str) -> bool:
+        """Check whether numbers appear in order inside text."""
+        if not numbers:
+            return True
+        cursor = 0
+        for num in numbers:
+            idx = text.find(num, cursor)
+            if idx < 0:
+                return False
+            cursor = idx + len(num)
+        return True
+
+    def _coverage_compact(self, text: str) -> str:
+        """Compact text for coverage comparison while normalizing common OCR symbol variants."""
+        compact = self._compact(text or "")
+        if not compact:
+            return ""
+        compact = compact.replace("µ", "μ")
+        compact = re.sub(r"(?i)(\d)u(?=s\b)", r"\1μ", compact)
+        compact = re.sub(r"(?i)u(?=g/)", "μ", compact)
+        compact = compact.replace("﹣", "-").replace("－", "-").replace("–", "-").replace("—", "-")
+        compact = compact.replace("％", "%")
+        return compact
+
+    def _looks_like_model_value(self, value: str) -> bool:
+        compact = self._compact(value)
+        if not compact:
+            return False
+        if "全部型号" in compact:
+            return True
+        if "Edora" in value:
+            return True
+        if re.search(r"(SR|DR)(?:-T)?", value, re.IGNORECASE):
+            return True
+        return False
 
     def _extract_clause_topics(self, clause_text: str) -> list[str]:
         """Extract likely parameter topics from clause text."""

@@ -249,6 +249,52 @@ class TestEdgeCases:
         assert "100±20%" in normalizer.normalize("允许误差: 100士20%")
         assert "1μg/mL" in normalizer.normalize("浓度=1 ug/mL")
 
+    def test_normalize_microsecond_unit_variants(self):
+        """Microsecond OCR variants should normalize to μs in numeric contexts."""
+        normalizer = TextNormalizer()
+        assert ">=1μs" in normalizer.normalize("相间间隔>=1us")
+        assert "<=100μs" in normalizer.normalize("相间间隔<=100 u s")
+        assert "0.5μs" in normalizer.normalize("误差不超过0.5 μ u s")
+
+    def test_normalize_quote_variants(self):
+        """Curly/straight quote variants should normalize consistently."""
+        normalizer = TextNormalizer()
+        a = normalizer.normalize("“激活灯”亮橙色。")
+        b = normalizer.normalize("\"激活灯\"亮橙色。")
+        assert a == b
+
+    def test_normalize_repeated_heading_prefix(self):
+        """Duplicated heading prefixes from OCR should be collapsed."""
+        normalizer = TextNormalizer()
+        text = "脚踏开关脚踏开关应符合YY/T1057-2016标准的要求。"
+        normalized = normalizer.normalize(text)
+        assert normalized == "脚踏开关应符合YY/T1057-2016标准的要求。"
+
+    def test_normalize_repeated_heading_prefix_with_whitespace(self):
+        """Repeated headings separated by OCR whitespace/newline should be collapsed."""
+        normalizer = TextNormalizer()
+        text = "脚踏开关\n脚踏开关应符合YY/T1057-2016标准的要求。"
+        normalized = normalizer.normalize(text)
+        assert normalized == "脚踏开关应符合YY/T1057-2016标准的要求。"
+
+    def test_normalize_repeated_heading_with_micro_units(self):
+        """Repeated heading + micro unit variants should be normalized together."""
+        normalizer = TextNormalizer()
+        text = "脉冲宽度脉冲宽度>=0.5us且<=10us，误差不超过±10%或0.2us（取较大值）。"
+        normalized = normalizer.normalize(text)
+        assert normalized.startswith("脉冲宽度>=0.5μs且<=10μs")
+
+    def test_normalize_ocr_l_as_one_before_micro_unit(self):
+        """OCR l/I before micro-second unit in range should normalize to numeric 1."""
+        normalizer = TextNormalizer()
+        assert ">=1μs" in normalizer.normalize("相间间隔>=lμus")
+        assert ">=1μs" in normalizer.normalize("相间间隔>=Iμs")
+
+    def test_normalize_ns_case_variants(self):
+        """nS/ns case variants should normalize consistently."""
+        normalizer = TextNormalizer()
+        assert "700ns" in normalizer.normalize("脉冲下降时间<=700nS。")
+
     def test_normalize_heading_colon_before_requirement(self):
         """Heading colon before '应符合' should not create false mismatches."""
         normalizer = TextNormalizer()

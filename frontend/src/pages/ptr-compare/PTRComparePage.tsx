@@ -9,6 +9,7 @@ type PageState = 'upload' | 'results';
 interface ResultWithTaskId {
   result: PTRCompareResult;
   taskId: string;
+  generatedAtMs: number;
 }
 
 /**
@@ -23,7 +24,7 @@ export function PTRComparePage() {
   const [resultData, setResultData] = useState<ResultWithTaskId | null>(null);
 
   const handleComplete = (compareResult: PTRCompareResult, taskId: string) => {
-    setResultData({ result: compareResult, taskId });
+    setResultData({ result: compareResult, taskId, generatedAtMs: Date.now() });
     setPageState('results');
   };
 
@@ -70,6 +71,7 @@ export function PTRComparePage() {
             key="results"
             result={resultData.result}
             taskId={resultData.taskId}
+            generatedAtMs={resultData.generatedAtMs}
             onBack={handleBack}
             onReupload={handleReupload}
             onDashboard={handleDashboard}

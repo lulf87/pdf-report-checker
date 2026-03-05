@@ -316,6 +316,37 @@ class TestCompareDocuments:
         assert result_map["2.1.3"].result == ComparisonResult.MATCH
         assert result_map["2.2.1"].result == ComparisonResult.EXCLUDED
 
+    def test_scope_should_include_clause_present_in_report_table_even_if_third_page_misses_it(self):
+        """If report正文 contains clause, do not exclude it solely by third-page OCR range."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.2"),
+                full_text="2.1.2 脉冲幅度",
+                text_content="脉冲幅度应符合表1中的数值。",
+                level=3,
+            )
+        )
+
+        report_doc = ReportDocument(
+            third_page_fields=ThirdPageFields(
+                # Simulate OCR miss on third page (starts from 2.1.3)
+                inspection_items=["2.1.3～2.1.15"],
+            )
+        )
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="38",
+                standard_clause="2.1.2",
+                standard_requirement="脉冲幅度应符合表1中的数值。",
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result != ComparisonResult.EXCLUDED
+
     def test_parameter_table_clause_equivalence_should_match(self):
         """Base '符合表1中的数值' requirement should match report rows with detail matrix."""
         ptr_doc = PTRDocument()

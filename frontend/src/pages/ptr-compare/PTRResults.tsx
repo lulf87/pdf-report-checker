@@ -12,6 +12,7 @@ import type { PTRCompareResult, Clause } from '../../types/ptr';
 interface PTRResultsProps {
   result: PTRCompareResult;
   taskId: string;
+  generatedAtMs: number;
   onBack: () => void;
   onReupload: () => void;
   onDashboard: () => void;
@@ -48,8 +49,11 @@ type FilterType = 'all' | 'mismatched';
  * - Clause list with expandable cards
  * - Navigation buttons
  */
-export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: PTRResultsProps) {
+export function PTRResults({ result, taskId, generatedAtMs, onBack, onReupload, onDashboard }: PTRResultsProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const generatedAtText = new Date(generatedAtMs).toLocaleString('zh-CN', {
+    hour12: false,
+  });
 
   // Extract data from backend response structure
   const summary = result.summary || {
@@ -130,6 +134,31 @@ export function PTRResults({ result, taskId, onBack, onReupload, onDashboard }: 
         <p style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
           共核对 {visibleClauseCount} 条款（范围外 {summary.excluded} 条以警告展示）
         </p>
+      </motion.div>
+
+      <motion.div variants={itemVariants} style={{ marginBottom: '1.25rem' }}>
+        <GlassCard>
+          <div
+            style={{
+              padding: '0.9rem 1.1rem',
+              border: '1px solid rgba(196, 167, 108, 0.4)',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(196, 167, 108, 0.07)',
+            }}
+          >
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '0.35rem' }}>
+              当前页面展示的是一次任务快照结果。后端重启、规则变更或文件变更后，需要点击“重新上传”生成新任务。
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              任务ID:
+              {' '}
+              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: 'var(--text-primary)' }}>
+                {taskId}
+              </span>
+              {' '}· 生成时间: {generatedAtText}
+            </p>
+          </div>
+        </GlassCard>
       </motion.div>
 
       {/* Stats Overview */}

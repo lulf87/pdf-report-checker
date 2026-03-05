@@ -169,13 +169,24 @@ class PTRExtractor:
 
         for page in pdf_doc.pages:
             # Look for "2." pattern at the start of a line
-            # This is the main chapter marker
             lines = page.raw_text.split("\n")
-            for line in lines[:10]:  # Check first 10 lines only
+            found = False
+            for line in lines[:12]:  # Prioritize headings near top
                 line = line.strip()
                 if re.match(r"^2\s*[\.、\s]", line) or re.match(
                     r"^2\s*[\u4e00-\u9fff]+", line
                 ):
+                    chapter2_pages.append(page.page_number)
+                    found = True
+                    break
+            if found:
+                continue
+
+            # Fallback: scanned/OCR PTR may place 2.x clauses deep in page body.
+            # Accept page when at least one explicit chapter-2 clause marker appears.
+            for line in lines:
+                text = line.strip()
+                if re.match(r"^2\.\d+(?:\.\d+)*(?:[\.．、]?\s*[\u4e00-\u9fff])", text):
                     chapter2_pages.append(page.page_number)
                     break
 

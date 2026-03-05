@@ -100,6 +100,9 @@ class TextNormalizer:
         # Step 3: Normalize common OCR symbol variants
         text = self._normalize_ocr_symbol_variants(text)
 
+        # Step 3.5: Collapse duplicated leading headings from OCR line merge
+        text = self._normalize_repeated_heading_prefix(text)
+
         # Step 4: Remove formatting annotations like "单位：V"
         text = self._remove_format_annotations(text)
 
@@ -188,6 +191,13 @@ class TextNormalizer:
     def _normalize_ocr_symbol_variants(self, text: str) -> str:
         """Normalize common OCR symbol confusions."""
         normalized = text.replace("Ω", "Ω")
+        # Normalize quote variants to ASCII quotes for stable comparison.
+        normalized = (
+            normalized.replace("“", "\"")
+            .replace("”", "\"")
+            .replace("‘", "'")
+            .replace("’", "'")
+        )
         for src, dst in SCRIPT_SYMBOL_MAP.items():
             normalized = normalized.replace(src, dst)
 
@@ -206,6 +216,8 @@ class TextNormalizer:
         # Common symbol variants for concentration expressions and units.
         normalized = normalized.replace("µ", "μ")
         normalized = re.sub(r"ρ\s*(?=\()", "p", normalized)
+        # OCR may confuse leading numeric "1" as l/I in range expressions.
+        normalized = re.sub(r"(?<=[<>=≤≥])\s*[lI|](?=\s*(?:μ|u))", "1", normalized)
 
         # Normalize inch marks in specification values: 0.038'' -> 0.038"
         normalized = re.sub(
@@ -228,10 +240,20 @@ class TextNormalizer:
         normalized = re.sub(r"\bu\s*g\s*/\s*m\s*L\b", "μg/mL", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"\bu\s*L\b", "μL", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(\d)\s+μg/mL", r"\1μg/mL", normalized)
+        # Normalize microsecond unit variants in numeric contexts:
+        # 1us / 1 u s / 1 μ u s -> 1μs
+        normalized = re.sub(
+            r"(?<=\d)\s*(?:μ|u)\s*(?:u\s*)?s(?=[^A-Za-z]|$)",
+            "μs",
+            normalized,
+            flags=re.IGNORECASE,
+        )
         normalized = re.sub(r"(?<=\d)\s*ml\b", "mL", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"\bml\b", "mL", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=\d)\s*ms\b", "ms", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"\bms\b", "ms", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(?<=\d)\s*ns\b", "ns", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\bns\b", "ns", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=\d)\s*Hz\b", "Hz", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=\d)\s*V\b", "V", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=\d)\s*A\b", "A", normalized, flags=re.IGNORECASE)
@@ -242,6 +264,31 @@ class TextNormalizer:
         normalized = re.sub(r"之\s*4\s*差", "之差", normalized)
 
         return normalized
+
+    def _normalize_repeated_heading_prefix(self, text: str) -> str:
+        """Collapse duplicated leading heading tokens caused by OCR merge.
+
+        Examples:
+        - 脚踏开关脚踏开关应符合... -> 脚踏开关应符合...
+        - 脉冲宽度脉冲宽度>=0.5us... -> 脉冲宽度>=0.5us...
+        """
+        if not text:
+            return text
+
+        lines = text.split("\n")
+        pattern = re.compile(
+            r"^([\u4e00-\u9fffA-Za-z0-9/（）()]{2,20}?)\s*\1(?=(?:应|[<>≤≥=]))"
+        )
+        normalized_lines: list[str] = []
+        for line in lines:
+            prev = line
+            while True:
+                current = pattern.sub(r"\1", prev)
+                if current == prev:
+                    break
+                prev = current
+            normalized_lines.append(prev)
+        return "\n".join(normalized_lines)
 
     def normalize_list(self, texts: list[str]) -> list[str]:
         """Normalize a list of texts.
