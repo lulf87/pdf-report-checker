@@ -35,6 +35,7 @@ class InspectionItem:
     is_merged: bool = False
     source_page: int = 0
     row_index_in_page: int = 0
+    field_provenance: dict[str, str] = field(default_factory=dict)
 
     @property
     def is_complete(self) -> bool:

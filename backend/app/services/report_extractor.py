@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
-from app.models.common_models import PDFDocument, PDFPage, TableData
+from app.models.common_models import CellData, PDFDocument, PDFPage, TableData
 from app.models.report_models import (
     InspectionItem,
     InspectionTable,
@@ -20,6 +20,7 @@ from app.models.report_models import (
     ThirdPageFields,
 )
 from app.services.pdf_parser import PDFParser
+from app.services.table_normalizer import TableNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,7 @@ class ReportExtractor:
         self.pdf_parser = pdf_parser or PDFParser(ocr_fallback=use_ocr)
         self.use_ocr = use_ocr
         self.state = ExtractionState()
+        self.table_normalizer = TableNormalizer()
 
     def extract_from_file(self, file_path: str | Path) -> ReportDocument:
         """Extract report content from a PDF file.
@@ -469,31 +471,25 @@ class ReportExtractor:
             List of InspectionItem objects
         """
         items: list[InspectionItem] = []
+        row_values, row_provenance, row_has_merge = self._prepare_rows_with_merge_semantics(table)
 
-        for row_idx, row in enumerate(table.rows):
-            if not row:
+        for row_idx, cells in enumerate(row_values):
+            if not cells:
                 continue
 
-            # Skip header row
+            # Skip explicit header row when table already has separate headers.
             if row_idx == 0 and table.headers:
                 continue
 
-            # Extract cell values
-            cells = [cell.text for cell in row]
-
-            # Skip fully empty rows produced by table extraction noise.
+            # Skip fully empty rows produced by extraction noise.
             if not any((cell or "").strip() for cell in cells):
                 continue
 
-            # Check for continuation marker ("续X")
             sequence = (cells[0] if cells else "") or ""
             sequence = sequence.strip()
             is_continued = sequence.startswith("续")
-
-            # Clean sequence number
             clean_sequence = sequence.replace("续", "").strip()
 
-            # Create inspection item
             item = InspectionItem(
                 sequence_number=sequence,
                 inspection_project=cells[1] if len(cells) > 1 else "",
@@ -503,17 +499,14 @@ class ReportExtractor:
                 item_conclusion=cells[5] if len(cells) > 5 else "",
                 remark=cells[6] if len(cells) > 6 else "",
                 is_continued=is_continued,
-                is_merged=self._has_merged_cells(row),
+                is_merged=bool(row_has_merge.get(row_idx, False)),
                 source_page=page_num,
                 row_index_in_page=row_idx,
+                field_provenance=self._build_field_provenance(
+                    row_provenance.get(row_idx, {}),
+                ),
             )
 
-            # Handle merged cells (propagate values)
-            if item.is_merged and self.state.merged_cell_value:
-                if not item.inspection_project:
-                    item.inspection_project = self.state.merged_cell_value
-
-            # Update state for next row
             if item.sequence_number:
                 self.state.current_sequence = clean_sequence
                 if item.is_merged and item.inspection_project:
@@ -535,9 +528,93 @@ class ReportExtractor:
         from app.models.common_models import CellData
 
         for cell in row:
-            if isinstance(cell, CellData) and cell.is_merged():
-                return True
+            if isinstance(cell, CellData):
+                if cell.is_merged():
+                    return True
+                source = str(getattr(cell, "source", "") or "").lower()
+                if source in {"inferred", "merge_inferred"}:
+                    return True
         return False
+
+    def _prepare_rows_with_merge_semantics(
+        self,
+        table: TableData,
+    ) -> tuple[list[list[str]], dict[int, dict[int, str]], dict[int, bool]]:
+        """Build row texts with merged-cell propagation and provenance."""
+        row_count = len(table.rows)
+        col_count = max((len(row) for row in table.rows), default=0)
+
+        values: list[list[str]] = [["" for _ in range(col_count)] for _ in range(row_count)]
+        provenance: dict[int, dict[int, str]] = {idx: {} for idx in range(row_count)}
+        merged_rows: dict[int, bool] = {}
+
+        for row_idx, row in enumerate(table.rows):
+            for col_idx in range(col_count):
+                cell = row[col_idx] if col_idx < len(row) else None
+                if not isinstance(cell, CellData):
+                    continue
+                text = (cell.text or "").strip()
+                values[row_idx][col_idx] = text
+                provenance[row_idx][col_idx] = "native"
+                if cell.is_merged():
+                    merged_rows[row_idx] = True
+
+        # Native row-span propagation: anchor non-empty value fills merged block.
+        for row_idx, row in enumerate(table.rows):
+            for col_idx, cell in enumerate(row):
+                if not isinstance(cell, CellData):
+                    continue
+                if cell.row_span <= 1:
+                    continue
+                anchor = (cell.text or "").strip()
+                if not anchor:
+                    # C08 rule: empty anchor means merged block remains empty.
+                    continue
+                for offset in range(1, cell.row_span):
+                    target_row = row_idx + offset
+                    if target_row >= row_count:
+                        break
+                    if values[target_row][col_idx]:
+                        continue
+                    values[target_row][col_idx] = anchor
+                    provenance[target_row][col_idx] = "merge_inferred"
+                    merged_rows[target_row] = True
+
+        # Canonical inferred fill-down acts as backup when native span is absent.
+        canonical = self.table_normalizer.normalize(table)
+        for cell in canonical.cells:
+            if cell.source != "inferred":
+                continue
+            row_idx = cell.row
+            col_idx = cell.col
+            if row_idx >= row_count or col_idx >= col_count:
+                continue
+            if values[row_idx][col_idx]:
+                continue
+            if not (cell.text or "").strip():
+                continue
+            values[row_idx][col_idx] = cell.text.strip()
+            provenance[row_idx][col_idx] = "inferred"
+            merged_rows[row_idx] = True
+
+        return values, provenance, merged_rows
+
+    def _build_field_provenance(self, row_provenance: dict[int, str]) -> dict[str, str]:
+        field_map = {
+            0: "sequence_number",
+            1: "inspection_project",
+            2: "standard_clause",
+            3: "standard_requirement",
+            4: "test_result",
+            5: "item_conclusion",
+            6: "remark",
+        }
+        result: dict[str, str] = {}
+        for col_idx, field_name in field_map.items():
+            source = row_provenance.get(col_idx)
+            if source:
+                result[field_name] = source
+        return result
 
 
 def extract_report(file_path: str | Path) -> ReportDocument:

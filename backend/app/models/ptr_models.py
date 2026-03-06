@@ -187,6 +187,10 @@ class PTRTable:
     page_end: int | None = None
     position: tuple[int, int] | None = None
     bbox: tuple[float, float, float, float] | None = None
+    header_rows: list[list[str]] = field(default_factory=list)
+    column_paths: list[list[str]] = field(default_factory=list)
+    structure_confidence: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def num_rows(self) -> int:

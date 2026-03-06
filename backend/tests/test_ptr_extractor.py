@@ -22,6 +22,7 @@ from app.services.ptr_extractor import (
     PTRExtractor,
     extract_ptr,
 )
+from tests.table_fixture_builder import build_table
 
 
 # Test fixtures
@@ -527,6 +528,51 @@ class TestTableContinuationMerge:
         # Continuation row should inherit parameter column context.
         assert merged[0].rows[-1][0] == "房室间期(ms)"
 
+
+class TestCanonicalPtrTableConversion:
+    """Test canonical normalization path inside PTR table conversion."""
+
+    def test_convert_to_ptr_table_should_include_structured_fields(self):
+        extractor = PTRExtractor()
+        table_data = build_table(
+            rows=[
+                ["参数", "心房", "", "心室", ""],
+                ["", "常规数值", "标准设置", "常规数值", "标准设置"],
+                ["脉冲宽度(ms)", "0.1...(0.1)...1.5", "0.4", "0.1...(0.1)...1.5", "0.4"],
+            ],
+            table_number=1,
+            headers=["参数", "心房", "", "心室", ""],
+        )
+
+        ptr_table = extractor._convert_to_ptr_table(table_data)
+        assert ptr_table is not None
+        assert ptr_table.structure_confidence is not None
+        assert ptr_table.header_rows
+        assert ptr_table.column_paths
+        assert ptr_table.headers == [
+            "参数",
+            "心房 / 常规数值",
+            "心房 / 标准设置",
+            "心室 / 常规数值",
+            "心室 / 标准设置",
+        ]
+        assert ptr_table.rows
+
+    def test_convert_to_ptr_table_should_fallback_when_structure_confidence_low(self):
+        extractor = PTRExtractor()
+        table_data = build_table(
+            rows=[
+                ["", "", "", ""],
+                ["", "", "", ""],
+                ["随机文本A", "随机文本B", "123", "456"],
+            ],
+            table_number=3,
+            headers=["", "", "", ""],
+        )
+        ptr_table = extractor._convert_to_ptr_table(table_data)
+        assert ptr_table is not None
+        assert ptr_table.metadata.get("normalizer") == "legacy_fallback"
+        assert ptr_table.structure_confidence == 0.0
 
 class TestSubItemExtraction:
     """Test sub-item extraction logic."""

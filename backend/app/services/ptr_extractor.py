@@ -10,6 +10,7 @@ import logging
 import re
 import tempfile
 import threading
+from dataclasses import asdict
 from pathlib import Path
 from typing import Final
 
@@ -26,6 +27,7 @@ from app.models.ptr_models import (
     PTRTableReference,
 )
 from app.services.llm_vision_service import create_vlm_service
+from app.services.table_normalizer import TableNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +78,7 @@ class PTRExtractor:
             self.enable_table_vlm = bool(getattr(settings, "ptr_table_vlm_enabled", False))
         else:
             self.enable_table_vlm = bool(enable_table_vlm)
+        self.table_normalizer = TableNormalizer()
 
     def extract(self, pdf_doc: PDFDocument) -> PTRDocument:
         """Extract PTR structure from PDF document.
@@ -337,30 +340,32 @@ class PTRExtractor:
         if table_data.is_empty():
             return None
 
-        # Extract table number from caption or data
-        table_number = table_data.table_number
+        canonical = self.table_normalizer.normalize(table_data)
+        legacy_headers = self.table_normalizer.to_legacy_headers(canonical)
+        legacy_rows = self.table_normalizer.to_legacy_rows(canonical)
+        structure_confidence = canonical.diagnostics.structure_confidence
 
-        # Get headers
-        headers = table_data.headers.copy()
-
-        # Extract rows as text
-        rows: list[list[str]] = []
-        for row in table_data.rows:
-            row_text = [cell.text for cell in row]
-            rows.append(row_text)
+        if (
+            structure_confidence < 0.7
+            or (not legacy_rows and table_data.rows)
+            or (not legacy_headers and table_data.headers)
+        ):
+            logger.info(
+                "PTR table fallback to legacy conversion: page=%s table=%s conf=%.2f",
+                table_data.page,
+                table_data.table_number,
+                structure_confidence,
+            )
+            return self._convert_to_ptr_table_legacy(table_data)
 
         return PTRTable(
-            table_number=table_number,
+            table_number=table_data.table_number,
             caption=table_data.caption,
-            headers=headers,
-            rows=rows,
+            headers=legacy_headers,
+            rows=legacy_rows,
             page=table_data.page,
             page_end=table_data.page,
-            position=(
-                (table_data.bbox.x0, table_data.bbox.y0)
-                if table_data.bbox
-                else None
-            ),
+            position=((table_data.bbox.x0, table_data.bbox.y0) if table_data.bbox else None),
             bbox=(
                 (
                     float(table_data.bbox.x0),
@@ -371,7 +376,67 @@ class PTRExtractor:
                 if table_data.bbox
                 else None
             ),
+            header_rows=self._build_header_rows(canonical),
+            column_paths=[path.labels[:] for path in canonical.column_paths],
+            structure_confidence=structure_confidence,
+            metadata={
+                "canonical_diagnostics": asdict(canonical.diagnostics),
+                "column_roles": [path.role for path in canonical.column_paths],
+                "normalizer": "canonical_v1",
+                "needs_manual_review": bool(canonical.metadata.get("needs_manual_review", False)),
+                "parameter_records": [
+                    {
+                        "parameter_name": record.parameter_name,
+                        "dimensions": record.dimensions,
+                        "values": record.values,
+                        "source_rows": record.source_rows,
+                    }
+                    for record in self.table_normalizer.to_parameter_records(canonical)
+                ],
+            },
         )
+
+    def _convert_to_ptr_table_legacy(self, table_data) -> PTRTable:
+        """Legacy conversion fallback for low-confidence structure reconstruction."""
+        headers = table_data.headers.copy()
+        rows: list[list[str]] = []
+        for row in table_data.rows:
+            rows.append([cell.text for cell in row])
+
+        return PTRTable(
+            table_number=table_data.table_number,
+            caption=table_data.caption,
+            headers=headers,
+            rows=rows,
+            page=table_data.page,
+            page_end=table_data.page,
+            position=((table_data.bbox.x0, table_data.bbox.y0) if table_data.bbox else None),
+            bbox=(
+                (
+                    float(table_data.bbox.x0),
+                    float(table_data.bbox.y0),
+                    float(table_data.bbox.x1),
+                    float(table_data.bbox.y1),
+                )
+                if table_data.bbox
+                else None
+            ),
+            structure_confidence=0.0,
+            metadata={
+                "normalizer": "legacy_fallback",
+                "needs_manual_review": True,
+            },
+        )
+
+    def _build_header_rows(self, canonical) -> list[list[str]]:
+        header_rows: list[list[str]] = []
+        for row_idx in canonical.header_rows:
+            row_values: list[str] = []
+            for col_idx in range(canonical.n_cols):
+                cell = canonical.get_cell(row_idx, col_idx)
+                row_values.append(cell.text if cell else "")
+            header_rows.append(row_values)
+        return header_rows
 
     def _link_table_references(self, ptr_doc: PTRDocument) -> None:
         """Link table references to actual tables.
@@ -485,6 +550,15 @@ class PTRExtractor:
         if not previous.table_number:
             return False
 
+        structure_similarity = self._table_structure_similarity(previous, current)
+        current_top = float(current.position[1]) <= 130.0 if current.position else False
+
+        # Missing table number + similar structure strongly indicates continuation.
+        if structure_similarity >= 0.82:
+            return True
+        if structure_similarity >= 0.62 and current_top:
+            return True
+
         if self._looks_like_parameter_table(previous) and not self._looks_like_new_table_start(current):
             return True
         if not self._looks_like_new_table_start(current):
@@ -502,13 +576,56 @@ class PTRExtractor:
 
         header_keywords = ["参数", "参数名称", "型号", "标准设置", "允许误差", "数值", "单位"]
         hit_count = sum(1 for keyword in header_keywords if keyword in merged_header)
-        if hit_count >= 2:
+        if hit_count >= 2 and not self._has_parameter_like_body(table):
             return True
 
         first_header = (table.headers[0] or "").strip() if table.headers else ""
         if len(first_header) >= 25 and not any(k in first_header for k in header_keywords):
             return False
         return False
+
+    def _has_parameter_like_body(self, table: PTRTable) -> bool:
+        if not table.rows:
+            return False
+        sample_rows = table.rows[:3]
+        for row in sample_rows:
+            joined = "".join((cell or "").strip() for cell in row)
+            if any(token in joined for token in ["脉冲", "频率", "灵敏度", "不应期", "间期", "阻抗"]):
+                return True
+        return False
+
+    def _table_structure_similarity(self, previous: PTRTable, current: PTRTable) -> float:
+        prev_sig = self._table_structure_signature(previous)
+        curr_sig = self._table_structure_signature(current)
+        if not prev_sig or not curr_sig:
+            return 0.0
+
+        if prev_sig == curr_sig:
+            return 1.0
+
+        prev_tokens = set(prev_sig.split("|"))
+        curr_tokens = set(curr_sig.split("|"))
+        if not prev_tokens or not curr_tokens:
+            return 0.0
+        overlap = len(prev_tokens & curr_tokens)
+        union = len(prev_tokens | curr_tokens)
+        return overlap / union if union else 0.0
+
+    def _table_structure_signature(self, table: PTRTable) -> str:
+        col_count = max(len(table.headers), max((len(r) for r in table.rows), default=0))
+        header_paths = []
+        if table.column_paths:
+            for path in table.column_paths:
+                compact = re.sub(r"\s+", "", "/".join(path))
+                if compact:
+                    header_paths.append(compact)
+        if not header_paths:
+            header_paths = [re.sub(r"\s+", "", h or "") for h in table.headers if (h or "").strip()]
+        if not header_paths and table.rows:
+            header_paths = [re.sub(r"\s+", "", value or "") for value in table.rows[0] if (value or "").strip()]
+
+        key_fields = [f"cols:{col_count}", *header_paths[:8]]
+        return "|".join(field for field in key_fields if field)
 
     def _looks_like_parameter_table(self, table: PTRTable) -> bool:
         merged_header = " ".join(h for h in table.headers if h)
@@ -525,6 +642,19 @@ class PTRExtractor:
 
         if not base.headers and fragment.headers:
             base.headers = fragment.headers.copy()
+        if not base.header_rows and fragment.header_rows:
+            base.header_rows = [row[:] for row in fragment.header_rows]
+        if not base.column_paths and fragment.column_paths:
+            base.column_paths = [path[:] for path in fragment.column_paths]
+        if (
+            (base.structure_confidence is None or base.structure_confidence < 0.6)
+            and fragment.structure_confidence is not None
+        ):
+            base.structure_confidence = fragment.structure_confidence
+        if fragment.metadata:
+            if not base.metadata:
+                base.metadata = {}
+            base.metadata.setdefault("merged_from_pages", []).append(fragment.page)
 
         if base.bbox and fragment.bbox and fragment.page == base.page:
             base.bbox = (

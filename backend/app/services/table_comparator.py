@@ -458,8 +458,6 @@ class TableComparator:
         Returns:
             List of parameter comparisons
         """
-        comparisons: list[ParameterComparison] = []
-
         # Merge grouped continuation rows with same sequence block.
         report_text = self._build_grouped_report_text(
             report_item=report_item,
@@ -478,6 +476,45 @@ class TableComparator:
 
         # Prefer report-row topic (inspection_project) to avoid OCR noise from PTR clause body.
         clause_topics = self._resolve_row_filter_topics(report_item=report_item, clause=clause)
+
+        if self._should_use_canonical_path(ptr_table):
+            logger.info(
+                "Table comparator path=canonical table=%s clause=%s",
+                ptr_table.table_number,
+                str(clause.number) if clause else "",
+            )
+            canonical_comparisons = self._compare_table_parameters_canonical(
+                ptr_table=ptr_table,
+                report_text=report_text,
+                clause_topics=clause_topics,
+            )
+            if canonical_comparisons:
+                return canonical_comparisons
+            logger.info(
+                "Table comparator canonical path produced no comparisons; fallback to legacy table=%s clause=%s",
+                ptr_table.table_number,
+                str(clause.number) if clause else "",
+            )
+
+        logger.info(
+            "Table comparator path=legacy table=%s clause=%s",
+            ptr_table.table_number,
+            str(clause.number) if clause else "",
+        )
+        return self._compare_table_parameters_legacy(
+            ptr_table=ptr_table,
+            report_text=report_text,
+            clause_topics=clause_topics,
+        )
+
+    def _compare_table_parameters_legacy(
+        self,
+        ptr_table: PTRTable,
+        report_text: str,
+        clause_topics: list[str],
+    ) -> list[ParameterComparison]:
+        """Legacy row/index comparison path for flat tables."""
+        comparisons: list[ParameterComparison] = []
 
         # Compare each row in PTR table
         param_col_idx = self._find_column_index(
@@ -547,6 +584,299 @@ class TableComparator:
             comparisons.append(comparison)
 
         return comparisons
+
+    def _should_use_canonical_path(self, ptr_table: PTRTable) -> bool:
+        """Whether structured canonical comparison path is available."""
+        metadata = ptr_table.metadata or {}
+        parameter_records = metadata.get("parameter_records")
+        if isinstance(parameter_records, list) and parameter_records:
+            return True
+        return bool(ptr_table.column_paths)
+
+    def _compare_table_parameters_canonical(
+        self,
+        ptr_table: PTRTable,
+        report_text: str,
+        clause_topics: list[str],
+    ) -> list[ParameterComparison]:
+        """Canonical comparison path using semantic parameter records."""
+        records = self._collect_parameter_records(ptr_table)
+        if not records:
+            return []
+
+        candidate_records: list[dict[str, Any]] = []
+        fallback_records: list[dict[str, Any]] = []
+        for record in records:
+            parameter_name = str(record.get("parameter_name") or "").strip()
+            if not parameter_name:
+                continue
+            fallback_records.append(record)
+            if clause_topics and not self._row_matches_clause_topics(parameter_name, clause_topics):
+                continue
+            candidate_records.append(record)
+
+        records_to_compare = candidate_records if candidate_records else fallback_records
+
+        comparisons: list[ParameterComparison] = []
+        for record in records_to_compare:
+            parameter_name = str(record.get("parameter_name") or "").strip()
+            if not parameter_name:
+                continue
+
+            covered, evidence = self._is_parameter_record_covered_in_report(
+                record=record,
+                report_text=report_text,
+            )
+            report_value = evidence or ""
+            matches = covered
+            ptr_value = self._pick_ptr_value_from_parameter_record(record)
+
+            if not matches:
+                # Backward-compatible fallback.
+                report_value = self._extract_parameter_value(parameter_name, report_text)
+                matches = self._compare_values(ptr_value, report_value)
+
+            comparisons.append(
+                ParameterComparison(
+                    parameter_name=parameter_name,
+                    ptr_value=ptr_value,
+                    report_value=report_value,
+                    matches=matches,
+                    is_expanded=True,
+                )
+            )
+
+        return comparisons
+
+    def _collect_parameter_records(self, ptr_table: PTRTable) -> list[dict[str, Any]]:
+        """Collect semantic parameter records from metadata or column-path rows."""
+        metadata = ptr_table.metadata or {}
+        raw_records = metadata.get("parameter_records")
+        if isinstance(raw_records, list) and raw_records:
+            parsed = self._sanitize_parameter_records(raw_records)
+            if parsed:
+                return parsed
+
+        if not ptr_table.rows:
+            return []
+        return self._build_parameter_records_from_rows(ptr_table)
+
+    def _sanitize_parameter_records(self, records: list[Any]) -> list[dict[str, Any]]:
+        """Normalize metadata parameter records into predictable dict format."""
+        normalized: list[dict[str, Any]] = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            parameter_name = str(record.get("parameter_name") or "").strip()
+            if not parameter_name:
+                continue
+            dimensions = record.get("dimensions")
+            values = record.get("values")
+            normalized.append(
+                {
+                    "parameter_name": parameter_name,
+                    "dimensions": dimensions if isinstance(dimensions, dict) else {},
+                    "values": values if isinstance(values, dict) else {},
+                }
+            )
+        return normalized
+
+    def _build_parameter_records_from_rows(self, ptr_table: PTRTable) -> list[dict[str, Any]]:
+        """Build semantic records from rows using column role inference."""
+        role_map = self._infer_column_roles(ptr_table=ptr_table)
+        if not role_map:
+            return []
+
+        parameter_col = self._first_role_index(role_map, "parameter")
+        if parameter_col is None:
+            parameter_col = self._find_column_index(ptr_table.headers, ["参数", "参数名称"], default=0)
+        model_cols = self._role_indexes(role_map, {"model", "group"})
+        value_cols = self._role_indexes(role_map, {"value", "default", "tolerance", "remark"})
+        if not value_cols:
+            value_cols = [idx for idx in range(len(role_map)) if idx not in {parameter_col, *model_cols}]
+
+        records: list[dict[str, Any]] = []
+        for row in ptr_table.rows:
+            if not row or self._is_header_like_row(row, ptr_table.headers):
+                continue
+            values_row = list(row)
+            if len(values_row) < len(role_map):
+                values_row.extend([""] * (len(role_map) - len(values_row)))
+
+            parameter_name = str(values_row[parameter_col] if parameter_col < len(values_row) else "").strip()
+            if not parameter_name:
+                continue
+
+            dimensions: dict[str, str] = {}
+            for col_idx in model_cols:
+                value = str(values_row[col_idx] if col_idx < len(values_row) else "").strip()
+                if not value:
+                    continue
+                key = self._column_key(ptr_table, col_idx)
+                dimensions[key] = value
+
+            values: dict[str, str] = {}
+            for col_idx in value_cols:
+                value = str(values_row[col_idx] if col_idx < len(values_row) else "").strip()
+                if not value:
+                    continue
+                key = self._column_key(ptr_table, col_idx)
+                values[key] = value
+
+            if not values:
+                continue
+            records.append(
+                {
+                    "parameter_name": parameter_name,
+                    "dimensions": dimensions,
+                    "values": values,
+                }
+            )
+
+        return records
+
+    def _infer_column_roles(self, ptr_table: PTRTable) -> list[str]:
+        """Infer semantic roles per column from metadata/column_paths/headers."""
+        n_cols = max(
+            len(ptr_table.headers or []),
+            len(ptr_table.column_paths or []),
+            max((len(row) for row in (ptr_table.rows or [])), default=0),
+        )
+        if n_cols <= 0:
+            return []
+
+        metadata_roles = (ptr_table.metadata or {}).get("column_roles")
+        if isinstance(metadata_roles, list) and metadata_roles:
+            roles = [str(role or "unknown") for role in metadata_roles[:n_cols]]
+            if len(roles) < n_cols:
+                roles.extend(["unknown"] * (n_cols - len(roles)))
+            return roles
+
+        roles: list[str] = []
+        for idx in range(n_cols):
+            labels = self._column_labels(ptr_table, idx)
+            merged = self._compact(" ".join(labels))
+            role = "unknown"
+            if any(keyword in merged for keyword in ["参数名称", "参数", "检验项目", "项目"]):
+                role = "parameter"
+            elif any(keyword in merged for keyword in ["型号", "机型", "规格"]):
+                role = "model"
+            elif any(keyword in merged for keyword in ["组别", "分组", "部位", "类型"]):
+                role = "group"
+            elif any(keyword in merged for keyword in ["标准设置", "默认", "设置值"]):
+                role = "default"
+            elif any(keyword in merged for keyword in ["允许误差", "容差", "误差", "偏差"]):
+                role = "tolerance"
+            elif any(keyword in merged for keyword in ["备注", "说明"]):
+                role = "remark"
+            elif any(keyword in merged for keyword in ["常规数值", "检验结果", "数值", "值"]):
+                role = "value"
+            roles.append(role)
+
+        # Ensure there is at least one parameter column.
+        if "parameter" not in roles and roles:
+            fallback = self._find_column_index(ptr_table.headers, ["参数", "参数名称"], default=0)
+            fallback = min(max(fallback, 0), len(roles) - 1)
+            roles[fallback] = "parameter"
+        return roles
+
+    def _column_labels(self, ptr_table: PTRTable, col_idx: int) -> list[str]:
+        labels: list[str] = []
+        if col_idx < len(ptr_table.column_paths):
+            path = ptr_table.column_paths[col_idx]
+            if isinstance(path, list):
+                labels.extend(str(value or "") for value in path if str(value or "").strip())
+            elif isinstance(path, str) and path.strip():
+                labels.append(path.strip())
+        if col_idx < len(ptr_table.headers):
+            header = str(ptr_table.headers[col_idx] or "").strip()
+            if header:
+                labels.append(header)
+        return labels
+
+    def _column_key(self, ptr_table: PTRTable, col_idx: int) -> str:
+        labels = self._column_labels(ptr_table, col_idx)
+        if labels:
+            return labels[-1]
+        return f"col_{col_idx}"
+
+    def _first_role_index(self, roles: list[str], target: str) -> int | None:
+        for idx, role in enumerate(roles):
+            if role == target:
+                return idx
+        return None
+
+    def _role_indexes(self, roles: list[str], targets: set[str]) -> list[int]:
+        return [idx for idx, role in enumerate(roles) if role in targets]
+
+    def _pick_ptr_value_from_parameter_record(self, record: dict[str, Any]) -> str:
+        """Choose display expected value from semantic record."""
+        values = record.get("values")
+        if not isinstance(values, dict):
+            return ""
+
+        preferred_keys = ["标准设置", "default", "常规数值", "value", "允许误差", "tolerance"]
+        for key in preferred_keys:
+            for raw_key, raw_value in values.items():
+                value = str(raw_value or "").strip()
+                if not value:
+                    continue
+                key_text = self._compact(str(raw_key or ""))
+                if key in key_text:
+                    return value
+
+        for raw_value in values.values():
+            value = str(raw_value or "").strip()
+            if value:
+                return value
+        return ""
+
+    def _is_parameter_record_covered_in_report(
+        self,
+        record: dict[str, Any],
+        report_text: str,
+    ) -> tuple[bool, str]:
+        """Coverage check for one semantic parameter record."""
+        if not report_text:
+            return False, ""
+
+        report_compact = self._coverage_compact(report_text)
+        if not report_compact:
+            return False, ""
+
+        parameter_name = str(record.get("parameter_name") or "").strip()
+        required_cells: list[str] = []
+        if parameter_name:
+            required_cells.append(parameter_name)
+
+        dimensions = record.get("dimensions")
+        if isinstance(dimensions, dict):
+            for key, value in dimensions.items():
+                text = str(value or "").strip()
+                if not text or self._is_placeholder(text):
+                    continue
+                # Keep model-like values optional (legacy-compatible behavior).
+                if self._looks_like_model_value(text) or self._compact(str(key or "")) in {"型号", "model"}:
+                    continue
+                required_cells.append(text)
+
+        values = record.get("values")
+        if isinstance(values, dict):
+            for value in values.values():
+                text = str(value or "").strip()
+                if not text or self._is_placeholder(text):
+                    continue
+                required_cells.append(text)
+
+        if not required_cells:
+            return False, ""
+
+        for required in required_cells:
+            if not self._cell_is_covered(required, report_compact):
+                return False, ""
+
+        evidence = self._extract_parameter_value(parameter_name, report_text) if parameter_name else ""
+        return True, evidence or "已覆盖"
 
     def _resolve_row_filter_topics(
         self,

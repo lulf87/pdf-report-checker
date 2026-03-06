@@ -669,3 +669,100 @@ class TestEdgeCases:
         )
         assert len(comparisons) == 1
         assert comparisons[0].parameter_name.startswith("脉冲幅度")
+
+    def test_compare_table_parameters_should_use_parameter_records_when_available(self):
+        """Comparator should support structured ParameterRecord-style inputs.
+
+        Phase-0 lock: legacy row scan cannot pass this case because table rows are empty.
+        """
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[["", "", "", "", ""]],
+        )
+        # Simulate future canonical payload carried on PTRTable.
+        setattr(
+            ptr_table,
+            "metadata",
+            {
+                "parameter_records": [
+                    {
+                        "parameter_name": "脉冲宽度(ms)",
+                        "dimensions": {"型号": "全部型号"},
+                        "values": {
+                            "常规数值": "0.1...(0.1)...1.5",
+                            "标准设置": "0.4",
+                            "允许误差": "±20μs",
+                        },
+                    }
+                ]
+            },
+        )
+        setattr(
+            ptr_table,
+            "column_paths",
+            [["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
+        )
+
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            test_result=(
+                "脉冲宽度(ms) 常规数值 0.1...(0.1)...1.5；"
+                "标准设置 0.4；允许误差 ±20μs"
+            ),
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].matches is True
+
+    def test_compare_table_parameters_should_route_by_column_paths_roles(self):
+        """Comparator should not depend on fragile column index when column_paths exist."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["列1", "列2", "列3", "列4"],
+            rows=[
+                ["全部型号", "0.4", "脉冲宽度(ms)", "±20μs"],
+            ],
+        )
+        setattr(
+            ptr_table,
+            "column_paths",
+            [["型号"], ["标准设置"], ["参数"], ["允许误差"]],
+        )
+
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            test_result="脉冲宽度(ms) 标准设置 0.4 允许误差 ±20μs",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].parameter_name == "脉冲宽度(ms)"
+        assert comparisons[0].matches is True

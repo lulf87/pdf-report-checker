@@ -333,6 +333,14 @@ class PDFParser:
                     bbox=table_bbox,
                     page=page_number,
                     table_number=table_number,
+                    raw_rows=[list(row) for row in rows],
+                    source_engine="pymupdf",
+                    extraction_meta=self._build_table_extraction_meta(
+                        headers=headers,
+                        rows=rows,
+                        row_count=row_count,
+                        col_count=col_count,
+                    ),
                 )
                 tables.append(table_data)
 
@@ -345,6 +353,45 @@ class PDFParser:
             logger.warning(f"Error extracting tables from page {page_number}: {e}")
 
         return tables
+
+    def _build_table_extraction_meta(
+        self,
+        headers: list[str],
+        rows: list[list[CellData]],
+        row_count: int,
+        col_count: int,
+    ) -> dict[str, object]:
+        """Build lightweight extraction metadata for downstream normalizer."""
+        header_non_empty = sum(1 for value in headers if (value or "").strip())
+        has_sparse_headers = bool(headers) and header_non_empty < max(1, len(headers) // 2)
+
+        first_col_empty = 0
+        for row in rows:
+            if not row:
+                continue
+            first = (row[0].text if row else "") or ""
+            if not first.strip():
+                first_col_empty += 1
+
+        dense_candidate_rows = min(len(rows), 4)
+        multiline_header_candidate = 0
+        for idx in range(dense_candidate_rows):
+            joined = "".join((cell.text or "") for cell in rows[idx])
+            if any(token in joined for token in ["参数", "型号", "标准设置", "允许误差", "常规数值"]):
+                multiline_header_candidate += 1
+
+        return {
+            "row_count": row_count,
+            "col_count": col_count,
+            "header_non_empty_count": header_non_empty,
+            "first_col_empty_rows": first_col_empty,
+            "header_rows_candidate": multiline_header_candidate,
+            "suspicious_complex_table": (
+                multiline_header_candidate >= 2
+                or has_sparse_headers
+                or first_col_empty >= max(2, len(rows) // 3)
+            ),
+        }
 
     def _extract_text_with_ocr(self, page: fitz.Page, page_number: int) -> str:
         """Extract page text via OCR by rendering page image."""

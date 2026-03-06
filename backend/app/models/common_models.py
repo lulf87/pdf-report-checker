@@ -114,6 +114,9 @@ class TableData:
     page: int = 1
     caption: str = ""
     table_number: int | None = None
+    raw_rows: list[list[CellData]] = field(default_factory=list)
+    source_engine: str = "pymupdf"
+    extraction_meta: dict[str, Any] = field(default_factory=dict)
 
     @property
     def num_rows(self) -> int:
