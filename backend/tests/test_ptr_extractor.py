@@ -504,6 +504,7 @@ class TestTableContinuationMerge:
         base = PTRTable(
             table_number=1,
             headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
             rows=[
                 ["参数", "型号", "常规数值", "标准设置", "允许误差"],
                 ["房室间期(ms)", "Edora 8 SR", "不适用", "", ""],
@@ -513,7 +514,8 @@ class TestTableContinuationMerge:
         )
         continuation = PTRTable(
             table_number=None,
-            headers=["", "Edora 8 DR", "", "", ""],
+            headers=["", "", "", "", ""],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
             rows=[
                 ["", "Edora 8 DR", "20...(5)...350", "180-170-160", "±20"],
             ],
@@ -525,6 +527,12 @@ class TestTableContinuationMerge:
         assert len(merged) == 1
         assert merged[0].table_number == 1
         assert len(merged[0].rows) >= 3
+        assert merged[0].metadata.get("continuation_reason") in {
+            "high_structure_similarity",
+            "top_bottom_with_header_or_path_overlap",
+            "parameter_continuation_with_joint_evidence",
+            "top_bottom_with_path_overlap",
+        }
         # Continuation row should inherit parameter column context.
         assert merged[0].rows[-1][0] == "房室间期(ms)"
 
@@ -534,6 +542,7 @@ class TestTableContinuationMerge:
         base = PTRTable(
             table_number=1,
             headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
             rows=[
                 ["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...1.5", "0.4", "±20μs"],
             ],
@@ -543,6 +552,7 @@ class TestTableContinuationMerge:
         continuation = PTRTable(
             table_number=None,
             headers=["", "", "", "", ""],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
             rows=[
                 ["基础频率(bpm)", "全部型号", "30...(5)...200", "60", "±20ms"],
             ],
@@ -557,6 +567,12 @@ class TestTableContinuationMerge:
         assert merged_table.metadata.get("canonical_low_confidence") in {True, False}
         assert isinstance(merged_table.metadata.get("parameter_records"), list)
         assert len(merged_table.metadata.get("parameter_records", [])) >= 2
+        assert merged_table.metadata.get("continuation_reason") in {
+            "high_structure_similarity",
+            "top_bottom_with_header_or_path_overlap",
+            "high_structure_with_overlap",
+            "top_bottom_with_path_overlap",
+        }
 
 
 class TestCanonicalPtrTableConversion:

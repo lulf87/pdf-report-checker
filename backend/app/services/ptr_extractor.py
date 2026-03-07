@@ -553,7 +553,7 @@ class PTRExtractor:
 
             prev = merged[-1]
             prev_end_page = int(prev.page_end or prev.page)
-            is_continuation, reason = self._assess_table_continuation(prev, table, prev_end_page)
+            is_continuation, reason, evidence = self._assess_table_continuation(prev, table, prev_end_page)
             if is_continuation:
                 self._merge_table_into(prev, table)
                 if prev.metadata is None:
@@ -562,10 +562,17 @@ class PTRExtractor:
                     {"page": table.page, "reason": reason}
                 )
                 prev.metadata["continuation_merge_reason"] = reason
+                prev.metadata["continuation_reason"] = reason
+                prev.metadata["continuation_evidence"] = evidence
+                prev.metadata.setdefault("continuation_decisions", []).append(
+                    {"page": table.page, "merged": True, "reason": reason, "evidence": evidence}
+                )
                 prev.page_end = max(prev_end_page, int(table.page_end or table.page))
                 continue
             table.metadata = dict(table.metadata or {})
             table.metadata["continuation_reject_reason"] = reason
+            table.metadata["continuation_reason"] = reason
+            table.metadata["continuation_evidence"] = evidence
 
             merged.append(table)
 
@@ -618,56 +625,87 @@ class PTRExtractor:
         previous: PTRTable,
         current: PTRTable,
         previous_end_page: int,
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, dict[str, object]]:
         """Assess continuation relationship and provide a short reason."""
         page_gap = current.page - previous_end_page
+        evidence: dict[str, object] = {
+            "page_gap": page_gap,
+            "previous_page": previous.page,
+            "current_page": current.page,
+        }
         if page_gap < 0 or page_gap > 1:
-            return False, "page_gap_invalid"
+            return False, "page_gap_invalid", evidence
 
         prev_cols = max(len(previous.headers), max((len(r) for r in previous.rows), default=0))
         curr_cols = max(len(current.headers), max((len(r) for r in current.rows), default=0))
+        evidence["previous_column_count"] = prev_cols
+        evidence["current_column_count"] = curr_cols
         if prev_cols == 0 or curr_cols == 0:
-            return False, "empty_columns"
+            return False, "empty_columns", evidence
         if abs(prev_cols - curr_cols) > 1:
-            return False, "column_count_mismatch"
+            return False, "column_count_mismatch", evidence
 
         if previous.table_number and current.table_number and previous.table_number != current.table_number:
-            return False, "table_number_conflict"
+            return False, "table_number_conflict", evidence
         if previous.table_number and current.table_number == previous.table_number:
-            return True, "same_table_number"
+            return True, "same_table_number", evidence
 
         if current.table_number is not None:
-            return False, "current_has_table_number"
-
-        if not previous.table_number:
-            return False, "previous_missing_table_number"
-
-        if self._is_likely_parameter_continuation(previous=previous, current=current):
-            return True, "parameter_continuation_context"
+            return False, "current_has_table_number", evidence
 
         structure_similarity = self._table_structure_similarity(previous, current)
+        header_overlap = self._table_header_text_overlap_ratio(previous, current)
+        path_overlap = self._table_column_path_overlap_ratio(previous, current)
+        overlap_signal = max(header_overlap, path_overlap)
         current_top = self._is_top_of_page(current)
         previous_bottom = self._is_bottom_of_page(previous)
-        header_overlap = self._table_header_overlap_ratio(previous, current)
+        position_bridge = current_top and previous_bottom
+        parameter_signal, parameter_reason = self._is_likely_parameter_continuation(
+            previous=previous,
+            current=current,
+        )
 
-        if structure_similarity >= 0.82:
-            return True, "high_structure_similarity"
-        if structure_similarity >= 0.62 and current_top and previous_bottom:
-            return True, "structure_top_bottom_aligned"
-        if structure_similarity >= 0.5 and header_overlap >= 0.45 and current_top and previous_bottom:
-            return True, "structure_with_header_overlap_top_bottom"
-        if header_overlap >= 0.8 and structure_similarity >= 0.4:
-            return True, "strong_header_overlap"
+        evidence.update(
+            {
+                "structure_similarity": round(structure_similarity, 4),
+                "header_overlap": round(header_overlap, 4),
+                "column_path_overlap": round(path_overlap, 4),
+                "overlap_signal": round(overlap_signal, 4),
+                "previous_bottom": previous_bottom,
+                "current_top": current_top,
+                "position_bridge": position_bridge,
+                "parameter_continuation_signal": parameter_signal,
+                "parameter_continuation_reason": parameter_reason,
+            }
+        )
 
-        if structure_similarity < 0.35 and header_overlap < 0.35:
-            return False, "rejected: low_similarity"
-        if header_overlap < 0.25:
-            return False, "rejected: no_header_overlap"
-        if current_top and previous_bottom:
-            return True, "top_bottom_with_weak_overlap"
-        return False, "rejected: page_top_bottom_mismatch"
+        if not previous.table_number and not (structure_similarity >= 0.9 and position_bridge and overlap_signal >= 0.7):
+            return False, "previous_missing_table_number", evidence
 
-    def _is_likely_parameter_continuation(self, previous: PTRTable, current: PTRTable) -> bool:
+        if structure_similarity >= 0.88:
+            return True, "high_structure_similarity", evidence
+        if structure_similarity >= 0.78 and overlap_signal >= 0.55:
+            return True, "high_structure_with_overlap", evidence
+        if position_bridge and overlap_signal >= 0.55 and structure_similarity >= 0.4:
+            return True, "top_bottom_with_header_or_path_overlap", evidence
+        if position_bridge and parameter_signal and overlap_signal >= 0.45 and structure_similarity >= 0.35:
+            return True, "parameter_continuation_with_joint_evidence", evidence
+        if position_bridge and path_overlap >= 0.7 and structure_similarity >= 0.35:
+            return True, "top_bottom_with_path_overlap", evidence
+
+        if structure_similarity < 0.35 and overlap_signal < 0.35 and not position_bridge:
+            return False, "rejected: low_similarity", evidence
+        if overlap_signal < 0.3:
+            return False, "rejected: no_header_path_overlap", evidence
+        if parameter_signal and overlap_signal < 0.45:
+            return False, "rejected: weak_parameter_signal", evidence
+        if position_bridge and overlap_signal < 0.45:
+            return False, "rejected: top_bottom_without_overlap", evidence
+        if not position_bridge and structure_similarity < 0.78:
+            return False, "rejected: insufficient_position_evidence", evidence
+        return False, "rejected: insufficient_joint_evidence", evidence
+
+    def _is_likely_parameter_continuation(self, previous: PTRTable, current: PTRTable) -> tuple[bool, str]:
         """Detect continuation fragments for parameter tables in loose form.
 
         This captures cases where continuation fragments lose first-column parameters
@@ -676,35 +714,76 @@ class PTRExtractor:
         context).
         """
         if not current.rows:
-            return False
+            return False, "missing_rows"
 
         if max(len(previous.headers), max((len(r) for r in previous.rows), default=0)) != max(
             len(current.headers), max((len(r) for r in current.rows), default=0)
         ):
-            return False
+            return False, "column_count_mismatch"
 
-        if not (self._looks_like_parameter_table(previous) or self._looks_like_parameter_table(current)):
-            return False
+        if not self._looks_like_parameter_table(previous):
+            return False, "previous_not_parameter_table"
 
         first_row = self._first_data_row(current.rows)
         if not first_row:
-            return False
+            return False, "missing_first_data_row"
 
         first_cell = (first_row[0] or "").strip()
         second_cell = (first_row[1] or "").strip() if len(first_row) > 1 else ""
-        if not first_cell:
-            if self._looks_like_model_cell(second_cell):
-                return True
-            if self._is_repeated_header_row(first_row, previous.headers):
-                return True
-            return second_cell != ""
+        has_payload = any((value or "").strip() for value in first_row[2:])
+        current_parameter_like = (
+            self._looks_like_parameter_table(current)
+            or bool(current.column_paths)
+            or self._has_parameter_like_body(current)
+        )
+        if not current_parameter_like:
+            return False, "current_not_parameter_like"
 
-        if first_cell and self._looks_like_model_cell(first_cell):
-            return True
+        if self._is_duplicate_header_row(first_row, previous.headers):
+            return True, "repeated_header_row"
+        if not first_cell and self._looks_like_model_cell(second_cell) and has_payload:
+            return True, "blank_first_col_with_model_payload"
+        if first_cell and self._looks_like_parameter_cell(first_cell) and has_payload:
+            return True, "parameter_like_first_col_with_payload"
+        if first_cell and self._looks_like_model_cell(first_cell) and has_payload:
+            return True, "model_in_first_col_with_payload"
+        return False, "weak_signal_only"
 
-        if first_cell and self._looks_like_parameter_cell(first_cell):
-            return True
-        return False
+    def _table_header_text_overlap_ratio(self, previous: PTRTable, current: PTRTable) -> float:
+        """Compute overlap ratio from visible header text only."""
+        previous_tokens = {
+            re.sub(r"\s+", "", str(header or ""))
+            for header in previous.headers
+            if re.sub(r"\s+", "", str(header or ""))
+        }
+        current_tokens = {
+            re.sub(r"\s+", "", str(header or ""))
+            for header in current.headers
+            if re.sub(r"\s+", "", str(header or ""))
+        }
+        return self._overlap_ratio(previous_tokens, current_tokens)
+
+    def _table_column_path_overlap_ratio(self, previous: PTRTable, current: PTRTable) -> float:
+        """Compute overlap ratio from canonical column paths when present."""
+        previous_tokens = {
+            re.sub(r"\s+", "", "/".join(path))
+            for path in previous.column_paths
+            if isinstance(path, list) and re.sub(r"\s+", "", "/".join(path))
+        }
+        current_tokens = {
+            re.sub(r"\s+", "", "/".join(path))
+            for path in current.column_paths
+            if isinstance(path, list) and re.sub(r"\s+", "", "/".join(path))
+        }
+        return self._overlap_ratio(previous_tokens, current_tokens)
+
+    @staticmethod
+    def _overlap_ratio(previous_tokens: set[str], current_tokens: set[str]) -> float:
+        """Return normalized overlap ratio for two token sets."""
+        if not previous_tokens or not current_tokens:
+            return 0.0
+        overlap = len(previous_tokens & current_tokens)
+        return overlap / min(len(previous_tokens), len(current_tokens))
 
     @staticmethod
     def _first_data_row(rows: list[list[str]]) -> list[str]:
