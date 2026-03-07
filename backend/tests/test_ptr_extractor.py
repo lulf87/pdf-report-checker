@@ -528,6 +528,36 @@ class TestTableContinuationMerge:
         # Continuation row should inherit parameter column context.
         assert merged[0].rows[-1][0] == "房室间期(ms)"
 
+    def test_merge_continuation_tables_rebuilds_metadata(self):
+        extractor = PTRExtractor()
+
+        base = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...1.5", "0.4", "±20μs"],
+            ],
+            page=3,
+            position=(0, 500),
+        )
+        continuation = PTRTable(
+            table_number=None,
+            headers=["", "", "", "", ""],
+            rows=[
+                ["基础频率(bpm)", "全部型号", "30...(5)...200", "60", "±20ms"],
+            ],
+            page=4,
+            position=(0, 40),
+        )
+
+        merged = extractor._merge_continuation_tables([base, continuation])
+        assert len(merged) == 1
+        merged_table = merged[0]
+        assert merged_table.metadata.get("canonical_available") is True
+        assert merged_table.metadata.get("canonical_low_confidence") in {True, False}
+        assert isinstance(merged_table.metadata.get("parameter_records"), list)
+        assert len(merged_table.metadata.get("parameter_records", [])) >= 2
+
 
 class TestCanonicalPtrTableConversion:
     """Test canonical normalization path inside PTR table conversion."""
@@ -571,8 +601,10 @@ class TestCanonicalPtrTableConversion:
         )
         ptr_table = extractor._convert_to_ptr_table(table_data)
         assert ptr_table is not None
-        assert ptr_table.metadata.get("normalizer") == "legacy_fallback"
-        assert ptr_table.structure_confidence == 0.0
+        assert ptr_table.metadata.get("normalizer") in {"canonical_v1", "hybrid_fallback"}
+        assert ptr_table.metadata.get("canonical_available") is True
+        assert ptr_table.metadata.get("canonical_low_confidence") is True
+        assert ptr_table.metadata.get("canonical_disabled_reason") in {"legacy_headers_empty", None}
 
 class TestSubItemExtraction:
     """Test sub-item extraction logic."""

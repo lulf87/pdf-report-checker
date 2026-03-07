@@ -17,7 +17,7 @@ from typing import Final
 import fitz
 
 from app.config import settings
-from app.models.common_models import PDFDocument
+from app.models.common_models import PDFDocument, TableData, CellData
 from app.models.ptr_models import (
     PTRClause,
     PTRClauseNumber,
@@ -26,6 +26,7 @@ from app.models.ptr_models import (
     PTRTable,
     PTRTableReference,
 )
+from app.models.table_models import CanonicalTable
 from app.services.llm_vision_service import create_vlm_service
 from app.services.table_normalizer import TableNormalizer
 
@@ -344,56 +345,53 @@ class PTRExtractor:
         legacy_headers = self.table_normalizer.to_legacy_headers(canonical)
         legacy_rows = self.table_normalizer.to_legacy_rows(canonical)
         structure_confidence = canonical.diagnostics.structure_confidence
+        parameter_records = [
+            {
+                "parameter_name": record.parameter_name,
+                "dimensions": record.dimensions,
+                "values": record.values,
+                "source_rows": record.source_rows,
+            }
+            for record in self.table_normalizer.to_parameter_records(canonical)
+        ]
 
-        if (
-            structure_confidence < 0.7
-            or (not legacy_rows and table_data.rows)
-            or (not legacy_headers and table_data.headers)
-        ):
+        if not legacy_rows and table_data.rows:
             logger.info(
                 "PTR table fallback to legacy conversion: page=%s table=%s conf=%.2f",
                 table_data.page,
                 table_data.table_number,
                 structure_confidence,
             )
-            return self._convert_to_ptr_table_legacy(table_data)
+            ptr_table = self._convert_to_ptr_table_legacy(table_data)
+            ptr_table.structure_confidence = structure_confidence
+            ptr_table.metadata.update(
+                {
+                    "normalizer": "hybrid_fallback",
+                    "canonical_diagnostics": asdict(canonical.diagnostics),
+                    "column_roles": [path.role for path in canonical.column_paths],
+                    "needs_manual_review": bool(canonical.metadata.get("needs_manual_review", False)),
+                    "canonical_available": True,
+                    "canonical_low_confidence": bool(structure_confidence < 0.7),
+                    "canonical_disabled_reason": "legacy_headers_empty",
+                    "parameter_records": parameter_records,
+                    "canonical_snapshot": self._build_canonical_snapshot(
+                        canonical=canonical,
+                        table_data=table_data,
+                        headers=legacy_headers,
+                        rows=legacy_rows,
+                    ),
+                }
+            )
+            return ptr_table
 
-        return PTRTable(
-            table_number=table_data.table_number,
-            caption=table_data.caption,
-            headers=legacy_headers,
-            rows=legacy_rows,
-            page=table_data.page,
-            page_end=table_data.page,
-            position=((table_data.bbox.x0, table_data.bbox.y0) if table_data.bbox else None),
-            bbox=(
-                (
-                    float(table_data.bbox.x0),
-                    float(table_data.bbox.y0),
-                    float(table_data.bbox.x1),
-                    float(table_data.bbox.y1),
-                )
-                if table_data.bbox
-                else None
-            ),
-            header_rows=self._build_header_rows(canonical),
-            column_paths=[path.labels[:] for path in canonical.column_paths],
+        return self._build_ptr_table_from_canonical(
+            table_data=table_data,
+            canonical=canonical,
+            legacy_headers=legacy_headers,
+            legacy_rows=legacy_rows,
             structure_confidence=structure_confidence,
-            metadata={
-                "canonical_diagnostics": asdict(canonical.diagnostics),
-                "column_roles": [path.role for path in canonical.column_paths],
-                "normalizer": "canonical_v1",
-                "needs_manual_review": bool(canonical.metadata.get("needs_manual_review", False)),
-                "parameter_records": [
-                    {
-                        "parameter_name": record.parameter_name,
-                        "dimensions": record.dimensions,
-                        "values": record.values,
-                        "source_rows": record.source_rows,
-                    }
-                    for record in self.table_normalizer.to_parameter_records(canonical)
-                ],
-            },
+            parameter_records=parameter_records,
+            low_confidence=bool(structure_confidence < 0.7),
         )
 
     def _convert_to_ptr_table_legacy(self, table_data) -> PTRTable:
@@ -427,6 +425,86 @@ class PTRExtractor:
                 "needs_manual_review": True,
             },
         )
+
+    def _build_ptr_table_from_canonical(
+        self,
+        table_data: TableData,
+        canonical: CanonicalTable,
+        legacy_headers: list[str],
+        legacy_rows: list[list[str]],
+        structure_confidence: float,
+        parameter_records: list[dict[str, object]],
+        low_confidence: bool,
+    ) -> PTRTable:
+        ptr_table = PTRTable(
+            table_number=table_data.table_number,
+            caption=table_data.caption,
+            headers=legacy_headers,
+            rows=legacy_rows,
+            page=table_data.page,
+            page_end=table_data.page,
+            position=((table_data.bbox.x0, table_data.bbox.y0) if table_data.bbox else None),
+            bbox=(
+                (
+                    float(table_data.bbox.x0),
+                    float(table_data.bbox.y0),
+                    float(table_data.bbox.x1),
+                    float(table_data.bbox.y1),
+                )
+                if table_data.bbox
+                else None
+            ),
+            header_rows=self._build_header_rows(canonical),
+            column_paths=[path.labels[:] for path in canonical.column_paths],
+            structure_confidence=structure_confidence,
+            metadata={
+                "canonical_diagnostics": asdict(canonical.diagnostics),
+                "column_roles": [path.role for path in canonical.column_paths],
+                "normalizer": "canonical_v1",
+                "needs_manual_review": bool(canonical.metadata.get("needs_manual_review", False)),
+                "canonical_available": True,
+                "canonical_low_confidence": low_confidence,
+                "canonical_disabled_reason": None,
+                "parameter_records": parameter_records,
+                "canonical_snapshot": self._build_canonical_snapshot(
+                    canonical=canonical,
+                    table_data=table_data,
+                    headers=legacy_headers,
+                    rows=legacy_rows,
+                ),
+                "source_engine": table_data.source_engine,
+            },
+        )
+        return ptr_table
+
+    def _build_canonical_snapshot(
+        self,
+        canonical: CanonicalTable,
+        table_data: TableData,
+        headers: list[str],
+        rows: list[list[str]],
+    ) -> dict[str, object]:
+        return {
+            "table_number": table_data.table_number,
+            "caption": table_data.caption,
+            "headers": headers,
+            "rows": rows,
+            "header_rows": self._build_header_rows(canonical),
+            "column_paths": [path.labels[:] for path in canonical.column_paths],
+            "column_roles": [path.role for path in canonical.column_paths],
+            "n_cols": canonical.n_cols,
+            "n_rows": canonical.n_rows,
+            "merged_from_pages": table_data.page,
+            "source_engine": table_data.source_engine,
+            "extraction_meta": dict(table_data.extraction_meta or {}),
+            "page": table_data.page,
+            "position": table_data.bbox and {
+                "x0": table_data.bbox.x0,
+                "y0": table_data.bbox.y0,
+                "x1": table_data.bbox.x1,
+                "y1": table_data.bbox.y1,
+            },
+        }
 
     def _build_header_rows(self, canonical) -> list[list[str]]:
         header_rows: list[list[str]] = []
@@ -466,29 +544,35 @@ class PTRExtractor:
 
         ordered = sorted(tables, key=_sort_key)
         merged: list[PTRTable] = []
-        merged_end_pages: list[int] = []
 
         for source in ordered:
             table = self._normalize_table_cells(source)
             if not merged:
                 merged.append(table)
-                merged_end_pages.append(table.page)
                 continue
 
             prev = merged[-1]
-            prev_end_page = merged_end_pages[-1]
-            if self._is_table_continuation(prev, table, prev_end_page):
+            prev_end_page = int(prev.page_end or prev.page)
+            is_continuation, reason = self._assess_table_continuation(prev, table, prev_end_page)
+            if is_continuation:
                 self._merge_table_into(prev, table)
-                merged_end_pages[-1] = max(prev_end_page, table.page)
+                if prev.metadata is None:
+                    prev.metadata = {}
+                prev.metadata.setdefault("continuation_merge_reasons", []).append(
+                    {"page": table.page, "reason": reason}
+                )
+                prev.metadata["continuation_merge_reason"] = reason
+                prev.page_end = max(prev_end_page, int(table.page_end or table.page))
                 continue
+            table.metadata = dict(table.metadata or {})
+            table.metadata["continuation_reject_reason"] = reason
 
             merged.append(table)
-            merged_end_pages.append(table.page)
 
         for table in merged:
             self._repair_parameter_table_rows(table)
-        for idx, table in enumerate(merged):
-            table.page_end = merged_end_pages[idx]
+            self._rebuild_merged_ptr_table_metadata(table)
+            table.page_end = int(table.page_end or table.page)
 
         return merged
 
@@ -527,43 +611,186 @@ class PTRExtractor:
         previous_end_page: int,
     ) -> bool:
         """Whether current table is a continuation fragment of previous table."""
+        return self._assess_table_continuation(previous, current, previous_end_page)[0]
+
+    def _assess_table_continuation(
+        self,
+        previous: PTRTable,
+        current: PTRTable,
+        previous_end_page: int,
+    ) -> tuple[bool, str]:
+        """Assess continuation relationship and provide a short reason."""
         page_gap = current.page - previous_end_page
         if page_gap < 0 or page_gap > 1:
-            return False
+            return False, "page_gap_invalid"
 
         prev_cols = max(len(previous.headers), max((len(r) for r in previous.rows), default=0))
         curr_cols = max(len(current.headers), max((len(r) for r in current.rows), default=0))
         if prev_cols == 0 or curr_cols == 0:
-            return False
+            return False, "empty_columns"
         if abs(prev_cols - curr_cols) > 1:
-            return False
+            return False, "column_count_mismatch"
 
         if previous.table_number and current.table_number and previous.table_number != current.table_number:
-            return False
-
+            return False, "table_number_conflict"
         if previous.table_number and current.table_number == previous.table_number:
-            return True
+            return True, "same_table_number"
 
         if current.table_number is not None:
-            return False
+            return False, "current_has_table_number"
 
         if not previous.table_number:
-            return False
+            return False, "previous_missing_table_number"
+
+        if self._is_likely_parameter_continuation(previous=previous, current=current):
+            return True, "parameter_continuation_context"
 
         structure_similarity = self._table_structure_similarity(previous, current)
-        current_top = float(current.position[1]) <= 130.0 if current.position else False
+        current_top = self._is_top_of_page(current)
+        previous_bottom = self._is_bottom_of_page(previous)
+        header_overlap = self._table_header_overlap_ratio(previous, current)
 
-        # Missing table number + similar structure strongly indicates continuation.
         if structure_similarity >= 0.82:
-            return True
-        if structure_similarity >= 0.62 and current_top:
+            return True, "high_structure_similarity"
+        if structure_similarity >= 0.62 and current_top and previous_bottom:
+            return True, "structure_top_bottom_aligned"
+        if structure_similarity >= 0.5 and header_overlap >= 0.45 and current_top and previous_bottom:
+            return True, "structure_with_header_overlap_top_bottom"
+        if header_overlap >= 0.8 and structure_similarity >= 0.4:
+            return True, "strong_header_overlap"
+
+        if structure_similarity < 0.35 and header_overlap < 0.35:
+            return False, "rejected: low_similarity"
+        if header_overlap < 0.25:
+            return False, "rejected: no_header_overlap"
+        if current_top and previous_bottom:
+            return True, "top_bottom_with_weak_overlap"
+        return False, "rejected: page_top_bottom_mismatch"
+
+    def _is_likely_parameter_continuation(self, previous: PTRTable, current: PTRTable) -> bool:
+        """Detect continuation fragments for parameter tables in loose form.
+
+        This captures cases where continuation fragments lose first-column parameters
+        or header rows, while still staying close to the previous page and table
+        layout (same width, same page range proximity, same parameter-table
+        context).
+        """
+        if not current.rows:
+            return False
+
+        if max(len(previous.headers), max((len(r) for r in previous.rows), default=0)) != max(
+            len(current.headers), max((len(r) for r in current.rows), default=0)
+        ):
+            return False
+
+        if not (self._looks_like_parameter_table(previous) or self._looks_like_parameter_table(current)):
+            return False
+
+        first_row = self._first_data_row(current.rows)
+        if not first_row:
+            return False
+
+        first_cell = (first_row[0] or "").strip()
+        second_cell = (first_row[1] or "").strip() if len(first_row) > 1 else ""
+        if not first_cell:
+            if self._looks_like_model_cell(second_cell):
+                return True
+            if self._is_repeated_header_row(first_row, previous.headers):
+                return True
+            return second_cell != ""
+
+        if first_cell and self._looks_like_model_cell(first_cell):
             return True
 
-        if self._looks_like_parameter_table(previous) and not self._looks_like_new_table_start(current):
-            return True
-        if not self._looks_like_new_table_start(current):
+        if first_cell and self._looks_like_parameter_cell(first_cell):
             return True
         return False
+
+    @staticmethod
+    def _first_data_row(rows: list[list[str]]) -> list[str]:
+        """Return first row with any non-empty value."""
+        for row in rows:
+            if not row:
+                continue
+            if any((cell or "").strip() for cell in row):
+                return row
+        return []
+
+    def _looks_like_parameter_cell(self, text: str) -> bool:
+        """Heuristic for parameter-like first column values."""
+        compact = re.sub(r"\s+", "", text or "")
+        if not compact:
+            return False
+        if self._looks_like_model_cell(compact):
+            return False
+        keywords = [
+            "参数",
+            "指标",
+            "脉冲",
+            "频率",
+            "间期",
+            "电流",
+            "电压",
+            "电阻",
+            "阻抗",
+            "阈值",
+            "幅值",
+            "检验",
+            "心室",
+            "房室",
+            "腔室",
+        ]
+        if any(keyword in compact for keyword in keywords):
+            return True
+        return False
+
+    def _is_top_of_page(self, table: PTRTable) -> bool:
+        """Whether a table starts near a page top in continuation scenarios."""
+        if table.position is None:
+            return False
+        return float(table.position[1]) <= 150.0
+
+    def _is_bottom_of_page(self, table: PTRTable) -> bool:
+        """Whether a table ends near a page bottom in continuation scenarios."""
+        if table.position is None:
+            return False
+        return float(table.position[1]) >= 450.0
+
+    def _table_header_overlap_ratio(self, previous: PTRTable, current: PTRTable) -> float:
+        """Compute header/path token overlap ratio between two tables."""
+        prev_tokens = self._table_tokens(previous)
+        curr_tokens = self._table_tokens(current)
+        if not prev_tokens or not curr_tokens:
+            return 0.0
+
+        overlap = len(prev_tokens & curr_tokens)
+        return overlap / min(len(prev_tokens), len(curr_tokens))
+
+    def _table_tokens(self, table: PTRTable) -> set[str]:
+        """Extract canonical-ish structural tokens from headers/paths."""
+        tokens: set[str] = set()
+        if table.column_paths:
+            for path in table.column_paths:
+                if isinstance(path, list):
+                    compact = re.sub(r"\s+", "", "".join(path))
+                else:
+                    compact = re.sub(r"\s+", "", str(path))
+                if compact:
+                    tokens.add(compact)
+
+        if not tokens:
+            for header in table.headers:
+                compact = re.sub(r"\s+", "", str(header or ""))
+                if compact:
+                    tokens.add(compact)
+
+        if not tokens and table.rows:
+            for value in table.rows[0]:
+                compact = re.sub(r"\s+", "", str(value or ""))
+                if compact:
+                    tokens.add(compact)
+
+        return tokens
 
     def _looks_like_new_table_start(self, table: PTRTable) -> bool:
         """Detect if table fragment likely starts a fresh table with explicit headers."""
@@ -651,10 +878,11 @@ class PTRExtractor:
             and fragment.structure_confidence is not None
         ):
             base.structure_confidence = fragment.structure_confidence
-        if fragment.metadata:
-            if not base.metadata:
-                base.metadata = {}
-            base.metadata.setdefault("merged_from_pages", []).append(fragment.page)
+        if not base.metadata:
+            base.metadata = {}
+        merged_from_pages = base.metadata.setdefault("merged_from_pages", [])
+        if isinstance(merged_from_pages, list) and fragment.page not in merged_from_pages:
+            merged_from_pages.append(fragment.page)
 
         if base.bbox and fragment.bbox and fragment.page == base.page:
             base.bbox = (
@@ -671,6 +899,9 @@ class PTRExtractor:
             rows_to_add = rows_to_add[1:]
 
         base.rows.extend(rows_to_add)
+        base.metadata.setdefault("merged_row_counts", []).append(
+            {"from_page": fragment.page, "rows_added": len(rows_to_add)}
+        )
 
     def _is_duplicate_header_row(self, row: list[str], headers: list[str]) -> bool:
         if not row or not headers:
@@ -680,6 +911,238 @@ class PTRExtractor:
         if not row_text or not header_text:
             return False
         return row_text == header_text
+
+    def _rebuild_merged_ptr_table_metadata(self, table: PTRTable) -> None:
+        """Rebuild canonical metadata for a merged PTRTable from merged legacy rows."""
+        metadata = table.metadata or {}
+        if not table.rows:
+            return
+
+        snapshot = metadata.get("canonical_snapshot") if isinstance(metadata, dict) else None
+
+        # Keep continuation lineage even if snapshot structure changed.
+        merged_from_pages = metadata.get("merged_from_pages")
+        if isinstance(merged_from_pages, list):
+            merged_from_pages_values = list(merged_from_pages)
+        else:
+            merged_from_pages_values = [table.page]
+        if table.page not in merged_from_pages_values:
+            merged_from_pages_values.append(table.page)
+        if isinstance(snapshot, dict) and isinstance(snapshot.get("merged_from_pages"), list):
+            for page_no in snapshot.get("merged_from_pages"):
+                if isinstance(page_no, int) and page_no not in merged_from_pages_values:
+                    merged_from_pages_values.append(page_no)
+        elif isinstance(snapshot, dict) and isinstance(snapshot.get("page"), int):
+            if snapshot.get("page") not in merged_from_pages_values:
+                merged_from_pages_values.append(snapshot.get("page"))
+
+        source_headers = [str(value or "") for value in table.headers]
+        source_rows = [list(row) for row in table.rows]
+
+        snapshot_headers = snapshot.get("headers") if isinstance(snapshot, dict) else table.headers
+        snapshot_rows = snapshot.get("rows") if isinstance(snapshot, dict) else table.rows
+        if not isinstance(snapshot_headers, list):
+            snapshot_headers = source_headers
+        if not isinstance(snapshot_rows, list):
+            snapshot_rows = source_rows
+
+        # If snapshot rows are stale (for example missing continuation rows),
+        # prefer current merged rows.
+        if len(snapshot_rows) < len(source_rows):
+            snapshot_headers = source_headers
+            snapshot_rows = source_rows
+
+        if not snapshot_headers or not snapshot_rows:
+            return
+
+        source_engine = "pymupdf"
+        extraction_meta = {}
+        if isinstance(snapshot, dict):
+            source_engine = str(snapshot.get("source_engine", source_engine))
+            extraction_meta = snapshot.get("extraction_meta", {})
+            if snapshot.get("table_number") is not None:
+                try:
+                    table.table_number = int(snapshot.get("table_number"))  # type: ignore[assignment]
+                except (TypeError, ValueError):
+                    table.table_number = table.table_number
+            if "caption" in snapshot:
+                table.caption = str(snapshot.get("caption") or "")
+            if "caption" in snapshot and snapshot.get("caption") is not None:
+                table.caption = str(snapshot.get("caption"))
+
+        table_data = self._build_table_data_from_ptr_table_snapshot(
+            table,
+            rows=[list(row) for row in snapshot_rows],
+            headers=[str(value or "") for value in snapshot_headers],
+            source_engine=source_engine,
+            extraction_meta=extraction_meta if isinstance(extraction_meta, dict) else {},
+            page=int(snapshot.get("page", table.page)) if isinstance(snapshot, dict) and isinstance(snapshot.get("page"), int) else table.page,
+            table_number=table.table_number,
+        )
+        canonical = self.table_normalizer.normalize(table_data)
+        legacy_headers = self.table_normalizer.to_legacy_headers(canonical)
+        legacy_rows = self.table_normalizer.to_legacy_rows(canonical)
+
+        # Prefer reconstructed canonical headers/rows only when the rebuild does not
+        # shrink the body. Continuation merges often start from an incomplete
+        # snapshot (old base table only), and canonical normalization may mis-detect
+        # the first body row as a header for value-heavy tables.
+        use_rebuilt = bool(legacy_rows) and len(legacy_rows) == len(source_rows)
+        fallback_headers = source_headers
+        fallback_rows = source_rows
+        if use_rebuilt:
+            fallback_headers = legacy_headers
+            fallback_rows = legacy_rows
+
+        parameter_records = self._collect_parameter_records_from_canonical_rows(
+            canonical_headers=fallback_headers,
+            canonical_rows=fallback_rows,
+        )
+
+        table.headers = fallback_headers
+        table.rows = fallback_rows
+        table.header_rows = self._build_header_rows(canonical)
+        table.column_paths = (
+            [path.labels[:] for path in canonical.column_paths]
+            if canonical.column_paths
+            else [[header] if header else [] for header in table.headers]
+        )
+        table.structure_confidence = canonical.diagnostics.structure_confidence
+        table.metadata = {
+            **metadata,
+            "canonical_diagnostics": asdict(canonical.diagnostics),
+            "column_roles": [path.role for path in canonical.column_paths],
+            "canonical_available": True,
+            "canonical_low_confidence": canonical.diagnostics.structure_confidence < 0.7,
+            "needs_manual_review": bool(canonical.metadata.get("needs_manual_review", False)),
+            "parameter_records": parameter_records,
+            "canonical_snapshot": self._build_canonical_snapshot(
+                canonical=canonical,
+                table_data=table_data,
+                headers=table.headers,
+                rows=table.rows,
+            ),
+            "merged_from_pages": merged_from_pages_values,
+        }
+
+    def _collect_parameter_records_from_canonical_rows(
+        self,
+        canonical_headers: list[str],
+        canonical_rows: list[list[str]],
+    ) -> list[dict[str, object]]:
+        """Fallback parameter-record extraction for merged tables without reliable headers."""
+        if not canonical_headers or not canonical_rows:
+            return []
+
+        roles: list[str] = []
+        for index, header in enumerate(canonical_headers):
+            if index == 0:
+                roles.append("parameter")
+                continue
+            roles.append(self.table_normalizer.semantics.infer_column_role(header))
+
+        parameter_col = 0
+        for idx, role in enumerate(roles):
+            if role == "parameter":
+                parameter_col = idx
+                break
+
+        model_cols = [
+            idx
+            for idx, role in enumerate(roles)
+            if role in {"model", "group"} and idx != parameter_col
+        ]
+        value_cols = [idx for idx, role in enumerate(roles) if role in {"value", "default", "tolerance", "remark"}]
+        if not value_cols:
+            value_cols = [idx for idx in range(len(roles)) if idx not in {parameter_col, *model_cols}]
+
+        records: list[dict[str, object]] = []
+        for row_idx, row in enumerate(canonical_rows):
+            if not row:
+                continue
+            values = list(row) + ["" for _ in range(len(canonical_headers) - len(row))]
+            parameter_name = str(values[parameter_col] if parameter_col < len(values) else "").strip()
+            if not parameter_name:
+                continue
+
+            dimensions: dict[str, str] = {}
+            for col_idx in model_cols:
+                value = str(values[col_idx]).strip() if col_idx < len(values) else ""
+                if not value:
+                    continue
+                dimensions[canonical_headers[col_idx] if canonical_headers[col_idx] else f"col_{col_idx}"] = value
+
+            value_cells: dict[str, str] = {}
+            for col_idx in value_cols:
+                value = str(values[col_idx]).strip() if col_idx < len(values) else ""
+                if not value:
+                    continue
+                key = canonical_headers[col_idx] if col_idx < len(canonical_headers) else f"col_{col_idx}"
+                value_cells[key] = value
+
+            records.append(
+                {
+                    "parameter_name": parameter_name,
+                    "dimensions": dimensions,
+                    "values": value_cells,
+                    "source_rows": [row_idx],
+                }
+            )
+        return records
+
+    def _build_table_data_from_ptr_table_snapshot(
+        self,
+        table: PTRTable,
+        rows: list[list[str]] | None = None,
+        headers: list[str] | None = None,
+        table_number: int | None = None,
+        caption: str | None = None,
+        page: int | None = None,
+        source_engine: str | None = None,
+        extraction_meta: dict[str, object] | None = None,
+    ) -> TableData:
+        """Reconstruct a TableData object from flattened PTR table values."""
+        row_values = rows if rows is not None else table.rows
+        header_values = headers if headers is not None else table.headers
+        if not row_values:
+            row_values = table.rows
+        if not header_values:
+            header_values = table.headers
+        target_page = page if page is not None else table.page
+        target_table_number = table.table_number if table_number is None else table_number
+        target_caption = table.caption if caption is None else caption
+        source = source_engine or (table.metadata.get("source_engine", "pymupdf") if isinstance(table.metadata, dict) else "pymupdf")
+        extraction_payload = extraction_meta if extraction_meta is not None else (
+            table.metadata.get("extraction_meta", {})
+            if isinstance(table.metadata, dict)
+            else {}
+        )
+
+        normalized_rows: list[list[CellData]] = []
+        for row_idx, row in enumerate(row_values):
+            cell_row: list[CellData] = []
+            for col_idx, value in enumerate(row):
+                cell_row.append(
+                    CellData(
+                        text=str(value or ""),
+                        row=row_idx,
+                        col=col_idx,
+                        row_span=1,
+                        col_span=1,
+                    )
+                )
+            normalized_rows.append(cell_row)
+
+        return TableData(
+            rows=normalized_rows,
+            headers=header_values[:],
+            page=target_page,
+            caption=target_caption,
+            table_number=target_table_number,
+            raw_rows=normalized_rows,
+            source_engine=source,
+            extraction_meta=extraction_payload,
+        )
 
     def _repair_parameter_table_rows(self, table: PTRTable) -> None:
         """Repair row-shift artifacts caused by row-spans in complex parameter tables."""

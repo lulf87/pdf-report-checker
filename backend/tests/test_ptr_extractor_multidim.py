@@ -89,3 +89,30 @@ class TestPTRContinuationByStructure:
 
         merged = extractor._merge_continuation_tables([p1, p2])
         assert len(merged) == 2
+
+    def test_should_reject_continuation_when_similarity_is_low(self):
+        extractor = PTRExtractor()
+
+        p1 = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"],
+            ],
+            page=5,
+            position=(0, 520),
+        )
+        p2 = PTRTable(
+            table_number=None,
+            headers=["目录", "章节", "摘要", "说明", "备注"],
+            rows=[
+                ["其他内容", "A", "B", "C", "D"],
+            ],
+            page=6,
+            position=(0, 40),
+        )
+
+        merged = extractor._merge_continuation_tables([p1, p2])
+        assert len(merged) == 2
+        reasons = [m.metadata.get("continuation_reject_reason") for m in merged]
+        assert "rejected: no_header_overlap" in reasons or "rejected: low_similarity" in reasons

@@ -728,6 +728,61 @@ class TestEdgeCases:
         )
         assert len(comparisons) == 1
         assert comparisons[0].matches is True
+        assert ptr_table.metadata is not None
+        assert ptr_table.metadata.get("comparison_path_used") == "canonical"
+
+    def test_compare_table_parameters_should_fallback_to_legacy_when_canonical_invalid(self, monkeypatch):
+        """Canonical failure should transparently fall back to legacy path."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲宽度(ms)", "0.1...(0.1)...1.5", "0.4", "±20μs"],
+            ],
+        )
+        setattr(
+            ptr_table,
+            "column_paths",
+            [["参数"], ["常规数值"], ["标准设置"], ["允许误差"]],
+        )
+        monkeypatch.setattr(
+            comparator,
+            "_compare_table_parameters_canonical",
+            lambda *args, **kwargs: ([], "missing_parameter_records"),
+        )
+        setattr(
+            ptr_table,
+            "metadata",
+            {
+                "canonical_available": True,
+                "canonical_low_confidence": True,
+            },
+        )
+
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            test_result="脉冲宽度(ms) 标准设置 0.4",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+        assert len(comparisons) == 1
+        assert comparisons[0].matches is True
+        assert ptr_table.metadata is not None
+        assert ptr_table.metadata.get("comparison_path_used") == "legacy"
+        assert "canonical_path_unavailable" not in ptr_table.metadata.get("comparison_path_reason", "")
 
     def test_compare_table_parameters_should_route_by_column_paths_roles(self):
         """Comparator should not depend on fragile column index when column_paths exist."""
@@ -766,3 +821,71 @@ class TestEdgeCases:
         assert len(comparisons) == 1
         assert comparisons[0].parameter_name == "脉冲宽度(ms)"
         assert comparisons[0].matches is True
+
+    def test_compare_table_parameters_dimension_records_keep_siblings_separate(self):
+        """Sibling dimensions in multi-dimension tables should generate separate records."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=[
+                "参数",
+                "型号",
+                "心房",
+                "常规数值",
+                "心室",
+                "常规数值",
+            ],
+            rows=[
+                ["脉冲宽度(ms)", "全部型号", "20...1.5", "3.0", "10...6.5", "2.5"],
+            ],
+            column_paths=[
+                ["参数"],
+                ["型号"],
+                ["心房", "常规数值"],
+                ["心房", "标准设置"],
+                ["心室", "常规数值"],
+                ["心室", "标准设置"],
+            ],
+        )
+
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            test_result=(
+                "脉冲宽度(ms) 心房 常规数值 20...1.5 标准设置 3.0"
+                "心室 常规数值 10...6.5"
+            ),
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+        assert len(comparisons) == 2
+        heart_records = {
+            item.ptr_value for item in comparisons
+            if item.parameter_name == "脉冲宽度(ms)"
+        }
+        assert "3.0" in heart_records or "20...1.5" in heart_records
+
+    def test_compare_table_parameters_should_favor_default_first_for_pick_value(self):
+        """Canonical pick should prefer default/标准设置 over 单个常规数值 when both exist."""
+        comparator = TableComparator()
+        record = {
+            "parameter_name": "脉冲宽度(ms)",
+            "values": {
+                "常规数值": "0.1...(0.1)...1.5",
+                "标准设置": "0.4",
+                "允许误差": "±20μs",
+            },
+        }
+        ptr_value = comparator._pick_ptr_value_from_parameter_record(record)
+        assert ptr_value == "0.4"

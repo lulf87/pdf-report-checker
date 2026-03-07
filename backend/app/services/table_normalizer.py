@@ -4,6 +4,7 @@ Canonical table normalizer for multidimensional tables.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import asdict
 
@@ -15,6 +16,7 @@ from app.models.table_models import (
     ColumnPath,
     ParameterRecord,
 )
+from app.services.table_semantics import TableSemantics
 
 
 class TableNormalizer:
@@ -22,8 +24,12 @@ class TableNormalizer:
 
     MAX_HEADER_SCAN_ROWS = 4
 
+    def __init__(self) -> None:
+        self.semantics = TableSemantics(logger=logging.getLogger(__name__))
+
     def normalize(self, table_data: TableData) -> CanonicalTable:
         """Normalize a table while preserving structure/provenance."""
+        self.semantics.reset()
         source_rows = table_data.raw_rows or table_data.rows or []
         dense_rows = self._to_dense_matrix(source_rows)
         n_rows = len(dense_rows)
@@ -64,6 +70,7 @@ class TableNormalizer:
             n_cols=n_cols,
             fallback_headers=table_data.headers,
         )
+        canonical.metadata["unknown_role_count"] = self.semantics.unknown_role_count
 
         self._fill_down_dimension_cells(canonical=canonical, dense_rows=dense_rows)
         self._remove_repeated_header_rows(canonical=canonical, dense_rows=dense_rows)
@@ -104,52 +111,83 @@ class TableNormalizer:
         if not canonical.body_rows or not canonical.column_paths:
             return []
 
-        parameter_col = self._find_first_role(canonical.column_paths, {"parameter"}, default=0)
-        dimension_cols = self._find_role_indexes(canonical.column_paths, {"model", "group"})
-        value_cols = self._find_role_indexes(
-            canonical.column_paths,
-            {"value", "default", "tolerance", "remark"},
-        )
-        if not value_cols:
-            value_cols = [idx for idx in range(canonical.n_cols) if idx not in {parameter_col, *dimension_cols}]
+        roles = [path.role for path in canonical.column_paths]
+        if not roles:
+            roles = self._infer_column_roles(canonical.column_paths)
 
-        records: list[ParameterRecord] = []
+        parameter_col = self._find_first_role(canonical.column_paths, {"parameter"}, default=0)
+        # Explicit row-level dimension columns are still useful, especially for model-type columns.
+        explicit_dimension_cols = self._find_role_indexes(canonical.column_paths, {"model", "group"})
+        value_cols = self._find_role_indexes(canonical.column_paths, {"value", "default", "tolerance", "remark"})
+        if not value_cols:
+            value_cols = [idx for idx in range(canonical.n_cols) if idx not in {parameter_col, *explicit_dimension_cols}]
+
+        # Build records keyed by (parameter, dimensions) to avoid siblings (e.g. 心房 vs 心室) merging.
+        records_by_key: dict[tuple[str, tuple[tuple[str, str], ...]], ParameterRecord] = {}
+
         for row_idx in canonical.body_rows:
             parameter_cell = canonical.get_cell(row_idx, parameter_col)
             parameter_name = (parameter_cell.text if parameter_cell else "").strip()
             if not parameter_name:
                 continue
 
-            dimensions: dict[str, str] = {}
-            for col_idx in dimension_cols:
+            base_dimensions: dict[str, str] = {}
+            # 1) explicit dimension columns (型号/分组/组别...)
+            for col_idx in explicit_dimension_cols:
                 cell = canonical.get_cell(row_idx, col_idx)
                 value = (cell.text if cell else "").strip()
                 if not value:
                     continue
-                key = canonical.column_paths[col_idx].key or f"dim_{col_idx}"
-                dimensions[key] = value
+                base_dimensions[self._format_dimension_key(canonical.column_paths[col_idx])] = value
 
-            values: dict[str, str] = {}
+            # 2) path-derived dimensions (e.g., "心房" in ["心房","常规数值"]).
             for col_idx in value_cols:
                 cell = canonical.get_cell(row_idx, col_idx)
                 value = (cell.text if cell else "").strip()
                 if not value:
                     continue
-                key = canonical.column_paths[col_idx].key or f"value_{col_idx}"
-                values[key] = value
 
-            if not values:
-                continue
-            records.append(
-                ParameterRecord(
-                    parameter_name=parameter_name,
-                    dimensions=dimensions,
-                    values=values,
-                    source_rows=[row_idx],
-                )
-            )
+                path = canonical.column_paths[col_idx] if col_idx < len(canonical.column_paths) else ColumnPath(leaf_col=col_idx)
+                dimension_labels, _, _ = self.semantics.split_path_semantics(path.labels)
+                dimensions = dict(base_dimensions)
+                if dimension_labels:
+                    for axis_idx, axis_label in enumerate(dimension_labels, start=1):
+                        key = f"axis_{axis_idx}"
+                        if axis_label:
+                            dimensions.setdefault(key, axis_label)
 
-        return records
+                role = roles[col_idx] if col_idx < len(roles) else path.role
+                leaf_key = self.semantics.infer_value_leaf_label(path.key, role=role)
+                if not leaf_key:
+                    leaf_key = path.key
+
+                key = (parameter_name, tuple(sorted(dimensions.items())))
+                record = records_by_key.get(key)
+                if record is None:
+                    record = ParameterRecord(
+                        parameter_name=parameter_name,
+                        dimensions=dimensions,
+                        values={},
+                        source_rows=[row_idx],
+                    )
+                    records_by_key[key] = record
+                elif row_idx not in record.source_rows:
+                    record.source_rows.append(row_idx)
+
+                if value:
+                    record.values.setdefault(leaf_key, value)
+
+        return list(records_by_key.values())
+
+    def _infer_column_roles(self, column_paths: list[ColumnPath]) -> list[str]:
+        labels = [path.labels for path in column_paths]
+        return self.semantics.infer_column_roles(labels)
+
+    @staticmethod
+    def _format_dimension_key(path: ColumnPath) -> str:
+        if path.key:
+            return path.key
+        return f"dim_{path.leaf_col}"
 
     def _to_dense_matrix(self, rows: list[list[CellData]]) -> list[list[CanonicalCell]]:
         n_rows = len(rows)
@@ -301,7 +339,7 @@ class TableNormalizer:
                 if labels and labels[-1] == label:
                     continue
                 labels.append(label)
-            role = self._infer_column_role(" / ".join(labels))
+            role = self.semantics.infer_column_role(labels)
             paths.append(ColumnPath(leaf_col=col_idx, labels=labels, role=role))
         return paths
 
@@ -310,7 +348,7 @@ class TableNormalizer:
         for col_idx in range(n_cols):
             label = fallback_headers[col_idx].strip() if col_idx < len(fallback_headers) else ""
             labels = [label] if label else []
-            role = self._infer_column_role(label) if label else ("parameter" if col_idx == 0 else "unknown")
+            role = self.semantics.infer_column_role(label) if label else ("parameter" if col_idx == 0 else "unknown")
             paths.append(ColumnPath(leaf_col=col_idx, labels=labels, role=role))
         return paths
 
@@ -461,26 +499,6 @@ class TableNormalizer:
             score -= 0.1
 
         diagnostics.structure_confidence = max(0.0, min(1.0, score))
-
-    def _infer_column_role(self, key: str) -> str:
-        normalized = re.sub(r"\s+", "", key or "")
-        if not normalized:
-            return "unknown"
-        if any(token in normalized for token in ["参数", "项目", "检验项目"]):
-            return "parameter"
-        if any(token in normalized for token in ["型号", "机型", "适用型号"]):
-            return "model"
-        if any(token in normalized for token in ["分组", "类别", "腔室"]):
-            return "group"
-        if any(token in normalized for token in ["标准设置", "默认设置"]):
-            return "default"
-        if any(token in normalized for token in ["允许误差", "误差", "偏差"]):
-            return "tolerance"
-        if any(token in normalized for token in ["常规数值", "数值", "范围"]):
-            return "value"
-        if any(token in normalized for token in ["备注", "说明"]):
-            return "remark"
-        return "unknown"
 
     def _find_role_indexes(self, paths: list[ColumnPath], roles: set[str]) -> list[int]:
         return [idx for idx, path in enumerate(paths) if path.role in roles]

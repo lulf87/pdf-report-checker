@@ -12,6 +12,7 @@ from typing import Any
 
 from app.models.ptr_models import PTRClause, PTRDocument, PTRTable
 from app.models.report_models import InspectionItem
+from app.services.table_semantics import TableSemantics
 from app.services.text_normalizer import TextNormalizer
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ class TableComparator:
     def __init__(
         self,
         normalizer: TextNormalizer | None = None,
+        semantics: TableSemantics | None = None,
     ):
         """Initialize table comparator.
 
@@ -82,6 +84,7 @@ class TableComparator:
             normalizer: Text normalizer instance (created if None)
         """
         self.normalizer = normalizer or TextNormalizer()
+        self.semantics = semantics or TableSemantics(logger=logger)
 
     def compare_table_references(
         self,
@@ -483,29 +486,61 @@ class TableComparator:
                 ptr_table.table_number,
                 str(clause.number) if clause else "",
             )
-            canonical_comparisons = self._compare_table_parameters_canonical(
+            canonical_comparisons, reason = self._compare_table_parameters_canonical(
                 ptr_table=ptr_table,
                 report_text=report_text,
                 clause_topics=clause_topics,
             )
             if canonical_comparisons:
+                self._set_comparison_path_metadata(
+                    ptr_table,
+                    "canonical",
+                    "matched",
+                )
                 return canonical_comparisons
+
             logger.info(
-                "Table comparator canonical path produced no comparisons; fallback to legacy table=%s clause=%s",
+                "Table comparator canonical path produced no comparisons; fallback to legacy table=%s clause=%s reason=%s",
                 ptr_table.table_number,
                 str(clause.number) if clause else "",
+                reason,
             )
+        else:
+            reason = "canonical_path_unavailable"
 
-        logger.info(
-            "Table comparator path=legacy table=%s clause=%s",
-            ptr_table.table_number,
-            str(clause.number) if clause else "",
-        )
-        return self._compare_table_parameters_legacy(
+        legacy_comparisons = self._compare_table_parameters_legacy(
             ptr_table=ptr_table,
             report_text=report_text,
             clause_topics=clause_topics,
         )
+        final_reason = (
+            "legacy_fallback_after_canonical"
+            if reason not in {"canonical_path_unavailable", "invalid_column_roles"}
+            else reason
+        )
+        if not legacy_comparisons and reason == "canonical_path_unavailable":
+            final_reason = reason
+        elif not legacy_comparisons:
+            final_reason = f"{reason}|legacy_no_matches"
+
+        self._set_comparison_path_metadata(
+            ptr_table,
+            "legacy",
+            final_reason,
+        )
+        return legacy_comparisons
+
+    def _set_comparison_path_metadata(
+        self,
+        ptr_table: PTRTable,
+        path: str,
+        reason: str,
+    ) -> None:
+        """Record which comparison path is used for the current table."""
+        if ptr_table.metadata is None:
+            ptr_table.metadata = {}
+        ptr_table.metadata["comparison_path_used"] = path
+        ptr_table.metadata["comparison_path_reason"] = reason
 
     def _compare_table_parameters_legacy(
         self,
@@ -516,17 +551,22 @@ class TableComparator:
         """Legacy row/index comparison path for flat tables."""
         comparisons: list[ParameterComparison] = []
 
-        # Compare each row in PTR table
-        param_col_idx = self._find_column_index(
-            ptr_table.headers,
-            ["参数", "参数名称"],
-            default=0,
-        )
-        model_col_idx = self._find_column_index(
-            ptr_table.headers,
-            ["型号"],
-            default=1 if len(ptr_table.headers) > 1 else 0,
-        )
+        role_map = self._infer_column_roles(ptr_table)
+        param_col_idx = self._first_role_index(role_map, "parameter")
+        if param_col_idx is None:
+            param_col_idx = self._find_column_index(
+                ptr_table.headers,
+                ["参数", "参数名称"],
+                default=0,
+            )
+        model_col_idx = self._first_role_index(role_map, "model")
+        if model_col_idx is None:
+            model_col_idx = self._find_column_index(
+                ptr_table.headers,
+                ["型号"],
+                default=1 if len(ptr_table.headers) > 1 else 0,
+            )
+
         candidate_rows: list[list[str]] = []
         fallback_rows: list[list[str]] = []
         for row in ptr_table.rows:
@@ -543,9 +583,8 @@ class TableComparator:
             if not row:
                 continue
 
-            # First column is typically parameter name
             param_name = row[param_col_idx] if param_col_idx < len(row) else (row[0] if row else "")
-            ptr_value = self._pick_ptr_value_from_row(row, ptr_table.headers)
+            ptr_value = self._pick_ptr_value_from_row(row, headers=ptr_table.headers, roles=role_map)
 
             if not param_name:
                 continue
@@ -563,7 +602,7 @@ class TableComparator:
             report_value = evidence
             matches = covered
             if not matches:
-                # Fallback to legacy single-value extraction for backward compatibility.
+                # Backward-compatible fallback.
                 report_value = self._extract_parameter_value(param_name, report_text)
                 if not report_value:
                     model_text = row[model_col_idx] if model_col_idx < len(row) else ""
@@ -574,23 +613,33 @@ class TableComparator:
                         )
                 matches = self._compare_values(ptr_value, report_value)
 
-            comparison = ParameterComparison(
-                parameter_name=param_name,
-                ptr_value=ptr_value,
-                report_value=report_value,
-                matches=matches,
-                is_expanded=True,
+            comparisons.append(
+                ParameterComparison(
+                    parameter_name=param_name,
+                    ptr_value=ptr_value,
+                    report_value=report_value,
+                    matches=matches,
+                    is_expanded=True,
+                )
             )
-            comparisons.append(comparison)
 
         return comparisons
 
     def _should_use_canonical_path(self, ptr_table: PTRTable) -> bool:
         """Whether structured canonical comparison path is available."""
         metadata = ptr_table.metadata or {}
+        if metadata.get("canonical_available") is False:
+            return False
+
         parameter_records = metadata.get("parameter_records")
         if isinstance(parameter_records, list) and parameter_records:
             return True
+
+        canonical_snapshot = metadata.get("canonical_snapshot")
+        if canonical_snapshot:
+            # Even low-confidence tables should try canonical path first.
+            return True
+
         return bool(ptr_table.column_paths)
 
     def _compare_table_parameters_canonical(
@@ -598,11 +647,11 @@ class TableComparator:
         ptr_table: PTRTable,
         report_text: str,
         clause_topics: list[str],
-    ) -> list[ParameterComparison]:
+    ) -> tuple[list[ParameterComparison], str]:
         """Canonical comparison path using semantic parameter records."""
         records = self._collect_parameter_records(ptr_table)
         if not records:
-            return []
+            return [], "missing_parameter_records"
 
         candidate_records: list[dict[str, Any]] = []
         fallback_records: list[dict[str, Any]] = []
@@ -616,6 +665,8 @@ class TableComparator:
             candidate_records.append(record)
 
         records_to_compare = candidate_records if candidate_records else fallback_records
+        if not records_to_compare:
+            return [], "empty_comparison"
 
         comparisons: list[ParameterComparison] = []
         for record in records_to_compare:
@@ -640,26 +691,35 @@ class TableComparator:
                 ParameterComparison(
                     parameter_name=parameter_name,
                     ptr_value=ptr_value,
-                    report_value=report_value,
-                    matches=matches,
-                    is_expanded=True,
-                )
+                report_value=report_value,
+                matches=matches,
+                is_expanded=True,
+            )
             )
 
-        return comparisons
+        if not comparisons:
+            return [], "empty_comparison"
+        return comparisons, "matched"
 
     def _collect_parameter_records(self, ptr_table: PTRTable) -> list[dict[str, Any]]:
         """Collect semantic parameter records from metadata or column-path rows."""
+        self.semantics.reset()
         metadata = ptr_table.metadata or {}
         raw_records = metadata.get("parameter_records")
         if isinstance(raw_records, list) and raw_records:
             parsed = self._sanitize_parameter_records(raw_records)
             if parsed:
+                if ptr_table.metadata is not None:
+                    ptr_table.metadata["parameter_record_count"] = len(parsed)
                 return parsed
 
         if not ptr_table.rows:
             return []
-        return self._build_parameter_records_from_rows(ptr_table)
+        records = self._build_parameter_records_from_rows(ptr_table)
+        if ptr_table.metadata is not None:
+            ptr_table.metadata["parameter_record_count"] = len(records)
+            ptr_table.metadata["canonical_unknown_role_count"] = self.semantics.unknown_role_count
+        return records
 
     def _sanitize_parameter_records(self, records: list[Any]) -> list[dict[str, Any]]:
         """Normalize metadata parameter records into predictable dict format."""
@@ -690,13 +750,13 @@ class TableComparator:
         parameter_col = self._first_role_index(role_map, "parameter")
         if parameter_col is None:
             parameter_col = self._find_column_index(ptr_table.headers, ["参数", "参数名称"], default=0)
-        model_cols = self._role_indexes(role_map, {"model", "group"})
-        value_cols = self._role_indexes(role_map, {"value", "default", "tolerance", "remark"})
+        dimension_cols = self._role_indexes(role_map, {"model", "group"})
+        value_cols = self._role_indexes(role_map, {"default", "value", "tolerance", "remark"})
         if not value_cols:
-            value_cols = [idx for idx in range(len(role_map)) if idx not in {parameter_col, *model_cols}]
+            value_cols = [idx for idx in range(len(role_map)) if idx not in {parameter_col, *dimension_cols}]
 
-        records: list[dict[str, Any]] = []
-        for row in ptr_table.rows:
+        records: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, Any]] = {}
+        for row_idx, row in enumerate(ptr_table.rows):
             if not row or self._is_header_like_row(row, ptr_table.headers):
                 continue
             values_row = list(row)
@@ -707,33 +767,55 @@ class TableComparator:
             if not parameter_name:
                 continue
 
-            dimensions: dict[str, str] = {}
-            for col_idx in model_cols:
+            base_dimensions: dict[str, str] = {}
+            for col_idx in dimension_cols:
                 value = str(values_row[col_idx] if col_idx < len(values_row) else "").strip()
                 if not value:
                     continue
                 key = self._column_key(ptr_table, col_idx)
-                dimensions[key] = value
+                if key in base_dimensions:
+                    continue
+                base_dimensions[key] = value
 
-            values: dict[str, str] = {}
             for col_idx in value_cols:
                 value = str(values_row[col_idx] if col_idx < len(values_row) else "").strip()
                 if not value:
                     continue
-                key = self._column_key(ptr_table, col_idx)
-                values[key] = value
 
-            if not values:
-                continue
-            records.append(
-                {
-                    "parameter_name": parameter_name,
-                    "dimensions": dimensions,
-                    "values": values,
-                }
-            )
+                path_labels = self._column_labels(ptr_table, col_idx)
+                path_dims, leaf_label, leaf_role = self.semantics.split_path_semantics(path_labels)
+                dimensions = dict(base_dimensions)
+                for axis_index, axis_label in enumerate(path_dims, start=1):
+                    if not axis_label:
+                        continue
+                    dim_key = f"axis_{axis_index}"
+                    if dim_key not in dimensions:
+                        dimensions[dim_key] = axis_label
 
-        return records
+                value_key = leaf_label
+                if not value_key:
+                    value_key = self._column_key(ptr_table, col_idx)
+                value_key = self.semantics.infer_value_leaf_label(value_key, role=leaf_role)
+                if not value_key:
+                    value_key = self._column_key(ptr_table, col_idx)
+
+                record_key = (parameter_name, tuple(sorted(dimensions.items())))
+                record = records.get(record_key)
+                if record is None:
+                    record = {
+                        "parameter_name": parameter_name,
+                        "dimensions": dimensions,
+                        "values": {},
+                        "source_rows": [],
+                    }
+                    records[record_key] = record
+
+                if record["values"].get(value_key) is None:
+                    record["values"][value_key] = value
+                if row_idx not in record["source_rows"]:
+                    record["source_rows"].append(row_idx)
+
+        return list(records.values())
 
     def _infer_column_roles(self, ptr_table: PTRTable) -> list[str]:
         """Infer semantic roles per column from metadata/column_paths/headers."""
@@ -750,27 +832,14 @@ class TableComparator:
             roles = [str(role or "unknown") for role in metadata_roles[:n_cols]]
             if len(roles) < n_cols:
                 roles.extend(["unknown"] * (n_cols - len(roles)))
-            return roles
+            if "parameter" in roles:
+                return roles
 
         roles: list[str] = []
+        self.semantics.reset()
         for idx in range(n_cols):
             labels = self._column_labels(ptr_table, idx)
-            merged = self._compact(" ".join(labels))
-            role = "unknown"
-            if any(keyword in merged for keyword in ["参数名称", "参数", "检验项目", "项目"]):
-                role = "parameter"
-            elif any(keyword in merged for keyword in ["型号", "机型", "规格"]):
-                role = "model"
-            elif any(keyword in merged for keyword in ["组别", "分组", "部位", "类型"]):
-                role = "group"
-            elif any(keyword in merged for keyword in ["标准设置", "默认", "设置值"]):
-                role = "default"
-            elif any(keyword in merged for keyword in ["允许误差", "容差", "误差", "偏差"]):
-                role = "tolerance"
-            elif any(keyword in merged for keyword in ["备注", "说明"]):
-                role = "remark"
-            elif any(keyword in merged for keyword in ["常规数值", "检验结果", "数值", "值"]):
-                role = "value"
+            role = self.semantics.infer_column_role(labels)
             roles.append(role)
 
         # Ensure there is at least one parameter column.
@@ -786,9 +855,11 @@ class TableComparator:
             path = ptr_table.column_paths[col_idx]
             if isinstance(path, list):
                 labels.extend(str(value or "") for value in path if str(value or "").strip())
+            elif hasattr(path, "labels") and isinstance(path.labels, list):
+                labels.extend(str(value or "") for value in path.labels if str(value or "").strip())
             elif isinstance(path, str) and path.strip():
                 labels.append(path.strip())
-        if col_idx < len(ptr_table.headers):
+        if not labels and col_idx < len(ptr_table.headers):
             header = str(ptr_table.headers[col_idx] or "").strip()
             if header:
                 labels.append(header)
@@ -817,12 +888,13 @@ class TableComparator:
 
         preferred_keys = ["标准设置", "default", "常规数值", "value", "允许误差", "tolerance"]
         for key in preferred_keys:
+            normalized_key = self._compact(key)
             for raw_key, raw_value in values.items():
                 value = str(raw_value or "").strip()
                 if not value:
                     continue
                 key_text = self._compact(str(raw_key or ""))
-                if key in key_text:
+                if normalized_key in key_text:
                     return value
 
         for raw_value in values.values():
@@ -1295,18 +1367,29 @@ class TableComparator:
 
         return norm1 == norm2
 
-    def _pick_ptr_value_from_row(self, row: list[str], headers: list[str] | None = None) -> str:
+    def _pick_ptr_value_from_row(
+        self,
+        row: list[str],
+        headers: list[str] | None = None,
+        roles: list[str] | None = None,
+    ) -> str:
         """Pick PTR expected value from table row."""
         if not row or len(row) < 2:
             return ""
 
         normalized_headers = [self.normalizer.normalize(h or "") for h in (headers or [])]
         preferred_columns: list[int] = []
-        for keywords in [["标准设置"], ["常规数值"], ["允许误差"]]:
-            for idx, header in enumerate(normalized_headers):
-                if any(keyword in header for keyword in keywords):
-                    preferred_columns.append(idx)
-                    break
+        if roles:
+            for role in ["default", "value", "tolerance", "remark"]:
+                for idx, role_value in enumerate(roles):
+                    if idx < len(row) and role_value == role:
+                        preferred_columns.append(idx)
+        else:
+            for keywords in [["标准设置"], ["常规数值"], ["允许误差"]]:
+                for idx, header in enumerate(normalized_headers):
+                    if any(keyword in header for keyword in keywords):
+                        preferred_columns.append(idx)
+                        break
 
         seen: set[int] = set()
         ordered_candidates: list[int] = []
