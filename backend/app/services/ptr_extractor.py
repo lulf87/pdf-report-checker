@@ -679,18 +679,52 @@ class PTRExtractor:
             }
         )
 
-        if not previous.table_number and not (structure_similarity >= 0.9 and position_bridge and overlap_signal >= 0.7):
+        accept_high_structure = structure_similarity >= 0.88
+        accept_high_structure_with_overlap = structure_similarity >= 0.78 and overlap_signal >= 0.55
+        accept_top_bottom_overlap = position_bridge and overlap_signal >= 0.55 and structure_similarity >= 0.4
+        accept_parameter_joint = (
+            position_bridge and parameter_signal and overlap_signal >= 0.45 and structure_similarity >= 0.35
+        )
+        accept_top_bottom_path = position_bridge and path_overlap >= 0.7 and structure_similarity >= 0.35
+        strong_evidence = any(
+            (
+                accept_high_structure,
+                accept_high_structure_with_overlap,
+                accept_top_bottom_overlap,
+                accept_parameter_joint,
+                accept_top_bottom_path,
+            )
+        )
+
+        evidence.update(
+            {
+                "accept_high_structure": accept_high_structure,
+                "accept_high_structure_with_overlap": accept_high_structure_with_overlap,
+                "accept_top_bottom_overlap": accept_top_bottom_overlap,
+                "accept_parameter_joint": accept_parameter_joint,
+                "accept_top_bottom_path": accept_top_bottom_path,
+                "strong_evidence": strong_evidence,
+            }
+        )
+
+        missing_table_numbers = previous.table_number is None and current.table_number is None
+        if missing_table_numbers:
+            evidence["missing_table_numbers"] = True
+            evidence["strong_missing_number_evidence"] = strong_evidence
+            if not strong_evidence:
+                return False, "missing_table_number_without_strong_evidence", evidence
+        elif previous.table_number is None:
             return False, "previous_missing_table_number", evidence
 
-        if structure_similarity >= 0.88:
+        if accept_high_structure:
             return True, "high_structure_similarity", evidence
-        if structure_similarity >= 0.78 and overlap_signal >= 0.55:
+        if accept_high_structure_with_overlap:
             return True, "high_structure_with_overlap", evidence
-        if position_bridge and overlap_signal >= 0.55 and structure_similarity >= 0.4:
+        if accept_top_bottom_overlap:
             return True, "top_bottom_with_header_or_path_overlap", evidence
-        if position_bridge and parameter_signal and overlap_signal >= 0.45 and structure_similarity >= 0.35:
+        if accept_parameter_joint:
             return True, "parameter_continuation_with_joint_evidence", evidence
-        if position_bridge and path_overlap >= 0.7 and structure_similarity >= 0.35:
+        if accept_top_bottom_path:
             return True, "top_bottom_with_path_overlap", evidence
 
         if structure_similarity < 0.35 and overlap_signal < 0.35 and not position_bridge:

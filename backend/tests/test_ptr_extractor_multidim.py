@@ -81,6 +81,105 @@ class TestPTRContinuationByStructure:
         # first-column context should be repaired for continuation row
         assert merged[0].rows[-1][0] == "脉冲宽度(ms)"
 
+    def test_should_merge_without_table_number_when_joint_evidence_is_strong(self):
+        extractor = PTRExtractor()
+
+        p1 = PTRTable(
+            table_number=None,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
+            rows=[
+                ["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                ["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...1.5", "0.4", "±20μs"],
+            ],
+            page=14,
+            position=(0, 520),
+        )
+        p2 = PTRTable(
+            table_number=None,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
+            rows=[
+                ["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                ["基础频率(bpm)", "全部型号", "30...(5)...200", "60", "±20ms"],
+            ],
+            page=15,
+            position=(0, 40),
+        )
+
+        merged = extractor._merge_continuation_tables([p1, p2])
+
+        assert len(merged) == 1
+        assert merged[0].metadata.get("continuation_reason") in {
+            "high_structure_similarity",
+            "high_structure_with_overlap",
+            "top_bottom_with_header_or_path_overlap",
+        }
+        assert merged[0].metadata.get("continuation_evidence", {}).get("strong_missing_number_evidence") is True
+        assert any(row[0] == "基础频率(bpm)" for row in merged[0].rows)
+
+    def test_assess_without_table_number_should_hit_high_structure_with_overlap(self, monkeypatch):
+        extractor = PTRExtractor()
+        previous = PTRTable(table_number=None, headers=["A", "B", "C"], rows=[["1", "2", "3"]], page=30, position=(0, 300))
+        current = PTRTable(table_number=None, headers=["A", "B", "C"], rows=[["4", "5", "6"]], page=31, position=(0, 260))
+
+        monkeypatch.setattr(extractor, "_table_structure_similarity", lambda *args, **kwargs: 0.8)
+        monkeypatch.setattr(extractor, "_table_header_text_overlap_ratio", lambda *args, **kwargs: 0.6)
+        monkeypatch.setattr(extractor, "_table_column_path_overlap_ratio", lambda *args, **kwargs: 0.0)
+        monkeypatch.setattr(extractor, "_is_top_of_page", lambda *args, **kwargs: False)
+        monkeypatch.setattr(extractor, "_is_bottom_of_page", lambda *args, **kwargs: False)
+        monkeypatch.setattr(extractor, "_is_likely_parameter_continuation", lambda *args, **kwargs: (False, "weak_signal_only"))
+
+        is_continuation, reason, evidence = extractor._assess_table_continuation(previous, current, previous.page)
+
+        assert is_continuation is True
+        assert reason == "high_structure_with_overlap"
+        assert evidence["strong_evidence"] is True
+        assert evidence["missing_table_numbers"] is True
+        assert evidence["strong_missing_number_evidence"] is True
+
+    def test_assess_without_table_number_should_hit_top_bottom_with_header_or_path_overlap(self, monkeypatch):
+        extractor = PTRExtractor()
+        previous = PTRTable(table_number=None, headers=["A", "B", "C"], rows=[["1", "2", "3"]], page=32, position=(0, 520))
+        current = PTRTable(table_number=None, headers=["A", "B", "C"], rows=[["4", "5", "6"]], page=33, position=(0, 40))
+
+        monkeypatch.setattr(extractor, "_table_structure_similarity", lambda *args, **kwargs: 0.45)
+        monkeypatch.setattr(extractor, "_table_header_text_overlap_ratio", lambda *args, **kwargs: 0.6)
+        monkeypatch.setattr(extractor, "_table_column_path_overlap_ratio", lambda *args, **kwargs: 0.0)
+        monkeypatch.setattr(extractor, "_is_top_of_page", lambda table: table.page == 33)
+        monkeypatch.setattr(extractor, "_is_bottom_of_page", lambda table: table.page == 32)
+        monkeypatch.setattr(extractor, "_is_likely_parameter_continuation", lambda *args, **kwargs: (False, "weak_signal_only"))
+
+        is_continuation, reason, evidence = extractor._assess_table_continuation(previous, current, previous.page)
+
+        assert is_continuation is True
+        assert reason == "top_bottom_with_header_or_path_overlap"
+        assert evidence["strong_evidence"] is True
+        assert evidence["strong_missing_number_evidence"] is True
+
+    def test_assess_without_table_number_should_reject_when_only_weak_signal(self, monkeypatch):
+        extractor = PTRExtractor()
+        previous = PTRTable(table_number=None, headers=["参数", "型号", "常规数值"], rows=[["脉冲宽度", "全部型号", "0.4"]], page=34, position=(0, 300))
+        current = PTRTable(table_number=None, headers=["", "", ""], rows=[["", "Edora 8 DR", "其他模式"]], page=35, position=(0, 260))
+
+        monkeypatch.setattr(extractor, "_table_structure_similarity", lambda *args, **kwargs: 0.2)
+        monkeypatch.setattr(extractor, "_table_header_text_overlap_ratio", lambda *args, **kwargs: 0.0)
+        monkeypatch.setattr(extractor, "_table_column_path_overlap_ratio", lambda *args, **kwargs: 0.0)
+        monkeypatch.setattr(extractor, "_is_top_of_page", lambda *args, **kwargs: False)
+        monkeypatch.setattr(extractor, "_is_bottom_of_page", lambda *args, **kwargs: False)
+        monkeypatch.setattr(
+            extractor,
+            "_is_likely_parameter_continuation",
+            lambda *args, **kwargs: (True, "blank_first_col_with_model_payload"),
+        )
+
+        is_continuation, reason, evidence = extractor._assess_table_continuation(previous, current, previous.page)
+
+        assert is_continuation is False
+        assert reason == "missing_table_number_without_strong_evidence"
+        assert evidence["strong_evidence"] is False
+        assert evidence["strong_missing_number_evidence"] is False
+
     def test_should_not_merge_when_structure_fingerprint_differs(self):
         extractor = PTRExtractor()
 
@@ -107,6 +206,7 @@ class TestPTRContinuationByStructure:
             "rejected: no_header_path_overlap",
             "rejected: insufficient_position_evidence",
             "rejected: insufficient_joint_evidence",
+            "missing_table_number_without_strong_evidence",
         }
 
     def test_should_reject_continuation_when_similarity_is_low(self):
@@ -140,7 +240,7 @@ class TestPTRContinuationByStructure:
         extractor = PTRExtractor()
 
         p1 = PTRTable(
-            table_number=1,
+            table_number=None,
             headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
             rows=[
                 ["脉冲宽度(ms)", "Edora 8 DR", "20...(5)...350", "180-170-160", "±20"],
@@ -161,7 +261,40 @@ class TestPTRContinuationByStructure:
         merged = extractor._merge_continuation_tables([p1, p2])
 
         assert len(merged) == 2
-        assert merged[1].metadata.get("continuation_reject_reason") == "rejected: no_header_path_overlap"
+        assert merged[1].metadata.get("continuation_reject_reason") in {
+            "rejected: no_header_path_overlap",
+            "missing_table_number_without_strong_evidence",
+        }
+
+    def test_should_not_merge_without_table_number_when_semantics_differ(self):
+        extractor = PTRExtractor()
+
+        p1 = PTRTable(
+            table_number=None,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
+            rows=[["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"]],
+            page=16,
+            position=(0, 520),
+        )
+        p2 = PTRTable(
+            table_number=None,
+            headers=["参数", "通道", "输出模式", "报警策略", "备注"],
+            column_paths=[["参数"], ["通道"], ["输出模式"], ["报警策略"], ["备注"]],
+            rows=[["器械类型", "A通道", "单次输出", "高优先级", "植入式心脏起搏器"]],
+            page=17,
+            position=(0, 40),
+        )
+
+        merged = extractor._merge_continuation_tables([p1, p2])
+
+        assert len(merged) == 2
+        assert merged[1].metadata.get("continuation_reject_reason") in {
+            "rejected: no_header_path_overlap",
+            "rejected: low_similarity",
+            "rejected: insufficient_joint_evidence",
+            "missing_table_number_without_strong_evidence",
+        }
 
     def test_should_not_merge_when_table_number_conflicts(self):
         extractor = PTRExtractor()
