@@ -14,6 +14,7 @@ from app.models.ptr_models import (
     PTRTableReference,
 )
 from app.models.report_models import InspectionItem
+from app.services.ptr_extractor import PTRExtractor
 from app.services.table_comparator import (
     TableComparator,
     ParameterComparison,
@@ -727,6 +728,65 @@ class TestEdgeCases:
             report_items=[report_item],
         )
         assert len(comparisons) == 1
+        assert comparisons[0].matches is True
+        assert ptr_table.metadata is not None
+        assert ptr_table.metadata.get("comparison_path_used") == "canonical"
+
+    def test_compare_table_parameters_should_see_page2_records_after_no_number_continuation_merge(self):
+        """Merged no-number continuation should still surface continuation-page parameters canonically."""
+        extractor = PTRExtractor()
+        comparator = TableComparator()
+
+        p1 = PTRTable(
+            table_number=None,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
+            rows=[
+                ["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                ["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...1.5", "0.4", "±20μs"],
+            ],
+            page=20,
+            position=(0, 520),
+        )
+        p2 = PTRTable(
+            table_number=None,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            column_paths=[["参数"], ["型号"], ["常规数值"], ["标准设置"], ["允许误差"]],
+            rows=[
+                ["参数", "型号", "常规数值", "标准设置", "允许误差"],
+                ["基础频率(bpm)", "全部型号", "30...(5)...200", "60", "±20ms"],
+            ],
+            page=21,
+            position=(0, 40),
+        )
+
+        merged = extractor._merge_continuation_tables([p1, p2])
+        assert len(merged) == 1
+        ptr_table = merged[0]
+
+        report_item = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            inspection_project="基础频率",
+            standard_requirement="基础频率应符合表1中的数值。",
+            test_result="基础频率(bpm) 常规数值 30...(5)...200 标准设置 60 允许误差 ±20ms",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 基础频率",
+            text_content="基础频率(bpm)：基础频率应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+
+        assert len(comparisons) == 1
+        assert comparisons[0].parameter_name == "基础频率(bpm)"
         assert comparisons[0].matches is True
         assert ptr_table.metadata is not None
         assert ptr_table.metadata.get("comparison_path_used") == "canonical"
