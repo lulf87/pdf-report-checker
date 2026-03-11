@@ -244,8 +244,9 @@ class ReportExtractor:
                 elif field_name == "型号规格":
                     fields.model_spec = value
                 elif field_name == "检验项目":
-                    # Parse comma-separated list
-                    items = [item.strip() for item in re.split(r"[,，、]", value)]
+                    # Preserve parenthetical exclusions like
+                    # "2.1～2.8（除生物相容性、电磁兼容性）" as one logical item.
+                    items = self._split_inspection_items(value)
                     fields.inspection_items = items
                 elif field_name == "生产日期":
                     fields.production_date = value
@@ -283,6 +284,46 @@ class ReportExtractor:
         )
 
         return fields
+
+    def _split_inspection_items(self, value: str) -> list[str]:
+        """Split inspection scope items while preserving parentheses content."""
+        text = (value or "").strip()
+        if not text:
+            return []
+
+        items: list[str] = []
+        current: list[str] = []
+        depth = 0
+
+        for char in text:
+            if char in "（(":
+                depth += 1
+                current.append(char)
+                continue
+            if char in "）)" and depth > 0:
+                depth -= 1
+                current.append(char)
+                continue
+            if char in ",，、" and depth == 0:
+                candidate = "".join(current).strip()
+                if candidate:
+                    items.append(candidate)
+                current = []
+                continue
+            current.append(char)
+
+        candidate = "".join(current).strip()
+        if candidate:
+            items.append(candidate)
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for item in items:
+            if item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+        return deduped
 
     def _extract_multiline_field_value(
         self,
@@ -472,6 +513,7 @@ class ReportExtractor:
         """
         items: list[InspectionItem] = []
         row_values, row_provenance, row_has_merge = self._prepare_rows_with_merge_semantics(table)
+        previous_item: InspectionItem | None = None
 
         for row_idx, cells in enumerate(row_values):
             if not cells:
@@ -507,14 +549,64 @@ class ReportExtractor:
                 ),
             )
 
+            if not item.sequence_number and self._should_mark_blank_row_as_continuation(item, previous_item):
+                item.is_continued = True
+
             if item.sequence_number:
                 self.state.current_sequence = clean_sequence
                 if item.is_merged and item.inspection_project:
                     self.state.merged_cell_value = item.inspection_project
 
             items.append(item)
+            previous_item = item
 
         return items
+
+    def _should_mark_blank_row_as_continuation(
+        self,
+        item: InspectionItem,
+        previous_item: InspectionItem | None,
+    ) -> bool:
+        """Whether a blank-sequence row should join the previous logical record."""
+        if (item.sequence_number or "").strip():
+            return False
+        if previous_item is None:
+            return False
+        if not ((previous_item.sequence_number or "").strip() or previous_item.is_continued):
+            return False
+
+        payload_fields = [
+            item.inspection_project,
+            item.standard_clause,
+            item.standard_requirement,
+            item.test_result,
+            item.item_conclusion,
+            item.remark,
+        ]
+        if not any((value or "").strip() for value in payload_fields):
+            return False
+
+        if item.is_merged:
+            return True
+
+        if any(source in {"merge_inferred", "inferred"} for source in item.field_provenance.values()):
+            return True
+
+        project_text = (item.inspection_project or "").strip()
+        if not project_text:
+            return True
+
+        if re.match(r"^[a-zA-Z][\)）\.、]", project_text):
+            return True
+        if project_text.startswith(("注", "说明", "其中")):
+            return True
+
+        previous_clause = re.sub(r"\s+", "", previous_item.standard_clause or "")
+        current_clause = re.sub(r"\s+", "", item.standard_clause or "")
+        if previous_clause and current_clause and previous_clause == current_clause:
+            return True
+
+        return False
 
     def _has_merged_cells(self, row: list) -> bool:
         """Check if row has merged cells.

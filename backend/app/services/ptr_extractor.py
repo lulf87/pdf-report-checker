@@ -32,6 +32,31 @@ from app.services.table_normalizer import TableNormalizer
 
 logger = logging.getLogger(__name__)
 
+MAIN_REQUIREMENT_SECTION_KEYWORDS: Final = (
+    "性能",
+    "指标",
+    "要求",
+    "规格",
+    "参数",
+)
+TEST_METHOD_SECTION_KEYWORDS: Final = (
+    "检验方法",
+    "试验方法",
+    "检测方法",
+    "测试方法",
+    "方法学",
+)
+APPENDIX_SECTION_KEYWORDS: Final = (
+    "附录",
+    "appendix",
+)
+INFORMATIONAL_CLAUSE_PATTERNS: Final = (
+    re.compile(r"^\s*注[:：]"),
+    re.compile(r"^\s*说明[:：]"),
+    re.compile(r"^\s*图\s*[A-Z]?\d+"),
+    re.compile(r"^\s*按图\s*[A-Z]?\d+"),
+)
+
 # Regex patterns for clause detection
 # Matches: "2." "2.1" "2.1.1" etc.
 CLAUSE_NUMBER_PATTERN: Final = re.compile(
@@ -110,6 +135,8 @@ class PTRExtractor:
 
         # Scanned PTR OCR may repeat chapter headings across pages.
         ptr_doc.clauses = self._deduplicate_clauses(ptr_doc.clauses)
+        self._classify_clause_types(ptr_doc)
+        ptr_doc.metadata["clause_type_counts"] = self._count_clause_types(ptr_doc.clauses)
 
         # Extract tables from all pages and merge continuation fragments.
         raw_tables: list[PTRTable] = []
@@ -132,6 +159,100 @@ class PTRExtractor:
         )
 
         return ptr_doc
+
+    def _count_clause_types(self, clauses: list[PTRClause]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for clause in clauses:
+            clause_type = str(clause.clause_type or "main_requirement")
+            counts[clause_type] = counts.get(clause_type, 0) + 1
+        return counts
+
+    def _classify_clause_types(self, ptr_doc: PTRDocument) -> None:
+        """Classify extracted Chapter-2 clauses into comparison pools.
+
+        Rules:
+        - Performance/requirement sections stay in the main clause pool.
+        - Test-method sections, appendix-like clauses, notes and figure-only text
+          are excluded from main consistency statistics.
+        """
+        top_level_types: dict[int, str] = {}
+
+        for clause in ptr_doc.clauses:
+            clause_type = self._infer_clause_type(
+                clause=clause,
+                top_level_types=top_level_types,
+            )
+            clause.clause_type = clause_type
+            if clause.level == 2 and len(clause.number.parts) >= 2:
+                top_level_types[clause.number.parts[1]] = clause_type
+
+    def _infer_clause_type(
+        self,
+        clause: PTRClause,
+        top_level_types: dict[int, str],
+    ) -> str:
+        text = self._compact_clause_text(clause.text_content or clause.full_text)
+        full_text = self._compact_clause_text(clause.full_text)
+        chapter = clause.number.parts[0] if clause.number.parts else 0
+
+        if clause.number.parts == (2,):
+            return "informational"
+
+        if "附录" in text or "附录" in full_text:
+            return "appendix"
+
+        if chapter == 3:
+            return "test_method"
+
+        # Chapter 2 remains the main requirement pool by default even when OCR
+        # contaminates a heading with nearby notes/figure instructions.
+        if chapter == 2:
+            return "main_requirement"
+
+        if self._looks_like_appendix_or_note(text) or self._looks_like_appendix_or_note(full_text):
+            return "informational"
+
+        if clause.level >= 3 and len(clause.number.parts) >= 2:
+            inherited = top_level_types.get(clause.number.parts[1])
+            if inherited:
+                return inherited
+
+        if clause.level == 2:
+            return "informational"
+        if chapter == 3:
+            return "test_method"
+        return "main_requirement"
+
+    def _compact_clause_text(self, text: str) -> str:
+        return re.sub(r"\s+", "", text or "")
+
+    def _contains_section_keyword(self, text: str, keywords: tuple[str, ...]) -> bool:
+        lowered = (text or "").lower()
+        return any(keyword in lowered for keyword in keywords)
+
+    def _looks_like_appendix_or_note(self, text: str) -> bool:
+        if not text:
+            return False
+        if any(pattern.search(text) for pattern in INFORMATIONAL_CLAUSE_PATTERNS):
+            return True
+        if "箭头方向代表数据传输方向" in text:
+            return True
+        return False
+
+    def _looks_like_method_step(self, text: str) -> bool:
+        if not text:
+            return False
+        method_keywords = (
+            "按图",
+            "测试系统",
+            "安装",
+            "连接",
+            "布图",
+            "步骤",
+            "示意图",
+            "流程图",
+        )
+        return any(keyword in text for keyword in method_keywords)
 
     def _deduplicate_clauses(self, clauses: list[PTRClause]) -> list[PTRClause]:
         """Deduplicate clauses by number, preferring richer text content.

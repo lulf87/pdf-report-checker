@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.models.common_models import BoundingBox, TextBlock
 from app.services.ocr_service import (
     CaptionInfo,
     LabelOCRResult,
@@ -181,6 +182,30 @@ class TestFieldExtraction:
         assert "batch_number" in fields
         assert "serial_number" in fields
 
+    def test_extract_ref_and_lot_fallback_fields(self):
+        """REF/LOT style labels should still yield model and batch fields."""
+        service = OCRService()
+
+        text = (
+            "REF|NoVAEPP1206\n"
+            "LOT2BL009\n"
+            "生产日期：2025-12-03\n"
+        )
+
+        fields = service._extract_fields(text)
+        assert fields.get("model_spec") == "NoVAEPP1206"
+        assert fields.get("batch_number") == "2BL009"
+
+    def test_extract_date_candidates_should_pick_earliest_as_production_date(self):
+        """When only standalone dates exist, earliest date should be used as production date."""
+        service = OCRService()
+
+        text = "2027-12-02\n2025-12-03\n"
+        fields = service._extract_fields(text)
+
+        assert fields.get("production_date") == "2025-12-03"
+        assert fields.get("expiration_date") == "2027-12-02"
+
     def test_extract_multiline_registrant_address(self):
         """Test extracting multiline registrant address."""
         service = OCRService()
@@ -258,7 +283,7 @@ class TestLLMEnhancement:
                 Path(path).write_bytes(b"fake-image")
 
         class _FakePage:
-            def get_pixmap(self, matrix=None, alpha=False):
+            def get_pixmap(self, matrix=None, clip=None, alpha=False):
                 return _FakePixmap()
 
         class _FakeDoc:
@@ -274,6 +299,75 @@ class TestLLMEnhancement:
                 return _FakePage()
 
         monkeypatch.setattr("app.services.ocr_service.fitz.open", lambda _: _FakeDoc())
+
+    @pytest.mark.asyncio
+    async def test_extract_label_from_page_should_focus_on_label_region_before_field_extraction(self, monkeypatch):
+        service = OCRService()
+        self._patch_fake_fitz_open(monkeypatch)
+
+        monkeypatch.setattr(
+            service,
+            "process_image",
+            lambda image_path, extract_fields=True: LabelOCRResult(
+                raw_text="产品名称：一次性使用磁电定位心脏脉冲电场消融导管\n型号规格：NavAEPP1206\n批号：2BL009\n生产日期：2025-12-03",
+                fields={
+                    "product_name": "一次性使用磁电定位心脏脉冲电场消融导管",
+                    "model_spec": "NavAEPP1206",
+                    "batch_number": "2BL009",
+                    "production_date": "2025-12-03",
+                },
+                confidence=0.92,
+                success=True,
+            ),
+        )
+
+        page = SimpleNamespace(
+            raw_text=(
+                "照片页说明\n"
+                "图1 中文标签\n"
+                "产品名称：一次性使用磁电定位心脏脉冲电场消融导管\n"
+                "型号规格：NavAEPP1206\n"
+                "批号：2BL009\n"
+                "生产日期：2025-12-03\n"
+                "其他干扰文字：检验方法见附录B\n"
+            ),
+            text_blocks=[
+                TextBlock(
+                    text="图1 中文标签",
+                    bbox=BoundingBox(30, 40, 180, 70, 1),
+                ),
+                TextBlock(
+                    text="产品名称：一次性使用磁电定位心脏脉冲电场消融导管",
+                    bbox=BoundingBox(40, 120, 320, 145, 1),
+                ),
+                TextBlock(
+                    text="型号规格：NavAEPP1206",
+                    bbox=BoundingBox(40, 150, 240, 175, 1),
+                ),
+                TextBlock(
+                    text="批号：2BL009",
+                    bbox=BoundingBox(40, 180, 180, 205, 1),
+                ),
+                TextBlock(
+                    text="生产日期：2025-12-03",
+                    bbox=BoundingBox(40, 210, 220, 235, 1),
+                ),
+                TextBlock(
+                    text="检验方法见附录B",
+                    bbox=BoundingBox(60, 520, 220, 545, 1),
+                ),
+            ],
+            page_number=1,
+        )
+
+        result = await service.extract_label_from_page(page=page, pdf_path="/tmp/fake-report.pdf", enable_llm=False)
+
+        assert result is not None
+        assert result.fields["product_name"] == "一次性使用磁电定位心脏脉冲电场消融导管"
+        assert result.fields["model_spec"] == "NavAEPP1206"
+        assert result.fields["batch_number"] == "2BL009"
+        assert result.fields["production_date"] == "2025-12-03"
+        assert result.metadata.get("label_region_detected") is True
 
     @pytest.mark.asyncio
     async def test_extract_label_from_page_applies_vlm_fix_when_needed(self, monkeypatch):

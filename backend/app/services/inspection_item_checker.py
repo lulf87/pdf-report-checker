@@ -228,14 +228,10 @@ class InspectionItemChecker:
         if (item.sequence_number or "").strip():
             return False
 
-        # If project name appears without sequence, it's likely an abnormal blank row
-        # (should be counted as C09 blank sequence issue).
-        if (item.inspection_project or "").strip():
-            return False
-
-        return any(
+        has_payload = any(
             (value or "").strip()
             for value in (
+                item.inspection_project,
                 item.standard_clause,
                 item.standard_requirement,
                 item.test_result,
@@ -243,6 +239,23 @@ class InspectionItemChecker:
                 item.remark,
             )
         )
+        if not has_payload:
+            return False
+
+        if item.is_continued or item.is_merged:
+            return True
+
+        if any(source in {"merge_inferred", "inferred"} for source in item.field_provenance.values()):
+            return True
+
+        project_text = (item.inspection_project or "").strip()
+        if not project_text:
+            return True
+        if re.match(r"^[a-zA-Z][\)）\.、]", project_text):
+            return True
+        if project_text.startswith(("注", "说明", "其中")):
+            return True
+        return False
 
     def _get_sequence_first_rows(self, table: InspectionTable) -> list[InspectionItem]:
         """Get first non-continued row for each sequence.

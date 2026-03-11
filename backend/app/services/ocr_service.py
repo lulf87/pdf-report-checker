@@ -16,6 +16,10 @@ from pathlib import Path
 from typing import Any
 
 import fitz
+
+# PaddleOCR may perform a model host connectivity check at import time, which
+# blocks API startup on constrained or offline environments.
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 from paddleocr import PaddleOCR
 
 from app.config import settings
@@ -25,6 +29,12 @@ logger = logging.getLogger(__name__)
 
 # Field extraction regex patterns for Chinese labels
 FIELD_PATTERNS = {
+    # Product Name: 产品名称, 名称, 器械名称
+    "product_name": [
+        r"产品\s*名称\s*(?:[：:]\s*)?([^\n]+)",
+        r"器械\s*名称\s*(?:[：:]\s*)?([^\n]+)",
+        r"品名\s*(?:[：:]\s*)?([^\n]+)",
+    ],
     # Model/Spec: 型号, 规格, 规格型号, Model, Spec
     "model_spec": [
         r"规格\s*型号\s*(?:[：:]\s*)?([^\n]+)",
@@ -41,6 +51,12 @@ FIELD_PATTERNS = {
         r"MFD\s*(?:[：:]\s*)?([^\n]+)",
         r"Manufacturing Date\s*(?:[：:]\s*)?([^\n]+)",
         r"制造\s*日期\s*(?:[：:]\s*)?([^\n]+)",
+    ],
+    "expiration_date": [
+        r"失效\s*日期\s*(?:[：:]\s*)?([^\n]+)",
+        r"有效期至\s*(?:[：:]\s*)?([^\n]+)",
+        r"EXP\s*(?:[：:]\s*)?([^\n]+)",
+        r"Expiration Date\s*(?:[：:]\s*)?([^\n]+)",
     ],
     # Batch/Lot Number: 批号, LOT, Lot Number, Batch Number
     "batch_number": [
@@ -109,6 +125,7 @@ class LabelOCRResult:
     confidence: float = 0.0
     warnings: list[str] = field(default_factory=list)
     success: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get_field(self, field_name: str) -> str | None:
         """Get a field value."""
@@ -352,6 +369,22 @@ class OCRService:
             if date_candidate:
                 fields["production_date"] = date_candidate
 
+        date_candidates = self._extract_date_candidates(text)
+        if not fields.get("production_date") and date_candidates:
+            fields["production_date"] = date_candidates[0]
+        if not fields.get("expiration_date") and len(date_candidates) >= 2:
+            fields["expiration_date"] = date_candidates[-1]
+
+        if not fields.get("model_spec"):
+            model_candidate = self._extract_model_spec_fallback(text)
+            if model_candidate:
+                fields["model_spec"] = model_candidate
+
+        if not fields.get("batch_number"):
+            batch_candidate = self._extract_batch_number_fallback(text)
+            if batch_candidate:
+                fields["batch_number"] = batch_candidate
+
         # Fallback: infer serial/batch from standalone alphanumeric token.
         if not fields.get("serial_number") and not fields.get("batch_number"):
             serial_candidate = self._extract_standalone_serial_or_batch(text)
@@ -366,15 +399,102 @@ class OCRService:
 
         return fields
 
+    def _select_label_region_from_page(
+        self,
+        page: Any,
+    ) -> tuple[str, fitz.Rect | None]:
+        """Locate the most likely Chinese-label region on a page before field extraction."""
+        anchor_keywords = (
+            "产品名称",
+            "器械名称",
+            "品名",
+            "规格型号",
+            "型号规格",
+            "型号",
+            "批号",
+            "LOT",
+            "序列号",
+            "生产日期",
+            "失效日期",
+            "MFG",
+            "MFD",
+            "注册人",
+        )
+        text_blocks = list(getattr(page, "text_blocks", []) or [])
+        if text_blocks:
+            anchor_blocks = [
+                block
+                for block in text_blocks
+                if any(keyword in str(getattr(block, "text", "") or "") for keyword in anchor_keywords)
+                and getattr(block, "bbox", None) is not None
+            ]
+            if anchor_blocks:
+                x0 = min(block.bbox.x0 for block in anchor_blocks)
+                y0 = min(block.bbox.y0 for block in anchor_blocks)
+                x1 = max(block.bbox.x1 for block in anchor_blocks)
+                y1 = max(block.bbox.y1 for block in anchor_blocks)
+                clip = fitz.Rect(max(0.0, x0 - 24), max(0.0, y0 - 24), x1 + 24, y1 + 220)
+                selected = [
+                    block
+                    for block in text_blocks
+                    if getattr(block, "bbox", None) is not None
+                    and block.bbox.x0 >= clip.x0 - 12
+                    and block.bbox.x1 <= clip.x1 + 12
+                    and block.bbox.y0 >= clip.y0 - 12
+                    and block.bbox.y1 <= clip.y1 + 12
+                ]
+                selected.sort(key=lambda block: (block.bbox.y0, block.bbox.x0))
+                region_text = "\n".join(
+                    str(getattr(block, "text", "") or "").strip()
+                    for block in selected
+                    if str(getattr(block, "text", "") or "").strip()
+                ).strip()
+                if region_text:
+                    return region_text, clip
+
+        raw_text = str(getattr(page, "raw_text", "") or "")
+        lines = [line.strip() for line in raw_text.split("\n")]
+        start_idx = -1
+        for idx, line in enumerate(lines):
+            if any(keyword in line for keyword in anchor_keywords):
+                start_idx = idx
+                break
+        if start_idx < 0:
+            return raw_text, None
+
+        collected: list[str] = []
+        for line in lines[start_idx:]:
+            if not line:
+                continue
+            if len(collected) >= 14:
+                break
+            collected.append(line)
+            if len(collected) >= 4 and any(stop in line for stop in ("图", "中文标签", "标签样张", "照片", "检验")):
+                break
+        return "\n".join(collected).strip(), None
+
     def _is_valid_field_value(self, field_name: str, value: str) -> bool:
         """Validate extracted value to avoid cross-field false captures."""
         cleaned = (value or "").strip()
         if not cleaned:
             return False
 
+        if re.fullmatch(r"[【】\[\]()（）:：|/\\-]+", cleaned):
+            return False
+
+        if field_name in {"model_spec", "batch_number", "serial_number"}:
+            compact = re.sub(r"\s+", "", cleaned)
+            if len(compact) < 3:
+                return False
+
         if field_name == "registrant":
             # Reject values that are clearly address/contact field spillover.
             if re.search(r"(住所|住址|地址|联系方式)", cleaned):
+                return False
+
+        if field_name == "production_date":
+            digits = re.sub(r"\D", "", cleaned)
+            if digits and len(digits) not in {8}:
                 return False
 
         return True
@@ -401,6 +521,10 @@ class OCRService:
             next_value = _next_non_empty(idx)
             if not next_value:
                 continue
+
+            if any(k in line for k in ["产品名称", "器械名称", "品名"]) and not fields.get("product_name"):
+                if len(next_value) >= 4:
+                    fields["product_name"] = next_value
 
             if ("规格型号" in line or "型号规格" in line) and not fields.get("model_spec"):
                 if re.fullmatch(r"[A-Za-z0-9.\-_/]+", next_value):
@@ -430,6 +554,31 @@ class OCRService:
                 continue
         return ""
 
+    def _extract_date_candidates(self, text: str) -> list[str]:
+        """Extract and sort plausible date candidates from OCR text."""
+        from datetime import datetime
+
+        raw_candidates = re.findall(
+            r"(20\d{2}[-/.年]?\d{1,2}[-/.月]?\d{1,2}日?)",
+            text or "",
+        )
+        parsed: list[tuple[datetime, str]] = []
+        seen: set[str] = set()
+
+        for raw in raw_candidates:
+            digits = re.sub(r"\D", "", raw)
+            if len(digits) != 8 or digits in seen:
+                continue
+            try:
+                parsed_dt = datetime.strptime(digits, "%Y%m%d")
+            except ValueError:
+                continue
+            seen.add(digits)
+            parsed.append((parsed_dt, f"{digits[:4]}-{digits[4:6]}-{digits[6:8]}"))
+
+        parsed.sort(key=lambda item: item[0])
+        return [value for _, value in parsed]
+
     def _extract_standalone_serial_or_batch(self, text: str) -> str:
         """Extract serial/batch-like token when label key is missing."""
         candidates = re.findall(r"\b[A-Z]{2,8}\d{6,}[A-Z0-9\-_/]*\b", text or "")
@@ -437,6 +586,52 @@ class OCRService:
             return ""
         # Prefer longest candidate; usually serial/batch is the longest alnum code.
         return sorted(candidates, key=len, reverse=True)[0]
+
+    def _extract_model_spec_fallback(self, text: str) -> str:
+        """Extract model/spec from REF-style or standalone code lines."""
+        compact_text = text or ""
+
+        inline_match = re.search(
+            r"\bREF\b[^\nA-Za-z0-9]{0,6}([A-Za-z][A-Za-z0-9.\-_/]{3,})",
+            compact_text,
+            re.IGNORECASE,
+        )
+        if inline_match:
+            return inline_match.group(1).strip()
+
+        lines = [line.strip() for line in compact_text.split("\n") if line.strip()]
+        for idx, line in enumerate(lines):
+            if re.fullmatch(r"REF", line, re.IGNORECASE):
+                for candidate in lines[idx + 1: idx + 4]:
+                    if re.fullmatch(r"[A-Za-z][A-Za-z0-9.\-_/]{2,}", candidate):
+                        return candidate
+            if "产品型号" in line or "型号规格" in line or "规格型号" in line:
+                for candidate in lines[idx + 1: idx + 5]:
+                    compact = re.sub(r"\s+", "", candidate)
+                    if re.fullmatch(r"[A-Za-z][A-Za-z0-9.\-_/]{2,}", compact):
+                        return compact
+        return ""
+
+    def _extract_batch_number_fallback(self, text: str) -> str:
+        """Extract lot/batch code from LOT-style or standalone batch lines."""
+        compact_text = text or ""
+
+        inline_match = re.search(
+            r"\bLOT\b[^\nA-Za-z0-9]{0,4}([A-Za-z0-9.\-_/]{3,})",
+            compact_text,
+            re.IGNORECASE,
+        )
+        if inline_match:
+            return inline_match.group(1).strip()
+
+        lines = [line.strip() for line in compact_text.split("\n") if line.strip()]
+        for idx, line in enumerate(lines):
+            if re.fullmatch(r"(?:LOT|批号|生产批号|产品批号|产品编号|产品编号/批号)", line, re.IGNORECASE):
+                for candidate in lines[idx + 1: idx + 4]:
+                    compact = re.sub(r"\s+", "", candidate)
+                    if re.fullmatch(r"[A-Za-z0-9.\-_/]{4,}", compact):
+                        return compact
+        return ""
 
     def _extract_multiline_value(
         self,
@@ -615,12 +810,19 @@ class OCRService:
                 for block in page.text_blocks
                 if getattr(block, "text", "")
             )
+        label_region_text, label_clip = self._select_label_region_from_page(page)
+        extraction_text = label_region_text or raw_text
 
         text_result = LabelOCRResult(
-            raw_text=raw_text,
-            fields=self._extract_fields(raw_text),
-            confidence=1.0 if raw_text else 0.0,
-            success=bool(raw_text),
+            raw_text=extraction_text,
+            fields=self._extract_fields(extraction_text),
+            confidence=1.0 if extraction_text else 0.0,
+            success=bool(extraction_text),
+            metadata={
+                "full_page_text": raw_text,
+                "label_region_text": extraction_text,
+                "label_region_detected": bool(label_region_text),
+            },
         )
 
         image_result: LabelOCRResult | None = None
@@ -635,11 +837,34 @@ class OCRService:
                         page_index = page_number - 1
                         if 0 <= page_index < pdf_doc.page_count:
                             fitz_page = pdf_doc[page_index]
-                            pix = fitz_page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
+                            pix = fitz_page.get_pixmap(
+                                matrix=fitz.Matrix(2.0, 2.0),
+                                clip=label_clip,
+                                alpha=False,
+                            )
                             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                                 tmp_image_path = tmp.name
                             pix.save(tmp_image_path)
                             image_result = self.process_image(tmp_image_path, extract_fields=True)
+                            if label_clip is not None and (
+                                image_result is None
+                                or not image_result.fields
+                                or sum(1 for value in image_result.fields.values() if str(value or "").strip()) <= 1
+                            ):
+                                full_pix = fitz_page.get_pixmap(
+                                    matrix=fitz.Matrix(2.0, 2.0),
+                                    clip=None,
+                                    alpha=False,
+                                )
+                                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as full_tmp:
+                                    full_image_path = full_tmp.name
+                                try:
+                                    full_pix.save(full_image_path)
+                                    full_page_result = self.process_image(full_image_path, extract_fields=True)
+                                    if full_page_result and len(full_page_result.fields) > len(image_result.fields if image_result else {}):
+                                        image_result = full_page_result
+                                finally:
+                                    Path(full_image_path).unlink(missing_ok=True)
                 except Exception as e:
                     logger.warning(f"Image-level OCR failed for page {page_number}: {e}")
 
@@ -654,6 +879,10 @@ class OCRService:
                     confidence=image_result.confidence,
                     warnings=[*text_result.warnings, *image_result.warnings],
                     success=True,
+                    metadata={
+                        **dict(text_result.metadata),
+                        "image_ocr_used": True,
+                    },
                 )
 
             if enable_llm:

@@ -432,6 +432,11 @@ def build_comparison_result(
     differs = sum(1 for r in comparison_results if r.result == ComparisonResult.DIFFER)
     missing = sum(1 for r in comparison_results if r.result == ComparisonResult.MISSING)
     excluded = sum(1 for r in comparison_results if r.result == ComparisonResult.EXCLUDED)
+    special_status_counts: dict[str, int] = {}
+    for detail in comparison_results:
+        status = str(getattr(detail, "comparison_status", "") or "")
+        if status and status != "pass":
+            special_status_counts[status] = special_status_counts.get(status, 0) + 1
     evaluated_clauses = max(total_clauses - excluded, 0)
     out_of_scope_clauses = [
         str(r.ptr_clause.number)
@@ -465,6 +470,8 @@ def build_comparison_result(
                     "ptr_value": p.ptr_value,
                     "report_value": p.report_value,
                     "matches": p.matches,
+                    "status": p.comparison_status,
+                    "details": p.details,
                 }
                 for p in table_result.parameters
             ]
@@ -497,9 +504,12 @@ def build_comparison_result(
                 else (detail.report_item.standard_requirement if detail.report_item else "")
             ),
             "result": detail.result.value,
+            "status": getattr(detail, "comparison_status", "pass"),
             "similarity": detail.similarity,
             "match_reason": detail.match_reason,
         }
+        if getattr(detail, "details", None):
+            clause_data["details"] = detail.details
 
         if detail.has_differences:
             clause_data["differences"] = [
@@ -524,6 +534,7 @@ def build_comparison_result(
             "differs": differs,
             "missing": missing,
             "excluded": excluded,
+            "special_status_counts": special_status_counts,
             "match_rate": matches / evaluated_clauses if evaluated_clauses > 0 else 0.0,
         },
         "warnings": {

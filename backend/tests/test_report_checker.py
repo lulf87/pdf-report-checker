@@ -169,7 +169,19 @@ class TestValuesMatch:
         """Test both non-empty but not matching."""
         checker = ReportChecker()
         assert checker._values_match("RF-2000", "RF-3000") is False
-        assert checker._values_match("2026.01.08", "2026/01/08") is False
+        assert checker._values_match("2026.01.08", "2026/01/09") is False
+
+    def test_date_values_match_across_separator_variants(self):
+        """Production dates should compare by date value, not separator style."""
+        checker = ReportChecker()
+        assert checker._values_match("2026.01.08", "2026/01/08") is True
+        assert checker._values_match("2025-12-03", "20251203") is True
+
+    def test_code_values_match_with_common_ocr_noise(self):
+        """Alphanumeric model codes should tolerate small OCR confusions."""
+        checker = ReportChecker()
+        assert checker._values_match("NavAEPP1206", "NOVAEPP1206") is True
+        assert checker._values_match("2BL010", "28L010") is True
 
     def test_normalized_match(self):
         """Test match after normalization."""
@@ -376,6 +388,161 @@ class TestC04SampleDescription:
         ]
         if serial_lot_results:
             assert serial_lot_results[0].status == CheckStatus.PASS
+
+    def test_real_component_labels_should_pass_c04(self):
+        checker = ReportChecker()
+        components = [
+            ComponentRow(
+                component_name="一次性使用磁电定位心脏脉冲电场消融导管",
+                model_spec="NavAEPP1206",
+                serial_lot="2BL009",
+                production_date="2025-12-03",
+            ),
+            ComponentRow(
+                component_name="一次性使用磁电定位心脏脉冲电场消融导管连接尾线",
+                model_spec="A1201",
+                serial_lot="2BL010",
+                production_date="2025-12-03",
+            ),
+        ]
+        label_ocr_results = [
+            (
+                CaptionInfo(
+                    raw_caption="中文标签：导管",
+                    main_name="导管",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="test",
+                    fields={
+                        "product_name": "一次性使用磁电定位心脏脉冲电场消融导管",
+                        "model_spec": "NavAEPP1206",
+                        "batch_number": "2BL009",
+                        "production_date": "2025-12-03",
+                    },
+                ),
+            ),
+            (
+                CaptionInfo(
+                    raw_caption="中文标签：连接尾线",
+                    main_name="连接尾线",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="test",
+                    fields={
+                        "product_name": "一次性使用磁电定位心脏脉冲电场消融导管连接尾线",
+                        "model_spec": "A1201",
+                        "batch_number": "2BL010",
+                        "production_date": "2025-12-03",
+                    },
+                ),
+            ),
+        ]
+
+        result = checker.check_c04_sample_description(components, label_ocr_results)
+
+        assert result.status == CheckStatus.PASS
+        assert all(field_result.status == CheckStatus.PASS for field_result in result.field_results)
+
+    def test_c04_should_prefer_model_and_batch_over_caption_name(self):
+        checker = ReportChecker()
+        components = [
+            ComponentRow(
+                component_name="一次性使用磁电定位心脏脉冲电场消融导管",
+                model_spec="NavAEPP1206",
+                serial_lot="2BL009",
+                production_date="2025-12-03",
+            )
+        ]
+        label_ocr_results = [
+            (
+                CaptionInfo(
+                    raw_caption="中文标签：其他部件",
+                    main_name="其他部件",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="test",
+                    fields={
+                        "product_name": "完全不同的名字",
+                        "model_spec": "NavAEPP1206",
+                        "batch_number": "2BL009",
+                        "production_date": "2025-12-03",
+                    },
+                ),
+            )
+        ]
+
+        result = checker.check_c04_sample_description(components, label_ocr_results)
+
+        assert result.status == CheckStatus.PASS
+
+    def test_c04_should_accept_model_code_with_small_ocr_noise(self):
+        checker = ReportChecker()
+        components = [
+            ComponentRow(
+                component_name="一次性使用磁电定位心脏脉冲电场消融导管",
+                model_spec="NavAEPP1206",
+                serial_lot="2BL009",
+                production_date="2025-12-03",
+            )
+        ]
+        label_ocr_results = [
+            (
+                CaptionInfo(
+                    raw_caption="№2 一次性使用磁电定位心脏脉冲电场消融导管 中文标签",
+                    main_name="一次性使用磁电定位心脏脉冲电场消融导管",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="REF|NoVAEPP1206\nLOT2BL009\n2025-12-03",
+                    fields={
+                        "product_name": "一次性使用磁电定位心脏脉冲电场消融导管",
+                        "model_spec": "NOVAEPP1206",
+                        "batch_number": "2BL009",
+                        "production_date": "2025-12-03",
+                    },
+                ),
+            )
+        ]
+
+        result = checker.check_c04_sample_description(components, label_ocr_results)
+
+        assert result.status == CheckStatus.PASS
+
+    def test_c04_should_not_fail_when_expiration_exists_only_on_label(self):
+        checker = ReportChecker()
+        components = [
+            ComponentRow(
+                component_name="一次性使用磁电定位心脏脉冲电场消融导管连接尾线",
+                model_spec="A1201",
+                production_date="2025-12-03",
+                expiration_date="",
+            )
+        ]
+        label_ocr_results = [
+            (
+                CaptionInfo(
+                    raw_caption="№4 一次性使用磁电定位心脏脉冲电场消融导管连接尾线 中文标签",
+                    main_name="一次性使用磁电定位心脏脉冲电场消融导管连接尾线",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="REF\nA1201\n2025-12-03\n2027-12-02",
+                    fields={
+                        "product_name": "一次性使用磁电定位心脏脉冲电场消融导管连接尾线",
+                        "model_spec": "A1201",
+                        "production_date": "2025-12-03",
+                        "expiration_date": "2027-12-02",
+                    },
+                ),
+            )
+        ]
+
+        result = checker.check_c04_sample_description(components, label_ocr_results)
+
+        assert result.status == CheckStatus.PASS
 
 
 class TestC05PhotoCoverage:

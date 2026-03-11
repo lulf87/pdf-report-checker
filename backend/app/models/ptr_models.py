@@ -142,6 +142,7 @@ class PTRClause:
     table_references: list[PTRTableReference] = field(default_factory=list)
     position: tuple[int, int] | None = None  # (page, offset)
     raw_text: str = ""
+    clause_type: str = "main_requirement"
 
     def __str__(self) -> str:
         """String representation."""
@@ -266,6 +267,10 @@ class PTRDocument:
     def get_top_level_clauses(self) -> list[PTRClause]:
         """Get top-level clauses (direct children of Chapter 2)."""
         return [c for c in self.clauses if c.level == 2]
+
+    def get_main_requirement_clauses(self) -> list[PTRClause]:
+        """Get Chapter-2 clauses that should participate in main consistency checks."""
+        return [c for c in self.clauses if c.clause_type == "main_requirement"]
 
     def has_table_references(self) -> bool:
         """Check if any clause references tables."""

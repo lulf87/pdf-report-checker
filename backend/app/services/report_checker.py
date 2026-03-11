@@ -5,6 +5,7 @@ Handles sample description table OCR comparison, photo coverage checks,
 and Chinese label coverage checks.
 """
 
+from difflib import SequenceMatcher
 import logging
 import re
 from dataclasses import dataclass, field
@@ -281,8 +282,71 @@ class ReportChecker:
         if table_empty != label_empty:
             return False
 
+        date_table = re.sub(r"\D", "", table_value or "")
+        date_label = re.sub(r"\D", "", label_value or "")
+        if len(date_table) == 8 and len(date_label) == 8:
+            return date_table == date_label
+
+        if self._looks_like_code_value(table_value, label_value):
+            return self._code_equals_with_ocr_tolerance(table_value, label_value)
+
         # Both non-empty, compare strictly (character-level).
-        return table_value.strip() == label_value.strip()
+        return re.sub(r"\s+", "", table_value.strip()) == re.sub(r"\s+", "", label_value.strip())
+
+    def _looks_like_code_value(self, value1: str, value2: str) -> bool:
+        compact1 = re.sub(r"\s+", "", value1 or "")
+        compact2 = re.sub(r"\s+", "", value2 or "")
+        if not compact1 or not compact2:
+            return False
+        code_re = re.compile(r"^[A-Za-z0-9.\-_/]+$")
+        if not code_re.fullmatch(compact1) or not code_re.fullmatch(compact2):
+            return False
+        return (
+            any(ch.isalpha() for ch in compact1 + compact2)
+            and any(ch.isdigit() for ch in compact1 + compact2)
+        )
+
+    def _code_equals_with_ocr_tolerance(self, value1: str, value2: str) -> bool:
+        compact1 = re.sub(r"\s+", "", (value1 or "").upper())
+        compact2 = re.sub(r"\s+", "", (value2 or "").upper())
+        if compact1 == compact2:
+            return True
+        if len(compact1) != len(compact2):
+            return False
+
+        confusable_groups = (
+            {"O", "0"},
+            {"I", "1", "L", "|"},
+            {"S", "5"},
+            {"B", "8"},
+        )
+
+        mismatches: list[tuple[str, str]] = []
+        for ch1, ch2 in zip(compact1, compact2, strict=False):
+            if ch1 == ch2:
+                continue
+            mismatches.append((ch1, ch2))
+
+        if not mismatches:
+            return True
+
+        if all(any(ch1 in group and ch2 in group for group in confusable_groups) for ch1, ch2 in mismatches):
+            return True
+
+        digit_suffix1 = re.search(r"(\d{3,})$", compact1)
+        digit_suffix2 = re.search(r"(\d{3,})$", compact2)
+        if (
+            len(mismatches) == 1
+            and digit_suffix1
+            and digit_suffix2
+            and digit_suffix1.group(1) == digit_suffix2.group(1)
+        ):
+            prefix1 = compact1[: digit_suffix1.start()]
+            prefix2 = compact2[: digit_suffix2.start()]
+            if prefix1 and prefix2 and SequenceMatcher(None, prefix1, prefix2).ratio() >= 0.8:
+                return True
+
+        return False
 
     def _find_standard_column_name(
         self, header: str, available_headers: list[str]
@@ -409,12 +473,14 @@ class ReportChecker:
 
         # Create a map of component names to their OCR results
         label_map: dict[str, list[tuple[CaptionInfo, LabelOCRResult]]] = {}
+        all_labels: list[tuple[CaptionInfo, LabelOCRResult]] = []
         for caption_info, ocr_result in label_ocr_results:
             if caption_info.is_chinese_label:
-                main_name = caption_info.main_name
+                main_name = ocr_result.get_field("product_name") or caption_info.main_name
                 if main_name not in label_map:
                     label_map[main_name] = []
                 label_map[main_name].append((caption_info, ocr_result))
+                all_labels.append((caption_info, ocr_result))
 
         # Check each component
         for component in components:
@@ -423,7 +489,7 @@ class ReportChecker:
 
             # Find matching labels for this component
             matching_labels = self._find_matching_labels_for_component(
-                component, label_map
+                component, label_map, all_labels
             )
 
             if not matching_labels:
@@ -483,6 +549,16 @@ class ReportChecker:
                     ):
                         status = CheckStatus.PASS
                         message = f"{component.component_name} - {field_name}: 均为空"
+                    elif (
+                        field_name == "失效日期"
+                        and self._is_empty_value(table_value)
+                        and not self._is_empty_value(best_label_value)
+                    ):
+                        status = CheckStatus.PASS
+                        message = (
+                            f"{component.component_name} - {field_name}: "
+                            "样品描述表未填写，标签提供了有效期信息"
+                        )
                     else:
                         status = CheckStatus.ERROR
                         message = (
@@ -616,7 +692,7 @@ class ReportChecker:
         label_map: dict[str, list[tuple[CaptionInfo, LabelOCRResult]]] = {}
         for caption_info, ocr_result in label_ocr_results:
             if caption_info.is_chinese_label:
-                main_name = caption_info.main_name
+                main_name = ocr_result.get_field("product_name") or caption_info.main_name
                 if main_name not in label_map:
                     label_map[main_name] = []
                 label_map[main_name].append((caption_info, ocr_result))
@@ -719,6 +795,7 @@ class ReportChecker:
         self,
         component: ComponentRow,
         label_map: dict[str, list[tuple[CaptionInfo, LabelOCRResult]]],
+        all_labels: list[tuple[CaptionInfo, LabelOCRResult]] | None = None,
     ) -> list[tuple[CaptionInfo, LabelOCRResult]]:
         """Find matching labels for a component.
 
@@ -735,24 +812,62 @@ class ReportChecker:
         normalized_component = self._normalize_name_for_match(component.component_name)
         if not normalized_component:
             return []
-        matched: list[tuple[CaptionInfo, LabelOCRResult]] = []
+        scored_matches: list[tuple[tuple[int, int, int], tuple[CaptionInfo, LabelOCRResult]]] = []
+        candidates = all_labels or [
+            label
+            for labels in label_map.values()
+            for label in labels
+        ]
 
-        for main_name, labels in label_map.items():
-            normalized_name = self._normalize_name_for_match(main_name)
-            if not normalized_name:
+        for candidate in candidates:
+            score = self._score_label_match_for_component(component, candidate)
+            if score is None:
                 continue
+            scored_matches.append((score, candidate))
 
-            # Check if one contains the other
-            if (
-                normalized_component == normalized_name
-                or (
-                    normalized_component in normalized_name
-                    or normalized_name in normalized_component
-                )
-            ):
-                matched.extend(labels)
+        scored_matches.sort(key=lambda item: item[0], reverse=True)
+        return [candidate for _, candidate in scored_matches]
 
-        return matched
+    def _score_label_match_for_component(
+        self,
+        component: ComponentRow,
+        candidate: tuple[CaptionInfo, LabelOCRResult],
+    ) -> tuple[int, int, int] | None:
+        caption_info, ocr_result = candidate
+        component_model = re.sub(r"\s+", "", component.model_spec or "")
+        component_batch = re.sub(r"\s+", "", component.serial_lot or "")
+        label_model = re.sub(r"\s+", "", self._get_ocr_field_value("规格型号", ocr_result) or "")
+        label_batch = re.sub(r"\s+", "", self._get_ocr_field_value("序列号批号", ocr_result) or "")
+
+        normalized_component = self._normalize_name_for_match(component.component_name)
+        product_name = self._normalize_name_for_match(ocr_result.get_field("product_name") or "")
+        caption_name = self._normalize_name_for_match(caption_info.main_name)
+
+        model_match = bool(
+            component_model
+            and label_model
+            and self._code_equals_with_ocr_tolerance(component_model, label_model)
+        )
+        batch_match = bool(
+            component_batch
+            and label_batch
+            and self._code_equals_with_ocr_tolerance(component_batch, label_batch)
+        )
+        name_match = bool(
+            normalized_component
+            and (
+                (product_name and (normalized_component == product_name or normalized_component in product_name or product_name in normalized_component))
+                or (caption_name and (normalized_component == caption_name or normalized_component in caption_name or caption_name in normalized_component))
+            )
+        )
+
+        if model_match and batch_match:
+            return (3, 1, len(product_name or caption_name))
+        if model_match:
+            return (2, int(batch_match), len(product_name or caption_name))
+        if name_match:
+            return (1, int(batch_match), len(product_name or caption_name))
+        return None
 
     def _find_matching_captions(
         self, component_name: str, caption_names: list[str]
@@ -850,6 +965,7 @@ class ReportChecker:
             Internal field name or None
         """
         mapping = {
+            "产品名称": "product_name",
             "型号": "model_spec",
             "规格": "model_spec",
             "Model": "model_spec",

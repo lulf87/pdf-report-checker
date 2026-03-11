@@ -666,6 +666,43 @@ class TestC09SequenceContinuity:
         assert result.blank_positions == []
         assert result.duplicate_numbers == []
 
+    def test_blank_subitem_continuation_rows_are_ignored(self):
+        """Blank sequence subitems and same-clause continuations should not trigger C09."""
+        checker = InspectionItemChecker()
+
+        table = InspectionTable()
+        table.items = [
+            InspectionItem(
+                sequence_number="1",
+                inspection_project="导管外观",
+                standard_clause="2.1.1",
+            ),
+            InspectionItem(
+                sequence_number="",
+                inspection_project="a) 远端应无破损",
+                standard_clause="",
+                standard_requirement="补充要求",
+                field_provenance={"standard_requirement": "merge_inferred"},
+            ),
+            InspectionItem(
+                sequence_number="",
+                inspection_project="说明：允许多行展开",
+                standard_clause="",
+                standard_requirement="续行内容",
+            ),
+            InspectionItem(
+                sequence_number="2",
+                inspection_project="尺寸",
+                standard_clause="2.1.2",
+            ),
+        ]
+
+        result = checker.check_c09_sequence_continuity(table)
+
+        assert result.status == CheckStatus.PASS
+        assert result.blank_positions == []
+        assert result.missing_numbers == []
+
     def test_non_data_sequence_marker_ignored(self):
         """Rows like '此处空白' are decorative and should be ignored in continuity check."""
         checker = InspectionItemChecker()

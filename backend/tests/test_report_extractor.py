@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from app.models.common_models import PDFDocument, PDFPage
+from app.models.common_models import CellData, TableData
 from app.models.report_models import (
     InspectionItem,
     InspectionTable,
@@ -395,6 +396,19 @@ class TestReportExtractor:
         fields = extractor._extract_third_page_fields(page)
         assert fields.client_address == "中国（江苏）自由贸易试验区苏州片区苏州工业园区星湖街328 号创意产业园五期A3-403-3 单元"
 
+    def test_extract_third_page_inspection_items_should_preserve_parenthetical_exclusions(self):
+        """Inspection scope should not split exclusion names inside parentheses."""
+        extractor = ReportExtractor()
+        page = PDFPage(
+            page_number=3,
+            width=595,
+            height=842,
+            raw_text="检验项目\n2.1～2.8（除生物相容性、电磁兼容性）\n",
+        )
+
+        fields = extractor._extract_third_page_fields(page)
+        assert fields.inspection_items == ["2.1～2.8（除生物相容性、电磁兼容性）"]
+
     def test_extract_first_page_fields_without_colon(self):
         """Should extract C01 keys from first page when key/value are on separate lines."""
         extractor = ReportExtractor()
@@ -420,6 +434,27 @@ class TestReportExtractor:
         assert fields["client"] == "苏州元科医疗器械有限公司"
         assert fields["sample_name"] == "一次性使用消化道脉冲电场消融导管"
         assert fields["model_spec"] == "RMC01"
+
+    def test_extract_items_marks_blank_continuation_row_as_logical_continuation(self):
+        """Blank sequence rows with continued payload should attach to previous logical record."""
+        extractor = ReportExtractor()
+        table = TableData(
+            headers=["序号", "检验项目", "标准条款", "标准要求", "检验结果", "单项结论", "备注"],
+            rows=[
+                [CellData("序号", 0, 0), CellData("检验项目", 0, 1), CellData("标准条款", 0, 2), CellData("标准要求", 0, 3), CellData("检验结果", 0, 4), CellData("单项结论", 0, 5), CellData("备注", 0, 6)],
+                [CellData("1", 1, 0), CellData("导管外观", 1, 1), CellData("2.1.1", 1, 2), CellData("应完整", 1, 3), CellData("符合要求", 1, 4), CellData("符合", 1, 5), CellData("", 1, 6)],
+                [CellData("", 2, 0), CellData("a) 远端应无破损", 2, 1), CellData("", 2, 2), CellData("补充说明", 2, 3), CellData("", 2, 4), CellData("", 2, 5), CellData("", 2, 6)],
+                [CellData("2", 3, 0), CellData("尺寸", 3, 1), CellData("2.1.2", 3, 2), CellData("应符合要求", 3, 3), CellData("符合要求", 3, 4), CellData("符合", 3, 5), CellData("", 3, 6)],
+            ],
+        )
+
+        items = extractor._extract_items_from_table(page_num=8, table=table)
+
+        assert len(items) == 3
+        assert items[0].sequence_number == "1"
+        assert items[1].sequence_number == ""
+        assert items[1].is_continued is True
+        assert items[1].inspection_project == "a) 远端应无破损"
 
 
 class TestConvenienceFunctions:

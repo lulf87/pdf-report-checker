@@ -35,6 +35,8 @@ class ParameterComparison:
     report_value: str
     matches: bool
     is_expanded: bool = False
+    comparison_status: str = "pass"
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -103,7 +105,7 @@ class TableComparator:
         results: list[TableExpansionResult] = []
 
         # Find clauses with table references
-        for clause in ptr_doc.clauses:
+        for clause in ptr_doc.get_main_requirement_clauses():
             if not clause.has_table_references():
                 continue
 
@@ -542,6 +544,91 @@ class TableComparator:
         ptr_table.metadata["comparison_path_used"] = path
         ptr_table.metadata["comparison_path_reason"] = reason
 
+    def _build_parameter_comparison(
+        self,
+        parameter_name: str,
+        ptr_value: str,
+        report_value: str,
+        matches: bool,
+        comparison_status: str = "pass",
+        details: dict[str, Any] | None = None,
+    ) -> ParameterComparison:
+        return ParameterComparison(
+            parameter_name=parameter_name,
+            ptr_value=ptr_value,
+            report_value=report_value,
+            matches=matches,
+            is_expanded=True,
+            comparison_status=comparison_status,
+            details=dict(details or {}),
+        )
+
+    def _detect_report_special_status(self, report_text: str) -> tuple[str, str]:
+        compact = self._compact(report_text)
+        if not compact:
+            return "", ""
+
+        patterns = [
+            ("out_of_scope_in_current_report", r"(?:非本报告范围|不在本报告范围|本报告范围外|当前报告范围外|本报告未开展)"),
+            ("pending_evidence", r"(?:待补证|补充提供|另附资料|后补资料|待补充证据)"),
+            ("external_reference", r"(?:另一份报告|另份报告|外部报告|另附报告|详见.*?报告|见.*?报告|参见.*?报告)"),
+        ]
+        for status, pattern in patterns:
+            match = re.search(pattern, compact)
+            if match:
+                return status, match.group(0)
+        return "", ""
+
+    def _report_mentions_dimension(self, report_text: str, value: str) -> bool:
+        compact_report = self._compact(report_text)
+        compact_value = self._compact(value)
+        if not compact_report or not compact_value:
+            return False
+        return compact_value in compact_report
+
+    def _select_records_for_report_context(
+        self,
+        records: list[dict[str, Any]],
+        report_text: str,
+    ) -> list[dict[str, Any]]:
+        matched_records: list[dict[str, Any]] = []
+        for record in records:
+            dimensions = record.get("dimensions")
+            if not isinstance(dimensions, dict):
+                continue
+            model_values = [
+                str(value or "").strip()
+                for key, value in dimensions.items()
+                if str(value or "").strip()
+                and not self._is_placeholder(str(value or ""))
+                and (
+                    self._compact(str(key or "")) in {"型号", "model", "规格", "spec"}
+                    or self._looks_like_model_value(str(value or ""))
+                )
+            ]
+            if model_values and any(self._report_mentions_dimension(report_text, value) for value in model_values):
+                matched_records.append(record)
+        return matched_records
+
+    def _select_rows_for_report_context(
+        self,
+        rows: list[list[str]],
+        model_col_idx: int | None,
+        report_text: str,
+    ) -> list[list[str]]:
+        if model_col_idx is None:
+            return rows
+        matched_rows: list[list[str]] = []
+        for row in rows:
+            if model_col_idx >= len(row):
+                continue
+            model_value = str(row[model_col_idx] or "").strip()
+            if not model_value or self._is_placeholder(model_value) or self._looks_like_model_value(model_value) is False:
+                continue
+            if self._report_mentions_dimension(report_text, model_value):
+                matched_rows.append(row)
+        return matched_rows
+
     def _compare_table_parameters_legacy(
         self,
         ptr_table: PTRTable,
@@ -579,14 +666,35 @@ class TableComparator:
             candidate_rows.append(row)
 
         rows_to_compare = candidate_rows if candidate_rows else fallback_rows
+        contextual_rows = self._select_rows_for_report_context(
+            rows=rows_to_compare,
+            model_col_idx=model_col_idx,
+            report_text=report_text,
+        )
+        if contextual_rows:
+            rows_to_compare = contextual_rows
         for row in rows_to_compare:
             if not row:
                 continue
 
             param_name = row[param_col_idx] if param_col_idx < len(row) else (row[0] if row else "")
             ptr_value = self._pick_ptr_value_from_row(row, headers=ptr_table.headers, roles=role_map)
+            special_status, special_evidence = self._detect_report_special_status(report_text)
 
             if not param_name:
+                continue
+
+            if special_status:
+                comparisons.append(
+                    self._build_parameter_comparison(
+                        parameter_name=param_name,
+                        ptr_value=ptr_value,
+                        report_value=special_evidence or report_text,
+                        matches=True,
+                        comparison_status=special_status,
+                        details={"special_status": special_status},
+                    )
+                )
                 continue
 
             # Coverage-style comparison: report can contain extra content,
@@ -614,12 +722,11 @@ class TableComparator:
                 matches = self._compare_values(ptr_value, report_value)
 
             comparisons.append(
-                ParameterComparison(
+                self._build_parameter_comparison(
                     parameter_name=param_name,
                     ptr_value=ptr_value,
                     report_value=report_value,
                     matches=matches,
-                    is_expanded=True,
                 )
             )
 
@@ -665,6 +772,9 @@ class TableComparator:
             candidate_records.append(record)
 
         records_to_compare = candidate_records if candidate_records else fallback_records
+        contextual_records = self._select_records_for_report_context(records_to_compare, report_text)
+        if contextual_records:
+            records_to_compare = contextual_records
         if not records_to_compare:
             return [], "empty_comparison"
 
@@ -673,6 +783,21 @@ class TableComparator:
             parameter_name = str(record.get("parameter_name") or "").strip()
             if not parameter_name:
                 continue
+            special_status, special_evidence = self._detect_report_special_status(report_text)
+            ptr_value = self._pick_ptr_value_from_parameter_record(record)
+
+            if special_status:
+                comparisons.append(
+                    self._build_parameter_comparison(
+                        parameter_name=parameter_name,
+                        ptr_value=ptr_value,
+                        report_value=special_evidence or report_text,
+                        matches=True,
+                        comparison_status=special_status,
+                        details={"special_status": special_status},
+                    )
+                )
+                continue
 
             covered, evidence = self._is_parameter_record_covered_in_report(
                 record=record,
@@ -680,7 +805,6 @@ class TableComparator:
             )
             report_value = evidence or ""
             matches = covered
-            ptr_value = self._pick_ptr_value_from_parameter_record(record)
 
             if not matches:
                 # Backward-compatible fallback.
@@ -688,13 +812,12 @@ class TableComparator:
                 matches = self._compare_values(ptr_value, report_value)
 
             comparisons.append(
-                ParameterComparison(
+                self._build_parameter_comparison(
                     parameter_name=parameter_name,
                     ptr_value=ptr_value,
-                report_value=report_value,
-                matches=matches,
-                is_expanded=True,
-            )
+                    report_value=report_value,
+                    matches=matches,
+                )
             )
 
         if not comparisons:
@@ -944,6 +1067,10 @@ class TableComparator:
             return False, ""
 
         for required in required_cells:
+            if self._looks_like_numeric_constraint(required):
+                numeric_evidence = self._find_satisfying_numeric_evidence(required, report_text)
+                if numeric_evidence:
+                    continue
             if not self._cell_is_covered(required, report_compact):
                 return False, ""
 
@@ -1028,6 +1155,7 @@ class TableComparator:
                 item.standard_requirement,
                 item.test_result,
                 item.inspection_project,
+                item.remark,
                 item.sequence_number if self._looks_like_shifted_text(item.sequence_number) else "",
             ]:
                 text = str(raw or "").strip()
@@ -1099,6 +1227,10 @@ class TableComparator:
             return False, ""
 
         for cell in required_cells:
+            if self._looks_like_numeric_constraint(cell):
+                numeric_evidence = self._find_satisfying_numeric_evidence(cell, report_text)
+                if numeric_evidence:
+                    continue
             if not self._cell_is_covered(cell, report_compact):
                 return False, ""
 
@@ -1159,6 +1291,8 @@ class TableComparator:
         if "Edora" in value:
             return True
         if re.search(r"(SR|DR)(?:-T)?", value, re.IGNORECASE):
+            return True
+        if re.fullmatch(r"[A-Za-z]{1,8}\d{2,}[A-Za-z0-9\-_/]*", value.strip()):
             return True
         return False
 
@@ -1312,9 +1446,58 @@ class TableComparator:
             if numeric:
                 return numeric
 
+        numeric_evidence = self._extract_best_numeric_evidence(report_text)
+        if numeric_evidence:
+            return numeric_evidence
+
         return ""
 
-    def _compare_values(self, value1: str, value2: str) -> bool:
+    def _looks_like_numeric_constraint(self, text: str) -> bool:
+        normalized = self._normalize_math_symbols(text)
+        if not re.search(r"\d", normalized):
+            return False
+        return bool(
+            re.search(r"(<=|>=|<|>|±|~|～|至|到)", normalized)
+            or re.search(r"[-+]\d", normalized)
+            or re.search(r"(mL|EU|套|Ω|ohm|mm|cm|m|°|N|V|A|Hz|kg|g|ml)", normalized, re.IGNORECASE)
+        )
+
+    def _extract_best_numeric_evidence(self, text: str) -> str:
+        candidates = self._extract_numeric_candidates(text)
+        return candidates[0] if candidates else ""
+
+    def _extract_numeric_candidates(self, text: str) -> list[str]:
+        if not text:
+            return []
+        normalized = self._normalize_math_symbols(text)
+        pattern = re.compile(
+            r"(?:<=|>=|<|>)?\s*[-+]?\d+(?:\.\d+)?"
+            r"(?:\s*(?:~|～|至|到|-)\s*[-+]?\d+(?:\.\d+)?)?"
+            r"(?:\s*±\s*\d+(?:\.\d+)?%?)?"
+            r"(?:\s*(?:EU/套|mL|ml|mm|cm|kHz|MHz|Hz|kg|ohm|Ω|°|EU|套|N|V|A|m|g))?",
+            re.IGNORECASE,
+        )
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for match in pattern.finditer(normalized):
+            candidate = match.group(0).strip()
+            if not candidate or not re.search(r"\d", candidate):
+                continue
+            compact = re.sub(r"\s+", "", candidate)
+            if compact in seen:
+                continue
+            seen.add(compact)
+            candidates.append(candidate)
+        return candidates
+
+    def _find_satisfying_numeric_evidence(self, expected: str, report_text: str) -> str:
+        candidates = self._extract_numeric_candidates(report_text)
+        for candidate in candidates:
+            if self._compare_values(expected, candidate, _recursing=True):
+                return candidate
+        return ""
+
+    def _compare_values(self, value1: str, value2: str, _recursing: bool = False) -> bool:
         """Compare two parameter values.
 
         Args:
@@ -1364,6 +1547,16 @@ class TableComparator:
         unitless2 = re.sub(r"[A-Za-zμΩ/%]+", "", compact2)
         if unitless1 and unitless1 == unitless2:
             return True
+
+        if not _recursing:
+            special_candidate_1 = self._extract_best_numeric_evidence(norm1)
+            special_candidate_2 = self._extract_best_numeric_evidence(norm2)
+            if special_candidate_1 and special_candidate_1 != norm1:
+                if self._compare_values(special_candidate_1, norm2, _recursing=True):
+                    return True
+            if special_candidate_2 and special_candidate_2 != norm2:
+                if self._compare_values(norm1, special_candidate_2, _recursing=True):
+                    return True
 
         return norm1 == norm2
 
@@ -1442,9 +1635,10 @@ class TableComparator:
         expected_norm = self._normalize_math_symbols(expected)
         actual_norm = self._normalize_math_symbols(actual)
 
-        actual_value = self._extract_single_numeric(actual_norm)
-        if actual_value is None:
+        actual_interval = self._extract_numeric_interval(actual_norm)
+        if actual_interval is None:
             return False
+        actual_lo, actual_hi = actual_interval
 
         # Range: a~b / a-b / a至b
         range_match = re.search(
@@ -1456,7 +1650,7 @@ class TableComparator:
             hi = float(range_match.group(2))
             if lo > hi:
                 lo, hi = hi, lo
-            return lo <= actual_value <= hi
+            return lo <= actual_lo and actual_hi <= hi
 
         # Comparator: <=x, <x, >=x, >x
         cmp_match = re.search(r"(<=|>=|<|>)\s*([-+]?\d+(?:\.\d+)?)", expected_norm)
@@ -1464,17 +1658,22 @@ class TableComparator:
             op = cmp_match.group(1)
             threshold = float(cmp_match.group(2))
             if op == "<":
-                return actual_value < threshold
+                return actual_hi < threshold
             if op == "<=":
-                return actual_value <= threshold
+                return actual_hi <= threshold
             if op == ">":
-                return actual_value > threshold
+                return actual_lo > threshold
             if op == ">=":
-                return actual_value >= threshold
+                return actual_lo >= threshold
 
         # Tolerance: base±tol or base±pct%
         tol_match = re.search(
-            r"([-+]?\d+(?:\.\d+)?)\s*±\s*([-+]?\d+(?:\.\d+)?)(%)?",
+            r"([-+]?\d+(?:\.\d+)?)"
+            r"(?:\s*[A-Za-zμΩ°/套]+)?"
+            r"\s*±\s*"
+            r"([-+]?\d+(?:\.\d+)?)"
+            r"(%)?"
+            r"(?:\s*[A-Za-zμΩ°/套]+)?",
             expected_norm,
         )
         if tol_match:
@@ -1482,9 +1681,44 @@ class TableComparator:
             tol = float(tol_match.group(2))
             if tol_match.group(3):
                 tol = abs(base) * tol / 100.0
-            return (base - tol) <= actual_value <= (base + tol)
+            # Signed deviation report values like +0.03 / -0.02~+0.06 should be
+            # evaluated against tolerance band centered at zero.
+            if self._looks_like_delta_expression(actual_norm):
+                return (-tol) <= actual_lo and actual_hi <= tol
+            return (base - tol) <= actual_lo and actual_hi <= (base + tol)
 
         return False
+
+    def _extract_numeric_interval(self, text: str) -> tuple[float, float] | None:
+        normalized = self._normalize_math_symbols(text)
+        cmp_match = re.search(r"(<=|>=|<|>)\s*([-+]?\d+(?:\.\d+)?)", normalized)
+        if cmp_match:
+            value = float(cmp_match.group(2))
+            return value, value
+
+        range_match = re.search(
+            r"([-+]?\d+(?:\.\d+)?)\s*(?:~|～|至|到|-)\s*([-+]?\d+(?:\.\d+)?)",
+            normalized,
+        )
+        if range_match:
+            lo = float(range_match.group(1))
+            hi = float(range_match.group(2))
+            if lo > hi:
+                lo, hi = hi, lo
+            return lo, hi
+
+        value = self._extract_single_numeric(normalized)
+        if value is None:
+            return None
+        return value, value
+
+    def _looks_like_delta_expression(self, text: str) -> bool:
+        compact = re.sub(r"\s+", "", text or "")
+        if not compact:
+            return False
+        if compact.startswith(("+", "-")):
+            return True
+        return bool(re.search(r"(?:~|～|至|到|-)[+-]\d", compact))
 
     def _extract_single_numeric(self, text: str) -> float | None:
         """Extract first numeric value as float."""

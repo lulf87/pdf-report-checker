@@ -447,6 +447,83 @@ class TestPTRExtractor:
         chapter2_pages = extractor._find_chapter2_pages(pdf_doc)
         assert 2 in chapter2_pages
 
+    def test_extract_should_classify_chapter2_as_main_and_chapter3_as_test_method(self):
+        """Chapter 2 clauses stay in main pool, chapter 3 clauses become test methods."""
+        extractor = PTRExtractor()
+        ptr_doc = PTRDocument(
+            clauses=[
+                PTRClause(number=PTRClauseNumber.from_string("2"), full_text="2 性能要求", text_content="性能要求", level=1),
+                PTRClause(number=PTRClauseNumber.from_string("2.1.2.1"), full_text="2.1.2.1 当用通用量具测量时，导管管身直径（外径）应符合尺寸要求", text_content="当用通用量具测量时，导管管身直径（外径）应符合尺寸要求", level=4),
+                PTRClause(number=PTRClauseNumber.from_string("2.1.2.2"), full_text="2.1.2.2 导管头端部分可调弯，调弯角度180±20°", text_content="导管头端部分可调弯，调弯角度180±20°", level=4),
+                PTRClause(number=PTRClauseNumber.from_string("2.1.3"), full_text="2.1.3 断裂力应符合下表规定", text_content="断裂力应符合下表规定", level=3),
+                PTRClause(number=PTRClauseNumber.from_string("2.7.2"), full_text="2.7.2 当用通用量具测量时，导管连接线外径、长度应符合尺寸要求", text_content="当用通用量具测量时，导管连接线外径、长度应符合尺寸要求", level=3),
+                PTRClause(number=PTRClauseNumber.from_string("2.8.1"), full_text="2.8.1 与系统配合，可提供的定位精度应≤1mm", text_content="与系统配合，可提供的定位精度应≤1mm", level=3),
+                PTRClause(number=PTRClauseNumber.from_string("3"), full_text="3 试验方法", text_content="试验方法", level=1),
+                PTRClause(number=PTRClauseNumber.from_string("3.1.2.1"), full_text="3.1.2.1 将测试系统按图1进行安装", text_content="将测试系统按图1进行安装", level=4),
+                PTRClause(number=PTRClauseNumber.from_string("3.7.2"), full_text="3.7.2 导管连接线尺寸的测量方法见图B1", text_content="导管连接线尺寸的测量方法见图B1", level=3),
+                PTRClause(number=PTRClauseNumber.from_string("3.8.1"), full_text="3.8.1 按图C1进行定位精度测试", text_content="按图C1进行定位精度测试", level=3),
+            ]
+        )
+        extractor._classify_clause_types(ptr_doc)
+        clause_map = {str(clause.number): clause for clause in ptr_doc.clauses}
+
+        assert clause_map["2"].clause_type == "informational"
+        assert clause_map["2.1.2.1"].clause_type == "main_requirement"
+        assert clause_map["2.1.2.2"].clause_type == "main_requirement"
+        assert clause_map["2.1.3"].clause_type == "main_requirement"
+        assert clause_map["2.7.2"].clause_type == "main_requirement"
+        assert clause_map["2.8.1"].clause_type == "main_requirement"
+        assert clause_map["3.1.2.1"].clause_type == "test_method"
+        assert clause_map["3.7.2"].clause_type == "test_method"
+        assert clause_map["3.8.1"].clause_type == "test_method"
+
+        main_numbers = [str(clause.number) for clause in ptr_doc.get_main_requirement_clauses()]
+        assert "2.1.2.1" in main_numbers
+        assert "2.1.2.2" in main_numbers
+        assert "2.1.3" in main_numbers
+        assert "2.7.2" in main_numbers
+        assert "2.8.1" in main_numbers
+        assert "3.1.2.1" not in main_numbers
+
+    def test_chapter2_descendants_should_not_inherit_informational_from_noisy_heading(self):
+        """Noisy 2.x heading text must not kick descendant requirements out of the main pool."""
+        extractor = PTRExtractor()
+        ptr_doc = PTRDocument(
+            clauses=[
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2"),
+                    full_text="2 性能要求",
+                    text_content="性能要求",
+                    level=1,
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1"),
+                    full_text="2.1 尺寸 将测试系统按图1进行安装 图B1测试布图 注：箭头方向代表数据传输方向",
+                    text_content="将测试系统按图1进行安装 图B1测试布图 注：箭头方向代表数据传输方向",
+                    level=2,
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.2.1"),
+                    full_text="2.1.2.1 当用通用量具测量时，导管管身直径（外径）应符合尺寸要求",
+                    text_content="当用通用量具测量时，导管管身直径（外径）应符合尺寸要求",
+                    level=4,
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.3"),
+                    full_text="2.1.3 断裂力应符合下表规定",
+                    text_content="断裂力应符合下表规定",
+                    level=3,
+                ),
+            ]
+        )
+
+        extractor._classify_clause_types(ptr_doc)
+        clause_map = {str(clause.number): clause for clause in ptr_doc.clauses}
+
+        assert clause_map["2.1"].clause_type == "main_requirement"
+        assert clause_map["2.1.2.1"].clause_type == "main_requirement"
+        assert clause_map["2.1.3"].clause_type == "main_requirement"
+
 
 class TestTableReferenceExtraction:
     """Test table reference extraction logic."""

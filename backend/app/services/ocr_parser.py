@@ -6,6 +6,7 @@ Special symbols are corrected after OCR with WARNING output for manual verificat
 """
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ from typing import Literal
 import numpy as np
 from PIL import Image
 
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 try:
     from paddleocr import PaddleOCR
     PADDLEOCR_AVAILABLE = True

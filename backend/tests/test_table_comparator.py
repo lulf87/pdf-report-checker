@@ -144,6 +144,20 @@ class TestTableComparator:
 
         assert comparator._compare_values("/", "——") is True
 
+    def test_compare_values_should_support_real_numeric_report_patterns(self):
+        comparator = TableComparator()
+
+        assert comparator._compare_values("2.5±0.1", "+0.03") is True
+        assert comparator._compare_values("2.5±0.1", "-0.02~+0.06") is True
+        assert comparator._compare_values("180±20°", "+6~+9") is True
+        assert comparator._compare_values("≥10", "17~46") is True
+        assert comparator._compare_values("≥15", "50~55") is True
+        assert comparator._compare_values("≤2.0mL", "0.4mL") is True
+        assert comparator._compare_values("≤20EU/套", "<20") is True
+        assert comparator._compare_values("≤10Ω", "6Ω") is True
+        assert comparator._compare_values("2m±0.05m", "+0.02m") is True
+        assert comparator._compare_values("6.5mm±0.5mm", "-0.2~+0.0mm") is True
+
     def test_extract_parameter_value(self):
         """Test parameter value extraction."""
         comparator = TableComparator()
@@ -286,6 +300,50 @@ class TestTableReferenceComparison:
         assert result.table_found is True
         assert result.total_parameters >= 0
         assert result.clause_number == "2.1"
+
+    def test_compare_table_references_should_ignore_non_main_requirement_clauses(self):
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.extend(
+            [
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.3"),
+                    full_text="2.1.3 断裂力见表1",
+                    text_content="断裂力见表1",
+                    level=3,
+                    clause_type="main_requirement",
+                    table_references=[PTRTableReference(table_number=1)],
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.2.1"),
+                    full_text="2.2.1 将测试系统按图1进行安装，见表1",
+                    text_content="将测试系统按图1进行安装，见表1",
+                    level=3,
+                    clause_type="test_method",
+                    table_references=[PTRTableReference(table_number=1)],
+                ),
+            ]
+        )
+        ptr_doc.tables.append(
+            PTRTable(
+                table_number=1,
+                headers=["参数", "值"],
+                rows=[["断裂力", "≥10N"]],
+            )
+        )
+
+        report_items = [
+            InspectionItem(
+                sequence_number="12",
+                standard_clause="2.1.3",
+                inspection_project="断裂力",
+                test_result="17~46N",
+            )
+        ]
+
+        results = TableComparator().compare_table_references(ptr_doc, report_items)
+
+        assert len(results) == 1
+        assert results[0].clause_number == "2.1.3"
 
     def test_compare_table_reference_should_select_best_candidate_when_duplicate_number(self):
         """When duplicate table numbers exist, should pick parameter table not narrative table."""
@@ -592,6 +650,38 @@ class TestEdgeCases:
         )
         assert len(comparisons) == 1
         assert comparisons[0].matches is True
+
+    def test_compare_table_parameters_should_mark_external_reference_without_failing(self):
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "值"],
+            rows=[["电磁兼容性", "应符合要求"]],
+        )
+        report_item = InspectionItem(
+            sequence_number="88",
+            standard_clause="2.9.1",
+            inspection_project="电磁兼容性",
+            test_result="/",
+            remark="电磁兼容性检验见另一份报告",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.9.1"),
+            full_text="2.9.1 电磁兼容性",
+            text_content="电磁兼容性应符合要求。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+
+        assert len(comparisons) == 1
+        assert comparisons[0].matches is True
+        assert comparisons[0].comparison_status == "external_reference"
 
     def test_compare_table_parameters_should_merge_continuation_rows_by_same_sequence(self):
         """Continuation rows under same sequence should be included in report text for coverage."""
