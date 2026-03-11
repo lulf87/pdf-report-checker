@@ -614,6 +614,40 @@ class TestEdgeCases:
         assert len(comparisons) == 1
         assert comparisons[0].parameter_name.startswith("脉冲宽度")
 
+    def test_compare_table_parameters_should_not_fallback_to_first_rows_when_topic_has_no_match(self):
+        """Table-reference evidence must not default to unrelated leading rows when clause topic is explicit."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["起搏模式", "Edora 8 DR", "DDDR", "DDDR", "/"],
+                ["脉冲宽度(ms)", "全部型号", "0.1...1.5", "0.4", "±20μs"],
+            ],
+        )
+        report_item = InspectionItem(
+            sequence_number="46",
+            standard_clause="2.1.12",
+            inspection_project="心室后心房不应期（PVARP）",
+            standard_requirement="心室后心房不应期应符合表1中的数值。",
+            test_result="-15～-12",
+        )
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.12"),
+            full_text="2.1.12 心室后心房不应期（PVARP）",
+            text_content="心室后心房不应期（PVARP）：心室后心房不应期应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=report_item,
+            clause=clause,
+            report_items=[report_item],
+        )
+
+        assert comparisons == []
+
     def test_compare_table_parameters_should_use_coverage_mode_with_extra_report_content(self):
         """Report may contain extra formulas/details; core PTR row content appearing should pass."""
         comparator = TableComparator()

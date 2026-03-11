@@ -148,6 +148,13 @@ export interface TableParameter {
   ptr_value: string;
   report_value: string;
   matches: boolean;
+  status?: string;
+  details?: {
+    ptr_values?: Record<string, string>;
+    evidence_source?: string;
+    continuation_segment?: string;
+    [key: string]: unknown;
+  };
 }
 
 export type DiffType = 'insert' | 'delete' | 'replace' | 'equal';

@@ -481,7 +481,7 @@ class TestRealSampleRegressions:
         report_doc = ReportExtractor().extract_from_pdf_doc(parse_pdf(report_path))
         comparison_results = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)
         report_items = report_doc.inspection_table.items if report_doc.inspection_table else []
-        table_results = compare_table_expansions(ptr_doc, report_items)
+        table_results = compare_table_expansions(ptr_doc, report_items, report_doc)
         return build_comparison_result(ptr_doc, report_doc, comparison_results, table_results)
 
     def test_5332_status_regression_should_keep_non_failure_special_states(self):
@@ -511,3 +511,28 @@ class TestRealSampleRegressions:
         assert clause_map["2.1"]["is_failure"] is False
         assert clause_map["2.2"]["display_status"] == "out_of_scope_in_current_report"
         assert clause_map["2.2"]["is_failure"] is False
+
+    def test_3940_table_reference_regression_should_only_show_matching_pvarp_row(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "3940" / "3940 产品技术要求 Edora 8 改批注zx260218 260225更新.pdf"
+        report_path = base / "report" / "3940" / "3940.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("3940 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+        clause = clause_map["2.1.12"]
+
+        assert clause["result"] == "match"
+        assert clause["match_reason"] == "table_parameter_equivalent"
+        assert len(clause["table_expansions"]) == 1
+
+        table = clause["table_expansions"][0]
+        assert table["table_number"] == 1
+        assert table["matches"] == 1
+        assert table["total_parameters"] == 1
+        assert [param["name"] for param in table["parameters"]] == ["PVARP(ms)"]
+        assert table["parameters"][0]["details"]["ptr_values"]["常规数值"] == "175...(25)...600"
+        assert table["parameters"][0]["details"]["ptr_values"]["标准设置"] == "225"
+        assert table["parameters"][0]["details"]["ptr_values"]["允许误差"] == "±20"
+        assert table["parameters"][0]["report_value"] == "-15～-12"

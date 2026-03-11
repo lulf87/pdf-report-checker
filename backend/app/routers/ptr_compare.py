@@ -360,7 +360,7 @@ async def process_comparison(
             else []
         )
         table_results = table_comparator.compare_table_references(
-            ptr_doc, report_items
+            ptr_doc, report_items, report_doc=report_doc
         )
 
         task["progress"] = 95

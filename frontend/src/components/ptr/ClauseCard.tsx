@@ -270,7 +270,7 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                           letterSpacing: '0.05em',
                         }}
                       >
-                        表格参数核对
+                        引用表参数校对
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         {clause.table_expansions.map((table, tableIndex) => (
@@ -294,7 +294,7 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                               }}
                             >
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                                表{table.table_number}：匹配 {table.matches}/{table.total_parameters}
+                                引用表{table.table_number}
                               </span>
                               <span
                                 style={{
@@ -302,33 +302,26 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                                   color: table.found ? 'var(--text-muted)' : 'var(--color-danger)',
                                 }}
                               >
-                                {table.found ? `一致率 ${Math.round(table.match_rate * 100)}%` : 'PTR 中未找到该表'}
+                                {table.found ? `匹配参数 ${table.matches}/${table.total_parameters}` : 'PTR 中未找到该表'}
                               </span>
                             </div>
 
                             {(table.parameters && table.parameters.length > 0) ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                {table.parameters.map((param, paramIndex) => (
-                                  <div
-                                    key={`${clause.number}-table-${table.table_number}-param-${paramIndex}`}
-                                    style={{
-                                      display: 'flex',
-                                      flexWrap: 'wrap',
-                                      gap: '0.35rem 0.75rem',
-                                      alignItems: 'start',
-                                      fontSize: '0.78rem',
-                                      lineHeight: 1.4,
-                                    }}
-                                  >
-                                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{param.name || '-'}</span>
-                                    <span style={{ color: 'var(--text-secondary)' }}>PTR={param.ptr_value || '-'}</span>
-                                    <span style={{ color: 'var(--text-secondary)' }}>报告={param.report_value || '-'}</span>
-                                    <span style={{ color: param.matches ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                      {param.matches ? '一致' : '不一致'}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
+                              <StructuredTable
+                                columns={['匹配参数', '常规数值', '标准设置', '允许误差', '报告实测', '结论']}
+                                rows={table.parameters.map((param) => {
+                                  const ptrValues = param.details?.ptr_values || {};
+                                  return [
+                                    param.name || '-',
+                                    ptrValues['常规数值'] || param.ptr_value || '-',
+                                    ptrValues['标准设置'] || (ptrValues['常规数值'] ? param.ptr_value || '-' : '-'),
+                                    ptrValues['允许误差'] || '-',
+                                    param.report_value || '-',
+                                    param.matches ? '一致' : '不一致',
+                                  ];
+                                })}
+                                summary="详情只展示本条款实际命中的表行，不再默认展开整张表的前几行。"
+                              />
                             ) : (
                               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                 未提取到可展示的参数项。
