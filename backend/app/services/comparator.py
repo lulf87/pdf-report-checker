@@ -20,6 +20,28 @@ from app.services.text_normalizer import TextNormalizer
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class InspectionScopeRule:
+    """Structured inspection scope rule parsed from the report coverage text."""
+
+    start: tuple[int, ...]
+    end: tuple[int, ...]
+    status: str = "in_scope"
+    evidence: str = ""
+
+
+@dataclass
+class InspectionScopeSpec:
+    """Structured inspection scope spec."""
+
+    rules: list[InspectionScopeRule] = field(default_factory=list)
+    excluded_topics: list[str] = field(default_factory=list)
+
+    @property
+    def has_explicit_rules(self) -> bool:
+        return len(self.rules) > 0
+
+
 class ComparisonResult(Enum):
     """Result of clause comparison."""
 
@@ -131,16 +153,42 @@ class ClauseComparator:
                 detail.result = ComparisonResult.EXCLUDED
                 detail.comparison_status = "group_clause"
                 detail.match_reason = "group_clause_with_children"
+                detail.details["display_title"] = self._extract_clause_display_title(ptr_clause)
+                detail.details["display_type"] = "plain_text"
+                detail.details["raw_text_collapsed"] = True
                 results.append(detail)
                 continue
-            if inspection_scope and not self._is_clause_in_scope(
-                str(ptr_clause.number),
-                inspection_scope,
-                report_clause_set,
-            ):
+            scope_decision = self._resolve_clause_scope(
+                ptr_clause=ptr_clause,
+                scope=inspection_scope,
+                report_clause_set=report_clause_set,
+            )
+            if scope_decision["action"] == "exclude":
                 detail = ComparisonDetail(ptr_clause=ptr_clause)
                 detail.result = ComparisonResult.EXCLUDED
-                detail.match_reason = "out_of_scope_third_page"
+                detail.comparison_status = scope_decision["status"]
+                detail.match_reason = scope_decision["reason"]
+                detail.details["display_title"] = self._extract_clause_display_title(ptr_clause)
+                detail.details["display_type"] = "out_of_scope_notice"
+                detail.details["raw_text_collapsed"] = True
+                detail.details["structured_summary"] = "本项在当前报告检验范围外，已从正文一致性统计中排除。"
+                detail.details["structured_notice"] = self._build_special_status_notice(scope_decision["status"])
+                if scope_decision["evidence"]:
+                    detail.details["special_evidence"] = scope_decision["evidence"]
+                results.append(detail)
+                continue
+            if scope_decision["action"] == "special_match":
+                detail = ComparisonDetail(ptr_clause=ptr_clause)
+                detail.result = ComparisonResult.MATCH
+                detail.comparison_status = scope_decision["status"]
+                detail.match_reason = scope_decision["status"]
+                detail.details["display_title"] = self._extract_clause_display_title(ptr_clause)
+                detail.details["display_type"] = "out_of_scope_notice"
+                detail.details["raw_text_collapsed"] = True
+                detail.details["structured_summary"] = "本项不按正文一致性失败处理。"
+                detail.details["structured_notice"] = self._build_special_status_notice(scope_decision["status"])
+                detail.details["special_status"] = scope_decision["status"]
+                detail.details["special_evidence"] = scope_decision["evidence"]
                 results.append(detail)
                 continue
             detail = self._compare_clause(ptr_clause, report_doc, excluded_numbers)
@@ -183,6 +231,7 @@ class ClauseComparator:
         clause_num_str = str(ptr_clause.number)
         if clause_num_str in excluded_numbers:
             detail.result = ComparisonResult.EXCLUDED
+            detail.comparison_status = "excluded"
             detail.match_reason = "excluded_by_standard_content"
             return detail
 
@@ -190,6 +239,7 @@ class ClauseComparator:
         report_item = self._find_matching_item(ptr_clause, report_doc)
         if not report_item:
             detail.result = ComparisonResult.MISSING
+            detail.comparison_status = "missing"
             return detail
 
         detail.report_item = report_item
@@ -227,19 +277,6 @@ class ClauseComparator:
             report_compact,
         )
         report_context = self._build_report_comparison_context(report_doc, report_item, report_text)
-
-        scope_status, scope_evidence = self._detect_scope_status(ptr_clause, report_doc)
-        if scope_status:
-            detail.result = ComparisonResult.MATCH
-            detail.comparison_status = scope_status
-            detail.match_reason = scope_status
-            detail.details["special_status"] = scope_status
-            detail.details["display_type"] = "out_of_scope_notice"
-            detail.details["structured_summary"] = "本项在当前报告检验范围外，按范围外条款展示。"
-            detail.details["structured_notice"] = "本项属于当前报告检验范围外内容，证据引用当前报告范围说明或外部报告。"
-            if scope_evidence:
-                detail.details["special_evidence"] = scope_evidence
-            return detail
 
         special_status, special_evidence = self.table_comparator._detect_report_special_status(report_context)
         if special_status:
@@ -358,7 +395,20 @@ class ClauseComparator:
             "图B1",
             "图1",
         )
-        return any(marker in compact_text for marker in noisy_markers)
+        if any(marker in compact_text for marker in noisy_markers):
+            return True
+
+        # Generic parent-table summary: heading/summary row that introduces a
+        # parameter table and relies on child clauses for the actual checks.
+        if ptr_clause.has_table_references():
+            table_markers = ("参数表", "见表", "表1", "表2", "表3")
+            requirement_markers = ("不应", "应不", "应能", "应可", "应无", "不得", "至少", "最高", "最低")
+            has_table_marker = any(marker in compact_text for marker in table_markers)
+            has_direct_requirement = any(marker in compact_text for marker in requirement_markers)
+            if has_table_marker and not has_direct_requirement:
+                return True
+
+        return False
 
     def _try_structured_bundle_match(
         self,
@@ -669,37 +719,6 @@ class ClauseComparator:
             if part and part.strip()
         )
 
-    def _detect_scope_status(
-        self,
-        ptr_clause: PTRClause,
-        report_doc: ReportDocument,
-    ) -> tuple[str, str]:
-        third = report_doc.third_page_fields
-        if not third or not third.inspection_items:
-            return "", ""
-
-        clause_text = self._compact_for_compare(self.normalizer.normalize(ptr_clause.text_content or ""))
-        for item in third.inspection_items:
-            normalized_item = self.normalizer.normalize(item or "")
-            match = re.search(r"除([^）)]+)", normalized_item)
-            if not match:
-                continue
-            excluded_segment = re.sub(r"[()（）]", "", match.group(1))
-            tokens = [
-                self._compact_for_compare(token)
-                for token in re.split(r"[、，,；;/及和]", excluded_segment)
-                if token and token.strip()
-            ]
-            for token in tokens:
-                reduced_token = token.rstrip("性")
-                if token and (
-                    token in clause_text
-                    or (reduced_token and reduced_token in clause_text)
-                    or (token and token in clause_text + "性")
-                ):
-                    return "out_of_scope_in_current_report", token
-        return "", ""
-
     def _extract_numeric_expectation(self, text: str) -> str:
         normalized = self.normalizer.normalize(text or "")
         compact = re.sub(r"\s+", "", normalized)
@@ -941,48 +960,80 @@ class ClauseComparator:
     def _parse_inspection_scope_from_third_page(
         self,
         report_doc: ReportDocument,
-    ) -> list[tuple[tuple[int, ...], tuple[int, ...]]]:
-        """Parse clause scope from third-page inspection items.
-
-        Example source values:
-        - "2.1.2～2.1.9"
-        - "2.10（除 ...）"
-        """
+    ) -> InspectionScopeSpec:
+        """Parse structured clause scope from third-page inspection items."""
         third = report_doc.third_page_fields
         if not third or not third.inspection_items:
-            return []
+            return InspectionScopeSpec()
 
-        scope: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+        spec = InspectionScopeSpec()
         range_re = re.compile(r"(\d+(?:\.\d+)+)\s*[~～\-至到]+\s*(\d+(?:\.\d+)+)")
         number_re = re.compile(r"\d+(?:\.\d+)+")
+        external_re = re.compile(r"(?:见另一份报告|见.*?报告|详见.*?报告|参见.*?报告|外部报告|另附报告)")
+        pending_re = re.compile(r"(?:待补证|补充提供|后补资料|待补充证据)")
+        exclude_res = [
+            re.compile(r"除([^）)]+)"),
+            re.compile(r"(?:不包括|不含|不检)([^；;。]+)"),
+        ]
+
+        seen_rules: set[tuple[tuple[int, ...], tuple[int, ...], str, str]] = set()
+        seen_topics: set[str] = set()
 
         for raw_item in third.inspection_items:
-            text = (raw_item or "").strip()
+            text = self.normalizer.normalize(raw_item or "")
             if not text:
                 continue
+
+            line_status = "in_scope"
+            if external_re.search(text):
+                line_status = "external_reference"
+            elif pending_re.search(text):
+                line_status = "pending_evidence"
+
+            for pattern in exclude_res:
+                match = pattern.search(text)
+                if not match:
+                    continue
+                segment = re.sub(r"[()（）]", "", match.group(1))
+                for token in re.split(r"[、，,；;/及和]", segment):
+                    compact_token = self._compact_for_compare(token)
+                    if compact_token and compact_token not in seen_topics:
+                        seen_topics.add(compact_token)
+                        spec.excluded_topics.append(compact_token)
+
+            matched_numbers: set[str] = set()
             for m in range_re.finditer(text):
                 start = self._parse_clause_number(m.group(1))
                 end = self._parse_clause_number(m.group(2))
-                if start and end:
-                    if start > end:
-                        start, end = end, start
-                    scope.append((start, end))
-            # Also capture standalone clause numbers (single item scope).
-            # Keep after range parsing to include isolated items like "2.10（除...）".
-            for token in number_re.findall(text):
-                num = self._parse_clause_number(token)
-                if num:
-                    scope.append((num, num))
+                if not start or not end:
+                    continue
+                if start > end:
+                    start, end = end, start
+                rule_key = (start, end, line_status, text)
+                if rule_key in seen_rules:
+                    continue
+                seen_rules.add(rule_key)
+                spec.rules.append(
+                    InspectionScopeRule(start=start, end=end, status=line_status, evidence=text)
+                )
+                matched_numbers.add(m.group(1))
+                matched_numbers.add(m.group(2))
 
-        # Deduplicate while preserving stable order.
-        seen: set[tuple[tuple[int, ...], tuple[int, ...]]] = set()
-        deduped: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
-        for item in scope:
-            if item in seen:
-                continue
-            seen.add(item)
-            deduped.append(item)
-        return deduped
+            for token in number_re.findall(text):
+                if token in matched_numbers:
+                    continue
+                num = self._parse_clause_number(token)
+                if not num:
+                    continue
+                rule_key = (num, num, line_status, text)
+                if rule_key in seen_rules:
+                    continue
+                seen_rules.add(rule_key)
+                spec.rules.append(
+                    InspectionScopeRule(start=num, end=num, status=line_status, evidence=text)
+                )
+
+        return spec
 
     def _parse_clause_number(self, value: str) -> tuple[int, ...]:
         """Parse dotted clause number into integer tuple."""
@@ -999,10 +1050,13 @@ class ClauseComparator:
     def _is_clause_in_scope(
         self,
         clause_number: str,
-        scope: list[tuple[tuple[int, ...], tuple[int, ...]]],
+        scope: InspectionScopeSpec,
         report_clause_set: set[str] | None = None,
     ) -> bool:
         """Check whether clause number falls into parsed third-page scope."""
+        if not scope or not scope.has_explicit_rules:
+            return True
+
         # If report正文明确存在该条款（或其父级条款），优先认定在范围内。
         if report_clause_set:
             if clause_number in report_clause_set:
@@ -1015,7 +1069,8 @@ class ClauseComparator:
         if not clause:
             return True
 
-        for start, end in scope:
+        for rule in scope.rules:
+            start, end = rule.start, rule.end
             if not start or not end:
                 continue
             # Treat single-point scope as "this clause and descendants".
@@ -1038,6 +1093,73 @@ class ClauseComparator:
                     return True
 
         return False
+
+    def _resolve_clause_scope(
+        self,
+        ptr_clause: PTRClause,
+        scope: InspectionScopeSpec,
+        report_clause_set: set[str] | None = None,
+    ) -> dict[str, str]:
+        """Resolve scope gating for a clause based on structured coverage rules."""
+        if not scope or (not scope.has_explicit_rules and not scope.excluded_topics):
+            return {"action": "none", "status": "", "reason": "", "evidence": ""}
+
+        clause_text = self._compact_for_compare(self.normalizer.normalize(ptr_clause.text_content or ""))
+        for token in scope.excluded_topics:
+            reduced_token = token.rstrip("性")
+            if token and (
+                token in clause_text
+                or (reduced_token and reduced_token in clause_text)
+                or (token and token in clause_text + "性")
+            ):
+                return {
+                    "action": "exclude",
+                    "status": "out_of_scope_in_current_report",
+                    "reason": "out_of_scope_third_page",
+                    "evidence": token,
+                }
+
+        clause_number = str(ptr_clause.number)
+        matching_rule: InspectionScopeRule | None = None
+        clause_tuple = self._parse_clause_number(clause_number)
+        if clause_tuple:
+            for rule in scope.rules:
+                start, end = rule.start, rule.end
+                if start == end:
+                    if clause_tuple[:len(start)] == start:
+                        matching_rule = rule
+                        break
+                    continue
+                depth = min(len(start), len(end), len(clause_tuple))
+                clause_prefix = clause_tuple[:depth]
+                start_prefix = start[:depth]
+                end_prefix = end[:depth]
+                if start_prefix <= clause_prefix <= end_prefix:
+                    parent_depth = max(0, depth - 1)
+                    if parent_depth == 0 or (
+                        clause_tuple[:parent_depth] == start[:parent_depth] == end[:parent_depth]
+                    ):
+                        matching_rule = rule
+                        break
+
+        if matching_rule and matching_rule.status in {"external_reference", "pending_evidence"}:
+            return {
+                "action": "special_match",
+                "status": matching_rule.status,
+                "reason": matching_rule.status,
+                "evidence": matching_rule.evidence,
+            }
+
+        in_scope = self._is_clause_in_scope(clause_number, scope, report_clause_set)
+        if in_scope:
+            return {"action": "none", "status": "", "reason": "", "evidence": ""}
+
+        return {
+            "action": "exclude",
+            "status": "out_of_scope_in_current_report",
+            "reason": "out_of_scope_third_page",
+            "evidence": matching_rule.evidence if matching_rule else "",
+        }
 
     def _collect_report_clause_numbers(self, report_doc: ReportDocument) -> set[str]:
         """Collect parseable clause numbers from report inspection table."""

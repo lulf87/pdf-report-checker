@@ -25,6 +25,7 @@ from app.services.comparator import (
     ComparisonResult,
 )
 from app.services.pdf_parser import PDFParser
+from app.services.presentation_status import get_clause_presentation_status
 from app.services.ptr_extractor import PTRExtractor
 from app.services.report_extractor import ReportExtractor
 from app.services.table_comparator import (
@@ -277,30 +278,8 @@ async def export_result(task_id: str) -> Response:
         )
 
     try:
-        # Transform result to match expected format
-        export_result = {
-            "statistics": {
-                "total": result.get("summary", {}).get("total_clauses", 0),
-                "consistent": result.get("summary", {}).get("matches", 0),
-                "inconsistent": result.get("summary", {}).get("differs", 0)
-                + result.get("summary", {}).get("missing", 0),
-                "consistency_rate": result.get("summary", {}).get("match_rate", 0) * 100,
-            },
-            "clauses": [
-                {
-                    "code": clause.get("ptr_number", ""),
-                    "title": clause.get("ptr_text", "")[:50] + "..."
-                    if len(clause.get("ptr_text", "")) > 50
-                    else clause.get("ptr_text", ""),
-                    "status": clause.get("result", "unknown"),
-                    "is_consistent": clause.get("result") == "match",
-                }
-                for clause in result.get("clauses", [])
-            ],
-        }
-
         # Generate PDF
-        pdf_bytes = export_ptr_to_pdf(export_result)
+        pdf_bytes = export_ptr_to_pdf(result)
 
         return Response(
             content=pdf_bytes,
@@ -438,15 +417,26 @@ def build_comparison_result(
         if status and status != "pass":
             special_status_counts[status] = special_status_counts.get(status, 0) + 1
     evaluated_clauses = max(total_clauses - excluded, 0)
+    presentation_states = [
+        (
+            r,
+            get_clause_presentation_status(
+                result=r.result.value,
+                comparison_status=getattr(r, "comparison_status", ""),
+                match_reason=getattr(r, "match_reason", ""),
+            ),
+        )
+        for r in comparison_results
+    ]
     out_of_scope_clauses = [
         str(r.ptr_clause.number)
-        for r in comparison_results
-        if r.result == ComparisonResult.EXCLUDED and r.ptr_clause is not None
+        for r, state in presentation_states
+        if state["display_status"] == "out_of_scope_in_current_report" and r.ptr_clause is not None
     ]
     missing_in_scope = [
         str(r.ptr_clause.number)
-        for r in comparison_results
-        if r.result == ComparisonResult.MISSING and r.ptr_clause is not None
+        for r, state in presentation_states
+        if state["display_status"] == "missing" and r.ptr_clause is not None
     ]
 
     # Build table details and clause->table mapping
@@ -495,6 +485,11 @@ def build_comparison_result(
     clauses = []
     for detail in comparison_results:
         clause_number = str(detail.ptr_clause.number) if detail.ptr_clause else ""
+        presentation = get_clause_presentation_status(
+            result=detail.result.value,
+            comparison_status=getattr(detail, "comparison_status", "pass"),
+            match_reason=detail.match_reason,
+        )
         clause_data = {
             "ptr_number": clause_number,
             "ptr_text": detail.ptr_clause.text_content if detail.ptr_clause else "",
@@ -507,6 +502,7 @@ def build_comparison_result(
             "status": getattr(detail, "comparison_status", "pass"),
             "similarity": detail.similarity,
             "match_reason": detail.match_reason,
+            **presentation,
             "display_title": (
                 detail.details.get("display_title")
                 if getattr(detail, "details", None)

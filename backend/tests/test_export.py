@@ -211,6 +211,36 @@ class TestReportExportService:
 
         assert table is not None
 
+    def test_format_clause_for_pdf_group_clause_not_red(self, service):
+        """Group clauses should not be rendered as red mismatches in export."""
+        clause = {
+            "ptr_number": "2.1",
+            "display_title": "基本电性能指标及允许误差",
+            "display_status": "group_clause",
+            "display_status_label": "分组条款",
+            "display_status_variant": "accent",
+            "display_status_explanation": "该条款属于父级/分组条款，已由下级条款单独判定。",
+        }
+
+        table = service._format_clause_for_pdf(clause)
+
+        assert table is not None
+
+    def test_format_clause_for_pdf_out_of_scope_not_red(self, service):
+        """Out-of-scope clauses should be exported as warning/info state instead of failure."""
+        clause = {
+            "ptr_number": "2.5.3",
+            "display_title": "电磁兼容",
+            "display_status": "out_of_scope_in_current_report",
+            "display_status_label": "范围外",
+            "display_status_variant": "warn",
+            "display_status_explanation": "该条款不在当前报告本次检验范围内。",
+        }
+
+        table = service._format_clause_for_pdf(clause)
+
+        assert table is not None
+
     def test_format_checks_for_pdf(self, service):
         """Test formatting multiple checks for PDF."""
         checks = [
@@ -249,6 +279,52 @@ class TestReportExportService:
     def test_convenience_function_export_ptr_to_pdf(self, ptr_result):
         """Test convenience function for PTR export."""
         pdf_bytes = export_ptr_to_pdf(ptr_result)
+
+        assert isinstance(pdf_bytes, bytes)
+        assert len(pdf_bytes) > 0
+
+    def test_export_ptr_comparison_accepts_summary_style_payload(self, service):
+        """Export should support the live PTR API payload with summary/display statuses."""
+        result = {
+            "summary": {
+                "total_clauses": 3,
+                "evaluated_clauses": 2,
+                "matches": 1,
+                "differs": 0,
+                "missing": 1,
+                "excluded": 1,
+                "match_rate": 0.5,
+                "special_status_counts": {
+                    "group_clause": 1,
+                    "out_of_scope_in_current_report": 1,
+                },
+            },
+            "clauses": [
+                {
+                    "ptr_number": "2.1",
+                    "display_title": "基本电性能指标及允许误差",
+                    "display_status": "group_clause",
+                    "display_status_label": "分组条款",
+                    "display_status_variant": "accent",
+                },
+                {
+                    "ptr_number": "2.5.3",
+                    "display_title": "电磁兼容",
+                    "display_status": "out_of_scope_in_current_report",
+                    "display_status_label": "范围外",
+                    "display_status_variant": "warn",
+                },
+                {
+                    "ptr_number": "2.1.6",
+                    "display_title": "干扰转复频率",
+                    "display_status": "missing",
+                    "display_status_label": "缺失",
+                    "display_status_variant": "danger",
+                },
+            ],
+        }
+
+        pdf_bytes = service.export_ptr_comparison(result)
 
         assert isinstance(pdf_bytes, bytes)
         assert len(pdf_bytes) > 0

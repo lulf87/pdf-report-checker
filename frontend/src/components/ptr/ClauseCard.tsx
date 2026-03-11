@@ -23,11 +23,10 @@ interface ClauseCardProps {
 export function ClauseCard({ clause, index }: ClauseCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRawText, setShowRawText] = useState(false);
-  const isMismatch = !clause.is_match;
-  const isOutOfScope = clause.display_type === 'out_of_scope_notice';
+  const isMismatch = Boolean(clause.is_failure);
   const titleText = clause.title || clause.ptr_text;
-  const badgeVariant = isOutOfScope ? 'warn' : (clause.is_match ? 'success' : 'danger');
-  const badgeLabel = isOutOfScope ? '范围外/引用' : (clause.is_match ? '一致' : '不一致');
+  const badgeVariant = clause.display_status_variant || (clause.is_match ? 'success' : 'danger');
+  const badgeLabel = clause.display_status_label || (clause.is_match ? '一致' : '不一致');
   const structuredRows = clause.structured_rows || [];
 
   return (
@@ -124,6 +123,18 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                 }}
               >
                 参数条款按“应符合表中数值”判定一致，展开后可查看表格参数明细。
+              </p>
+            )}
+            {clause.display_status_explanation && clause.display_status !== 'match' && (
+              <p
+                style={{
+                  marginTop: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1.5,
+                }}
+              >
+                {clause.display_status_explanation}
               </p>
             )}
 

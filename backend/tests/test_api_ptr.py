@@ -373,6 +373,32 @@ class TestBackgroundProcessing:
         assert clause_data["raw_text_collapsed"] is True
         assert clause_data["structured_rows"][0]["actual"] == "17～46"
 
+    def test_build_comparison_result_includes_presentation_status(self):
+        """API payload should expose unified presentation status for UI/export consumers."""
+        from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument
+        from app.models.report_models import ReportDocument
+        from app.routers.ptr_compare import build_comparison_result
+        from app.services.comparator import ComparisonDetail, ComparisonResult
+
+        ptr_clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.5.3"),
+            full_text="2.5.3 电磁兼容",
+            text_content="电磁兼容应符合要求。",
+            level=3,
+        )
+        detail = ComparisonDetail(
+            ptr_clause=ptr_clause,
+            result=ComparisonResult.MATCH,
+            comparison_status="out_of_scope_in_current_report",
+            match_reason="out_of_scope_in_current_report",
+        )
+
+        result = build_comparison_result(PTRDocument(clauses=[ptr_clause]), ReportDocument(), [detail], [])
+        clause = result["clauses"][0]
+        assert clause["display_status"] == "out_of_scope_in_current_report"
+        assert clause["display_status_variant"] == "warn"
+        assert clause["is_failure"] is False
+
 
 class TestAPIRoutes:
     """Test API route registration."""
@@ -438,3 +464,50 @@ class TestResponseModels:
         )
 
         assert response.result == result_data
+
+
+class TestRealSampleRegressions:
+    """Real sample regressions for status classification and display payload."""
+
+    def _run_ptr_compare(self, ptr_path: Path, report_path: Path) -> dict[str, Any]:
+        from app.routers.ptr_compare import build_comparison_result
+        from app.services.comparator import ClauseComparator
+        from app.services.pdf_parser import parse_pdf
+        from app.services.ptr_extractor import PTRExtractor
+        from app.services.report_extractor import ReportExtractor
+        from app.services.table_comparator import compare_table_expansions
+
+        ptr_doc = PTRExtractor().extract(parse_pdf(ptr_path))
+        report_doc = ReportExtractor().extract_from_pdf_doc(parse_pdf(report_path))
+        comparison_results = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)
+        report_items = report_doc.inspection_table.items if report_doc.inspection_table else []
+        table_results = compare_table_expansions(ptr_doc, report_items)
+        return build_comparison_result(ptr_doc, report_doc, comparison_results, table_results)
+
+    def test_5332_status_regression_should_keep_non_failure_special_states(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "5332" / "TR-AP0105-001 Rev01一次性使用磁电定位心脏脉冲电场消融导管产品技术要求-0305V2.pdf"
+        report_path = base / "report" / "5332" / "QW2025-5332 Draft.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("5332 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+
+        assert clause_map["2.5.3"]["display_status"] == "out_of_scope_in_current_report"
+        assert clause_map["2.5.3"]["is_failure"] is False
+
+    def test_3940_status_regression_should_not_render_parent_and_scope_clauses_as_failures(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "3940" / "3940 产品技术要求 Edora 8 改批注zx260218 260225更新.pdf"
+        report_path = base / "report" / "3940" / "3940.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("3940 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+
+        assert clause_map["2.1"]["display_status"] == "group_clause"
+        assert clause_map["2.1"]["is_failure"] is False
+        assert clause_map["2.2"]["display_status"] == "out_of_scope_in_current_report"
+        assert clause_map["2.2"]["is_failure"] is False

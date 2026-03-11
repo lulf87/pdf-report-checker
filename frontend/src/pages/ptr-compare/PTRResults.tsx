@@ -71,12 +71,12 @@ export function PTRResults({ result, taskId, generatedAtMs, onBack, onReupload, 
     ? Math.round((summary.matches / evaluatedClauseCount) * 100)
     : 0;
   const mismatchedCount = summary.differs + summary.missing;
+  const specialStatusCounts = summary.special_status_counts || {};
   const outOfScopeWarning = result.warnings?.out_of_scope;
   const missingInScopeWarning = result.warnings?.missing_in_scope;
 
   // Transform clauses to match ClauseList component expectations
   const transformedClauses: Clause[] = (result.clauses || [])
-    .filter(clause => clause.result !== 'excluded')
     .map((clause, index) => ({
       id: String(index),
       number: clause.ptr_number || '',
@@ -87,6 +87,11 @@ export function PTRResults({ result, taskId, generatedAtMs, onBack, onReupload, 
       status: clause.status,
       match_reason: clause.match_reason,
       display_type: clause.display_type,
+      display_status: clause.display_status,
+      display_status_label: clause.display_status_label,
+      display_status_variant: clause.display_status_variant,
+      display_status_explanation: clause.display_status_explanation,
+      is_failure: clause.is_failure,
       raw_text_collapsed: clause.raw_text_collapsed,
       structured_summary: clause.structured_summary,
       structured_notice: clause.structured_notice,
@@ -102,7 +107,7 @@ export function PTRResults({ result, taskId, generatedAtMs, onBack, onReupload, 
 
   // Filter clauses
   const filteredClauses = filter === 'mismatched'
-    ? transformedClauses.filter(c => !c.is_match)
+    ? transformedClauses.filter(c => c.is_failure)
     : transformedClauses;
 
   return (
@@ -138,7 +143,7 @@ export function PTRResults({ result, taskId, generatedAtMs, onBack, onReupload, 
           PTR 条款核对结果
         </h1>
         <p style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
-          共核对 {visibleClauseCount} 条款（范围外 {summary.excluded} 条以警告展示）
+          共展示 {visibleClauseCount} 条款（统计口径：正文判定 {evaluatedClauseCount} 条，范围外/分组 {summary.excluded} 条）
         </p>
       </motion.div>
 
@@ -287,6 +292,23 @@ export function PTRResults({ result, taskId, generatedAtMs, onBack, onReupload, 
                   {' '}({missingInScopeWarning.count} 条)：{missingInScopeWarning.clauses.join('、')}
                 </p>
               ) : null}
+            </div>
+          </GlassCard>
+        </motion.div>
+      ) : null}
+
+      {(specialStatusCounts.group_clause || specialStatusCounts.external_reference || specialStatusCounts.pending_evidence) ? (
+        <motion.div variants={itemVariants} style={{ marginBottom: '1.5rem' }}>
+          <GlassCard>
+            <div style={{ padding: '1rem 1.25rem', display: 'grid', gap: '0.35rem' }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                特殊状态条款不会计入红色失败。它们会按“分组条款 / 范围外 / 引用外部报告 / 待补证”单独展示。
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                分组条款 {specialStatusCounts.group_clause || 0} 条 ·
+                引用外部报告 {specialStatusCounts.external_reference || 0} 条 ·
+                待补证 {specialStatusCounts.pending_evidence || 0} 条
+              </p>
             </div>
           </GlassCard>
         </motion.div>

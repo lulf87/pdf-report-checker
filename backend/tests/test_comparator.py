@@ -6,7 +6,7 @@ Tests strict matching, diff algorithms, and similarity computation.
 
 import pytest
 
-from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument
+from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument, PTRTableReference
 from app.models.report_models import InspectionItem, InspectionTable, ReportDocument
 from app.models.report_models import ThirdPageFields
 from app.services.comparator import (
@@ -328,6 +328,42 @@ class TestCompareDocuments:
         assert result_map["2.1"].match_reason == "group_clause_with_children"
         assert result_map["2.1.1"].result == ComparisonResult.MATCH
 
+    def test_parent_table_summary_clause_should_be_group_clause_without_sample_specific_rules(self):
+        """Generic parent clauses that only introduce a parameter table should become group clauses."""
+        ptr_doc = PTRDocument()
+        parent = PTRClause(
+            number=PTRClauseNumber.from_string("2.1"),
+            full_text="2.1 基本电性能指标及允许误差 见表1参数表",
+            text_content="基本电性能指标及允许误差 见表1参数表",
+            level=2,
+            clause_type="main_requirement",
+        )
+        parent.table_references.append(PTRTableReference(table_number=1))
+        child = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.1"),
+            full_text="2.1.1 脉冲幅度",
+            text_content="脉冲幅度应符合表1中的数值。",
+            level=3,
+            clause_type="main_requirement",
+        )
+        ptr_doc.clauses.extend([parent, child])
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="1",
+                standard_clause="2.1.1",
+                standard_requirement="脉冲幅度应符合表1中的数值。",
+            )
+        )
+        report_doc.inspection_table = table
+
+        results = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)
+        result_map = {str(r.ptr_clause.number): r for r in results}
+        assert result_map["2.1"].comparison_status == "group_clause"
+        assert result_map["2.1"].result == ComparisonResult.EXCLUDED
+
     def test_measurement_bundle_clause_should_match_multiple_rows(self):
         """Multi-field size bundle should pass when each measurement row satisfies expectation."""
         ptr_doc = PTRDocument()
@@ -463,11 +499,57 @@ class TestCompareDocuments:
         report_doc.inspection_table = table
 
         result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
-        assert result.result == ComparisonResult.MATCH
+        assert result.result == ComparisonResult.EXCLUDED
         assert result.comparison_status == "out_of_scope_in_current_report"
-        assert result.match_reason == "out_of_scope_in_current_report"
+        assert result.match_reason == "out_of_scope_third_page"
         assert result.details["display_type"] == "out_of_scope_notice"
         assert "范围外" in result.details["structured_notice"]
+
+    def test_scope_rule_with_external_reference_should_not_be_treated_as_failure(self):
+        """Coverage lines that route a clause to another report should yield external_reference."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.10"),
+                full_text="2.10 电磁兼容",
+                text_content="电磁兼容应符合标准要求。",
+                level=2,
+                clause_type="main_requirement",
+            )
+        )
+        report_doc = ReportDocument(
+            third_page_fields=ThirdPageFields(
+                inspection_items=["2.10 见另一份报告 QW2025-1234"]
+            )
+        )
+        report_doc.inspection_table = InspectionTable()
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.comparison_status == "external_reference"
+
+    def test_scope_rule_with_pending_evidence_should_not_be_treated_as_failure(self):
+        """Coverage lines with pending evidence wording should map to pending_evidence."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.11"),
+                full_text="2.11 生物相容性",
+                text_content="生物相容性应符合标准要求。",
+                level=2,
+                clause_type="main_requirement",
+            )
+        )
+        report_doc = ReportDocument(
+            third_page_fields=ThirdPageFields(
+                inspection_items=["2.11 待补证，补充提供资料"]
+            )
+        )
+        report_doc.inspection_table = InspectionTable()
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.comparison_status == "pending_evidence"
 
     def test_embedded_clause_reference_should_not_beat_row_start_clause_match(self):
         """Clause matching should prefer rows whose requirement starts with the target clause."""
@@ -646,6 +728,7 @@ class TestCompareDocuments:
         assert result_map["2.1.2"].result == ComparisonResult.MATCH
         assert result_map["2.1.3"].result == ComparisonResult.MATCH
         assert result_map["2.2.1"].result == ComparisonResult.EXCLUDED
+        assert result_map["2.2.1"].comparison_status == "out_of_scope_in_current_report"
 
     def test_scope_should_include_clause_present_in_report_table_even_if_third_page_misses_it(self):
         """If report正文 contains clause, do not exclude it solely by third-page OCR range."""

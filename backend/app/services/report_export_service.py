@@ -24,6 +24,8 @@ from reportlab.platypus import (
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+from app.services.presentation_status import get_clause_presentation_status
+
 logger = logging.getLogger(__name__)
 
 # Color scheme - Morandi colors (matching frontend)
@@ -147,13 +149,28 @@ class ReportExportService:
         # Summary statistics
         story.append(Paragraph("核对总览", self.styles["ChineseHeading"]))
 
+        summary = result.get("summary", {})
         statistics = result.get("statistics", {})
+        ptr_statistics = {
+            "total": summary.get("total_clauses", statistics.get("total", 0)),
+            "consistent": summary.get("matches", statistics.get("consistent", 0)),
+            "inconsistent": (
+                summary.get("differs", 0) + summary.get("missing", 0)
+                if summary else statistics.get("inconsistent", 0)
+            ),
+            "excluded": summary.get("excluded", 0),
+            "consistency_rate": (
+                summary.get("match_rate", 0) * 100 if summary else statistics.get("consistency_rate", 0)
+            ),
+            "special_status_counts": summary.get("special_status_counts", {}),
+        }
         summary_data = [
             ["指标", "数值"],
-            ["条款总数", str(statistics.get("total", 0))],
-            ["一致数量", str(statistics.get("consistent", 0))],
-            ["不一致数量", str(statistics.get("inconsistent", 0))],
-            ["一致率", f"{statistics.get('consistency_rate', 0):.1f}%"],
+            ["条款总数", str(ptr_statistics.get("total", 0))],
+            ["一致数量", str(ptr_statistics.get("consistent", 0))],
+            ["不一致数量", str(ptr_statistics.get("inconsistent", 0))],
+            ["排除数量", str(ptr_statistics.get("excluded", 0))],
+            ["一致率", f"{ptr_statistics.get('consistency_rate', 0):.1f}%"],
         ]
 
         summary_table = Table(summary_data, colWidths=[80 * mm, 50 * mm])
@@ -295,21 +312,19 @@ class ReportExportService:
         Returns:
             PDF table element
         """
-        code = clause.get("code", "")
-        title = clause.get("title", "")
-        status = clause.get("status", "")
-        is_consistent = clause.get("is_consistent", True)
-
-        # Status color
-        status_color = COLOR_SUCCESS if is_consistent else COLOR_DANGER
-        status_text = "✅ 一致" if is_consistent else "❌ 不一致"
+        code = clause.get("code") or clause.get("ptr_number", "")
+        title = clause.get("title") or clause.get("display_title") or clause.get("ptr_text", "")
+        presentation = self._resolve_clause_presentation(clause)
+        status_color = self._status_color(presentation["display_status_variant"])
+        status_text = presentation["display_status_label"]
+        explanation = clause.get("display_status_explanation") or presentation["display_status_explanation"] or ""
 
         # Create clause table
         clause_data = [
-            [f"{code}: {title}", status_text],
+            [f"{code}: {title}", status_text, explanation],
         ]
 
-        table = Table(clause_data, colWidths=[120 * mm, 30 * mm])
+        table = Table(clause_data, colWidths=[95 * mm, 28 * mm, 47 * mm])
         table.setStyle(
             TableStyle([
                 ("FONTNAME", (0, 0), (-1, -1), self.chinese_font),
@@ -318,6 +333,7 @@ class ReportExportService:
                 ("TEXTCOLOR", (1, 0), (1, 0), colors.white),
                 ("ALIGN", (0, 0), (0, 0), "LEFT"),
                 ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                ("ALIGN", (2, 0), (2, 0), "LEFT"),
                 ("GRID", (0, 0), (-1, -1), 0.5, COLOR_BORDER),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("ROWHEIGHT", (0, 0), (-1, -1), 8 * mm),
@@ -326,6 +342,30 @@ class ReportExportService:
         )
 
         return table
+
+    def _resolve_clause_presentation(self, clause: dict[str, Any]) -> dict[str, Any]:
+        if clause.get("display_status"):
+            return {
+                "display_status": clause.get("display_status"),
+                "display_status_label": clause.get("display_status_label", clause.get("display_status")),
+                "display_status_variant": clause.get("display_status_variant", "info"),
+                "display_status_explanation": clause.get("display_status_explanation", ""),
+            }
+
+        return get_clause_presentation_status(
+            result="match" if clause.get("is_consistent") else ("differ" if clause.get("status") == "mismatched" else "excluded"),
+            comparison_status=clause.get("status", ""),
+            match_reason=clause.get("match_reason", ""),
+        )
+
+    def _status_color(self, variant: str) -> colors.Color:
+        return {
+            "success": COLOR_SUCCESS,
+            "danger": COLOR_DANGER,
+            "warn": COLOR_WARN,
+            "info": COLOR_INFO,
+            "accent": COLOR_ACCENT,
+        }.get(variant, COLOR_INFO)
 
     def _format_checks_for_pdf(self, checks: list[dict[str, Any]]) -> list[Any]:
         """Format a list of checks for PDF display.

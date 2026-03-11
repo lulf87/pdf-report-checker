@@ -33,6 +33,7 @@ export interface ComparisonSummary {
   missing: number;
   excluded: number;
   match_rate: number;
+  special_status_counts?: Record<string, number>;
 }
 
 // Backend response structure
@@ -72,6 +73,11 @@ export interface ClauseResult {
   match_reason?: string;
   display_title?: string;
   display_type?: 'plain_text' | 'measurement_bundle' | 'segmented_threshold_bundle' | 'out_of_scope_notice';
+  display_status?: 'match' | 'differ' | 'missing' | 'excluded' | 'group_clause' | 'out_of_scope_in_current_report' | 'external_reference' | 'pending_evidence';
+  display_status_label?: string;
+  display_status_variant?: 'success' | 'danger' | 'warn' | 'info' | 'accent';
+  display_status_explanation?: string;
+  is_failure?: boolean;
   raw_text_collapsed?: boolean;
   structured_summary?: string;
   structured_notice?: string;
@@ -114,6 +120,11 @@ export interface Clause {
   status?: string;
   match_reason?: string;
   display_type?: ClauseResult['display_type'];
+  display_status?: ClauseResult['display_status'];
+  display_status_label?: string;
+  display_status_variant?: ClauseResult['display_status_variant'];
+  display_status_explanation?: string;
+  is_failure?: boolean;
   raw_text_collapsed?: boolean;
   structured_summary?: string;
   structured_notice?: string;
