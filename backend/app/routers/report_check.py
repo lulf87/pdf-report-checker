@@ -379,6 +379,7 @@ async def process_report_check(
             third_page_fields,
             label_ocr_results,
             third_page_fields.sample_name if third_page_fields else "",
+            first_page_fields=first_page_fields,
         )
         c03_result = third_page_checker.check_c03_production_date_format(
             third_page_fields,

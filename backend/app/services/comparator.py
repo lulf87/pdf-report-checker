@@ -14,6 +14,7 @@ from typing import Literal
 
 from app.models.ptr_models import PTRClause, PTRDocument
 from app.models.report_models import InspectionItem, ReportDocument
+from app.services.table_comparator import TableComparator
 from app.services.text_normalizer import TextNormalizer
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ class ComparisonDetail:
     report_text_for_display: str = ""
     similarity: float = 0.0
     match_reason: str = ""
+    comparison_status: str = "pass"
+    details: dict[str, str] = field(default_factory=dict)
 
     @property
     def has_differences(self) -> bool:
@@ -95,6 +98,7 @@ class ClauseComparator:
         self.normalizer = normalizer or TextNormalizer()
         self.strict_mode = strict_mode
         self.soft_match_similarity_threshold = 0.82
+        self.table_comparator = TableComparator(normalizer=self.normalizer)
 
     def compare_documents(
         self,
@@ -118,9 +122,16 @@ class ClauseComparator:
         report_clause_set = self._collect_report_clause_numbers(report_doc)
 
         # Compare each PTR clause
-        for ptr_clause in ptr_doc.clauses:
+        for ptr_clause in ptr_doc.get_main_requirement_clauses():
             # Chapter heading "2" is section title, not a standalone requirement.
             if str(ptr_clause.number) == "2":
+                continue
+            if self._is_group_clause(ptr_clause, ptr_doc):
+                detail = ComparisonDetail(ptr_clause=ptr_clause)
+                detail.result = ComparisonResult.EXCLUDED
+                detail.comparison_status = "group_clause"
+                detail.match_reason = "group_clause_with_children"
+                results.append(detail)
                 continue
             if inspection_scope and not self._is_clause_in_scope(
                 str(ptr_clause.number),
@@ -212,6 +223,56 @@ class ClauseComparator:
             ptr_compact,
             report_compact,
         )
+        report_context = self._build_report_comparison_context(report_doc, report_item, report_text)
+
+        scope_status, scope_evidence = self._detect_scope_status(ptr_clause, report_doc)
+        if scope_status:
+            detail.result = ComparisonResult.MATCH
+            detail.comparison_status = scope_status
+            detail.match_reason = scope_status
+            detail.details["special_status"] = scope_status
+            if scope_evidence:
+                detail.details["special_evidence"] = scope_evidence
+            return detail
+
+        special_status, special_evidence = self.table_comparator._detect_report_special_status(report_context)
+        if special_status:
+            detail.result = ComparisonResult.MATCH
+            detail.comparison_status = special_status
+            detail.match_reason = special_status
+            detail.details["special_status"] = special_status
+            if special_evidence:
+                detail.details["special_evidence"] = special_evidence
+            return detail
+
+        structured_bundle_match = self._try_structured_bundle_match(
+            ptr_clause,
+            report_doc,
+            report_item,
+        )
+        if structured_bundle_match:
+            detail.result = ComparisonResult.MATCH
+            detail.comparison_status = "pass"
+            detail.match_reason = structured_bundle_match["reason"]
+            detail.similarity = max(detail.similarity, 0.94)
+            detail.details.update(structured_bundle_match["details"])
+            return detail
+
+        numeric_expectation = self._extract_numeric_expectation(ptr_clause.text_content)
+        numeric_evidence = ""
+        if numeric_expectation:
+            numeric_evidence = self.table_comparator._find_satisfying_numeric_evidence(
+                numeric_expectation,
+                self._build_report_result_context(report_item),
+            )
+        if numeric_expectation and numeric_evidence:
+            detail.result = ComparisonResult.MATCH
+            detail.comparison_status = "pass"
+            detail.match_reason = "numeric_semantic_match"
+            detail.similarity = max(detail.similarity, 0.92)
+            detail.details["numeric_expectation"] = numeric_expectation
+            detail.details["numeric_evidence"] = numeric_evidence
+            return detail
 
         # Perform comparison
         if detail.normalized_ptr == detail.normalized_report or ptr_compact == report_compact:
@@ -252,6 +313,316 @@ class ClauseComparator:
             )
 
         return detail
+
+    def _is_group_clause(
+        self,
+        ptr_clause: PTRClause,
+        ptr_doc: PTRDocument,
+    ) -> bool:
+        """Whether a clause is only a noisy parent/group heading.
+
+        Keep true standalone parents in the comparison pool. Only suppress
+        parent clauses that have descendants and whose own text is clearly
+        contaminated by appendix/method/figure-note noise.
+        """
+        clause_number = str(ptr_clause.number)
+        descendants = [
+            clause
+            for clause in ptr_doc.get_main_requirement_clauses()
+            if clause is not ptr_clause and str(clause.number).startswith(clause_number + ".")
+        ]
+        if not descendants:
+            return False
+
+        compact_text = self._compact_for_compare(
+            self.normalizer.normalize(ptr_clause.text_content or ptr_clause.full_text or "")
+        )
+        if not compact_text:
+            return False
+
+        noisy_markers = (
+            "将测试系统按图",
+            "测试布图",
+            "箭头方向代表数据传输方向",
+            "按图",
+            "图B1",
+            "图1",
+        )
+        return any(marker in compact_text for marker in noisy_markers)
+
+    def _try_structured_bundle_match(
+        self,
+        ptr_clause: PTRClause,
+        report_doc: ReportDocument,
+        report_item: InspectionItem,
+    ) -> dict[str, str] | None:
+        clause_text = self.normalizer.normalize(ptr_clause.text_content or "")
+        if not clause_text:
+            return None
+
+        if "尺寸要求" in clause_text:
+            bundle_rows = self._collect_bundle_rows(report_doc, report_item)
+            if not bundle_rows:
+                return None
+            matched_names = self._evaluate_measurement_bundle_rows(bundle_rows)
+            if not matched_names:
+                return None
+            required_keywords = self._expected_measurement_keywords(ptr_clause)
+            if required_keywords and not self._bundle_covers_keywords(matched_names, required_keywords):
+                return None
+            return {
+                "reason": "measurement_bundle_match",
+                "details": {
+                    "bundle_type": "measurement",
+                    "bundle_rows": "、".join(matched_names),
+                },
+            }
+
+        if "断裂力" in clause_text and "各试验段" in clause_text:
+            bundle_rows = self._collect_bundle_rows(report_doc, report_item)
+            if not bundle_rows:
+                return None
+            matched_names = self._evaluate_measurement_bundle_rows(bundle_rows)
+            if len(matched_names) < 2:
+                return None
+            return {
+                "reason": "segmented_threshold_bundle_match",
+                "details": {
+                    "bundle_type": "threshold_table",
+                    "bundle_rows": "、".join(matched_names),
+                },
+            }
+
+        return None
+
+    def _collect_bundle_rows(
+        self,
+        report_doc: ReportDocument,
+        report_item: InspectionItem,
+    ) -> list[InspectionItem]:
+        if not report_doc.inspection_table or not report_doc.inspection_table.items:
+            return []
+
+        items = report_doc.inspection_table.items
+        try:
+            start_idx = next(idx for idx, item in enumerate(items) if item is report_item)
+        except StopIteration:
+            return []
+
+        bundle_rows: list[InspectionItem] = []
+        for idx in range(start_idx + 1, len(items)):
+            item = items[idx]
+            requirement = self.normalizer.normalize(item.standard_requirement or "")
+            if not requirement:
+                if bundle_rows:
+                    break
+                continue
+            compact_requirement = self._compact_for_compare(requirement)
+            if re.match(r"^2(?:\.\d+)+", compact_requirement):
+                break
+            if self._extract_clause_number(item.standard_clause):
+                break
+            bundle_rows.append(item)
+
+        return bundle_rows
+
+    def _evaluate_measurement_bundle_rows(
+        self,
+        rows: list[InspectionItem],
+    ) -> list[str]:
+        matched_names: list[str] = []
+        for row in rows:
+            raw_name = self.normalizer.normalize(row.standard_requirement or "")
+            name = self._normalize_bundle_name(raw_name)
+            expected = self._resolve_bundle_expected_value(raw_name, row.test_result or "")
+            actual = self.normalizer.normalize(row.item_conclusion or row.remark or "")
+            if not name or not expected or not actual:
+                continue
+            if not (
+                self.table_comparator._compare_values(expected, actual)
+                or self._percent_delta_matches_percent_tolerance(expected, actual)
+            ):
+                return []
+            matched_names.append(name)
+        return matched_names
+
+    def _normalize_bundle_name(self, value: str) -> str:
+        text = self.normalizer.normalize(value or "")
+        text = re.sub(r"±\s*[-+]?\d+(?:\.\d+)?\s*[A-Za-zμΩ°/%]+", "", text)
+        text = re.sub(r"单位[:：]?[A-Za-zμΩ°/%（）()]+", "", text)
+        text = re.sub(r"\s+", "", text)
+        return text.strip()
+
+    def _resolve_bundle_expected_value(self, bundle_name: str, test_result: str) -> str:
+        normalized_result = self.normalizer.normalize(test_result or "")
+        compact_result = re.sub(r"\s+", "", normalized_result)
+        if not compact_result:
+            return ""
+        if "±" in compact_result or any(op in compact_result for op in ("<", ">", "≤", "≥")):
+            return normalized_result
+
+        normalized_name = self.normalizer.normalize(bundle_name or "")
+        tolerance_match = re.search(
+            r"±\s*[-+]?\d+(?:\.\d+)?\s*[A-Za-zμΩ°/%]+",
+            normalized_name,
+        )
+        if tolerance_match:
+            base_match = re.search(
+                r"[-+]?\d+(?:\.\d+)?\s*[A-Za-zμΩ°/%]+",
+                normalized_result,
+            )
+            if base_match:
+                return f"{base_match.group(0)}{tolerance_match.group(0)}"
+        return normalized_result
+
+    def _expected_measurement_keywords(self, ptr_clause: PTRClause) -> list[list[str]]:
+        clause_text = self._compact_for_compare(self.normalizer.normalize(ptr_clause.text_content or ""))
+        if all(keyword in clause_text for keyword in ("管身直径", "电极宽度", "电极间距", "有效长度")):
+            return [
+                ["管身直径", "外径"],
+                ["电极宽度"],
+                ["电极间距"],
+                ["环形圈最小直径"],
+                ["环形圈最大直径"],
+                ["有效长度"],
+            ]
+        if "导管连接线外径" in clause_text and "长度" in clause_text:
+            return [
+                ["连接线长度"],
+                ["外径"],
+            ]
+        return []
+
+    def _bundle_covers_keywords(
+        self,
+        matched_names: list[str],
+        required_keywords: list[list[str]],
+    ) -> bool:
+        compact_names = [self._compact_for_compare(name) for name in matched_names]
+        for keywords in required_keywords:
+            if not any(all(self._compact_for_compare(keyword) in name for keyword in keywords) for name in compact_names):
+                return False
+        return True
+
+    def _percent_delta_matches_percent_tolerance(self, expected: str, actual: str) -> bool:
+        expected_norm = self.normalizer.normalize(expected or "")
+        actual_norm = self.normalizer.normalize(actual or "")
+        tolerance_match = re.search(r"±\s*([-+]?\d+(?:\.\d+)?)\s*%", expected_norm)
+        if not tolerance_match or "%" not in actual_norm:
+            return False
+
+        tolerance = float(tolerance_match.group(1))
+        interval_match = re.search(
+            r"([-+]?\d+(?:\.\d+)?)\s*%\s*(?:~|～|至|到|-)\s*([-+]?\d+(?:\.\d+)?)\s*%",
+            actual_norm,
+        )
+        if interval_match:
+            low = float(interval_match.group(1))
+            high = float(interval_match.group(2))
+            if low > high:
+                low, high = high, low
+            return (-tolerance) <= low and high <= tolerance
+
+        single_match = re.search(r"([-+]?\d+(?:\.\d+)?)\s*%", actual_norm)
+        if single_match:
+            value = float(single_match.group(1))
+            return (-tolerance) <= value <= tolerance
+
+        return False
+
+    def _build_report_comparison_context(
+        self,
+        report_doc: ReportDocument,
+        report_item: InspectionItem,
+        report_text: str,
+    ) -> str:
+        parts = [
+            report_item.inspection_project or "",
+            report_item.standard_clause or "",
+            report_text or "",
+            report_item.test_result or "",
+            report_item.item_conclusion or "",
+            report_item.remark or "",
+        ]
+        third_page = report_doc.third_page_fields
+        if third_page and third_page.inspection_items:
+            parts.extend(third_page.inspection_items)
+        return "\n".join(part for part in parts if part and part.strip())
+
+    def _build_report_result_context(self, report_item: InspectionItem) -> str:
+        return "\n".join(
+            part
+            for part in [
+                report_item.test_result or "",
+                report_item.item_conclusion or "",
+                report_item.remark or "",
+            ]
+            if part and part.strip()
+        )
+
+    def _detect_scope_status(
+        self,
+        ptr_clause: PTRClause,
+        report_doc: ReportDocument,
+    ) -> tuple[str, str]:
+        third = report_doc.third_page_fields
+        if not third or not third.inspection_items:
+            return "", ""
+
+        clause_text = self._compact_for_compare(self.normalizer.normalize(ptr_clause.text_content or ""))
+        for item in third.inspection_items:
+            normalized_item = self.normalizer.normalize(item or "")
+            match = re.search(r"除([^）)]+)", normalized_item)
+            if not match:
+                continue
+            excluded_segment = re.sub(r"[()（）]", "", match.group(1))
+            tokens = [
+                self._compact_for_compare(token)
+                for token in re.split(r"[、，,；;/及和]", excluded_segment)
+                if token and token.strip()
+            ]
+            for token in tokens:
+                reduced_token = token.rstrip("性")
+                if token and (
+                    token in clause_text
+                    or (reduced_token and reduced_token in clause_text)
+                    or (token and token in clause_text + "性")
+                ):
+                    return "out_of_scope_in_current_report", token
+        return "", ""
+
+    def _extract_numeric_expectation(self, text: str) -> str:
+        normalized = self.normalizer.normalize(text or "")
+        compact = re.sub(r"\s+", "", normalized)
+        if not compact:
+            return ""
+
+        tolerance_match = re.search(
+            r"([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)\s*±\s*([-+]?\d+(?:\.\d+)?(?:%|[A-Za-zμΩ°/套]+)?)",
+            normalized,
+        )
+        if tolerance_match:
+            return re.sub(r"\s+", "", tolerance_match.group(0))
+
+        range_match = re.search(
+            r"([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)\s*(?:~|～|至|到|-)\s*([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)",
+            normalized,
+        )
+        if range_match:
+            return re.sub(r"\s+", "", range_match.group(0))
+
+        comparator_patterns = [
+            (r"(?:不应超过|应不超过|不超过|应不大于|不大于|小于等于|应≤|≤)\s*([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)", "<="),
+            (r"(?:应不小于|不小于|大于等于|应≥|≥)\s*([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)", ">="),
+            (r"(?:应小于|小于|<)\s*([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)", "<"),
+            (r"(?:应大于|大于|>)\s*([-+]?\d+(?:\.\d+)?(?:[A-Za-zμΩ°/套]+)?)", ">"),
+        ]
+        for pattern, op in comparator_patterns:
+            match = re.search(pattern, normalized)
+            if match:
+                return f"{op}{re.sub(r'\\s+', '', match.group(1))}"
+
+        return ""
 
     def _compact_for_compare(self, text: str) -> str:
         """Remove all whitespace so comparison ignores spacing/newline noise."""
@@ -614,14 +985,21 @@ class ClauseComparator:
         # Clause marker may be embedded inside a parent row's requirement text.
         # Skip chapter-level generic marker search (e.g. "2"), too ambiguous.
         if "." in clause_num_str:
-            clause_marker = re.compile(
-                rf"(?<![\d.]){re.escape(clause_num_str)}(?:[\.．、]|\s|$)",
-                re.IGNORECASE,
-            )
+            best_marker_item: InspectionItem | None = None
+            best_marker_score = -1
             for item in report_doc.inspection_table.items:
                 requirement = self._compose_row_requirement_text(item)
-                if requirement and clause_marker.search(requirement):
-                    return item
+                if not requirement:
+                    continue
+                marker_score = self._score_clause_marker_candidate(
+                    clause_num_str,
+                    requirement,
+                )
+                if marker_score > best_marker_score:
+                    best_marker_score = marker_score
+                    best_marker_item = item
+            if best_marker_item is not None and best_marker_score >= 1:
+                return best_marker_item
 
         # Match by parent standard-clause prefix (e.g. report has 2.1, PTR has 2.1.1.2).
         best_prefix_item: InspectionItem | None = None
@@ -677,6 +1055,40 @@ class ClauseComparator:
             return best_item
 
         return None
+
+    def _score_clause_marker_candidate(
+        self,
+        clause_number: str,
+        requirement_text: str,
+    ) -> int:
+        """Score whether a requirement row truly belongs to a target clause."""
+        normalized = requirement_text or ""
+        compact = re.sub(r"\s+", "", normalized)
+        if not compact:
+            return -1
+
+        exact_leading = re.compile(
+            rf"^\s*{re.escape(clause_number)}(?:[\.．、]|\s|$)",
+            re.IGNORECASE,
+        )
+        if exact_leading.search(normalized):
+            return 4
+
+        line_leading = re.compile(
+            rf"(?:^|\n)\s*{re.escape(clause_number)}(?:[\.．、]|\s|$)",
+            re.IGNORECASE,
+        )
+        if line_leading.search(normalized):
+            return 3
+
+        exact_anywhere = re.compile(
+            rf"(?<![\d.]){re.escape(clause_number)}(?:[\.．、]|\s|$)",
+            re.IGNORECASE,
+        )
+        if exact_anywhere.search(normalized):
+            return 1
+
+        return -1
 
     def _promote_parent_clause_matches(
         self,

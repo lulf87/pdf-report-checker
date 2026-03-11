@@ -183,6 +183,50 @@ class TestCompareDocuments:
         assert len(results) == 1
         assert str(results[0].ptr_clause.number) == "2.1"
 
+    def test_test_method_and_appendix_like_clauses_should_not_enter_main_pool(self):
+        """Only main requirements should be compared against the report body."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.extend(
+            [
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.1"),
+                    full_text="2.1.1 断裂力应不小于10N",
+                    text_content="断裂力应不小于10N",
+                    level=3,
+                    clause_type="main_requirement",
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.2.1"),
+                    full_text="2.2.1 将测试系统按图1进行安装",
+                    text_content="将测试系统按图1进行安装",
+                    level=3,
+                    clause_type="test_method",
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.2.2"),
+                    full_text="2.2.2 注：箭头方向代表数据传输方向",
+                    text_content="注：箭头方向代表数据传输方向",
+                    level=3,
+                    clause_type="informational",
+                ),
+            ]
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="12",
+                standard_clause="2.1.1",
+                standard_requirement="断裂力应不小于10N",
+            )
+        )
+        report_doc.inspection_table = table
+
+        results = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)
+
+        assert [str(detail.ptr_clause.number) for detail in results] == ["2.1.1"]
+
     def test_compare_single_clause_match(self):
         """Test comparing a single matching clause."""
         # Create PTR document
@@ -211,6 +255,251 @@ class TestCompareDocuments:
 
         assert len(results) == 1
         assert results[0].is_match is True
+
+    def test_numeric_semantic_clause_comparison_should_match_report_result(self):
+        """Numeric requirement clauses should compare against report result semantically."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.3.2"),
+                full_text="2.3.2 还原物质不应超过2.0mL。",
+                text_content="还原物质不应超过2.0mL。",
+                level=3,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="160",
+                inspection_project="化学性能",
+                standard_clause="",
+                standard_requirement="2.3.2 还原物质不应超过2.0mL。",
+                test_result="0.4mL",
+                item_conclusion="符合",
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.match_reason == "numeric_semantic_match"
+        assert result.details["numeric_evidence"] == "0.4mL"
+
+    def test_noisy_parent_group_clause_should_be_excluded_instead_of_differ(self):
+        """Noisy parent clauses with compared descendants should not report text mismatch."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.extend(
+            [
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1"),
+                    full_text="2.1 将测试系统按图1进行安装 图B1测试布图 注：箭头方向代表数据传输方向",
+                    text_content="将测试系统按图1进行安装 图B1测试布图 注：箭头方向代表数据传输方向",
+                    level=2,
+                    clause_type="main_requirement",
+                ),
+                PTRClause(
+                    number=PTRClauseNumber.from_string("2.1.1"),
+                    full_text="2.1.1 外表面",
+                    text_content="外表面",
+                    level=3,
+                    clause_type="main_requirement",
+                ),
+            ]
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="157",
+                standard_clause="2.1",
+                inspection_project="物理性能及结构",
+                standard_requirement="2.1.1 外表面",
+            )
+        )
+        report_doc.inspection_table = table
+
+        results = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)
+        result_map = {str(r.ptr_clause.number): r for r in results}
+        assert result_map["2.1"].result == ComparisonResult.EXCLUDED
+        assert result_map["2.1"].match_reason == "group_clause_with_children"
+        assert result_map["2.1.1"].result == ComparisonResult.MATCH
+
+    def test_measurement_bundle_clause_should_match_multiple_rows(self):
+        """Multi-field size bundle should pass when each measurement row satisfies expectation."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.2.1"),
+                full_text="2.1.2.1 导管尺寸要求",
+                text_content="当用通用量具测量时，导管管身直径（外径）、电极宽度、电极间距、环形圈直径、有效长度应符合产品型号/规格及其划分说明表中尺寸要求。",
+                level=4,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.extend(
+            [
+                InspectionItem(
+                    sequence_number="157",
+                    standard_requirement="2.1.2.1 当用通用量具测量时，导管尺寸应符合要求。",
+                ),
+                InspectionItem(standard_requirement="管身直径（外径）", test_result="2.5mm±0.1mm", item_conclusion="+0.03"),
+                InspectionItem(standard_requirement="电极宽度", test_result="2.5mm±0.1mm", item_conclusion="-0.02～+0.06"),
+                InspectionItem(standard_requirement="电极间距", test_result="4mm±0.5mm", item_conclusion="-0.4～-0.2"),
+                InspectionItem(standard_requirement="环形圈最小直径", test_result="20mm±10%", item_conclusion="-5%～+3%"),
+                InspectionItem(standard_requirement="环形圈最大直径", test_result="25mm±10%", item_conclusion="-6%～+2%"),
+                InspectionItem(standard_requirement="有效长度", test_result="115cm±3cm", item_conclusion="+0～+1"),
+                InspectionItem(standard_requirement="2.1.2.2 导管头端部分可调弯，调弯角度180±20°。"),
+            ]
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.match_reason == "measurement_bundle_match"
+
+    def test_segmented_threshold_bundle_should_match(self):
+        """Segment threshold tables should pass when every measured interval satisfies the minimum."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.1.3"),
+                full_text="2.1.3 断裂力",
+                text_content="断裂力 各试验段的断裂力应符合下表的规定。",
+                level=3,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.extend(
+            [
+                InspectionItem(sequence_number="续157", standard_clause="2.1", standard_requirement="2.1.3 断裂力 各试验段的断裂力应符合下表的规定。"),
+                InspectionItem(standard_requirement="试验段", test_result="断裂力（N）"),
+                InspectionItem(standard_requirement="环形圈头端与环形圈管身", test_result="≥10", item_conclusion="17～46"),
+                InspectionItem(standard_requirement="环形圈管身与可调弯管身", test_result="≥15", item_conclusion="50～55"),
+                InspectionItem(standard_requirement="可调弯管与外管管身", test_result="≥15", item_conclusion="37～57"),
+                InspectionItem(standard_requirement="外管管身", test_result="≥15", item_conclusion="186～213"),
+                InspectionItem(standard_requirement="外管管身与手柄", test_result="≥15", item_conclusion="173～228"),
+                InspectionItem(standard_requirement="2.1.4 调节机构的操控性"),
+            ]
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.match_reason == "segmented_threshold_bundle_match"
+
+    def test_measurement_bundle_should_combine_base_value_and_tolerance_split_across_columns(self):
+        """Rows like '连接线长度±0.05m' + '2m' + '+0.02' should still pass as one bundle."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.7.2"),
+                full_text="2.7.2 连接线尺寸",
+                text_content="尺寸 当用通用量具测量时，导管连接线外径、长度应符合导管连接线型号/规格表中尺寸要求。",
+                level=3,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.extend(
+            [
+                InspectionItem(standard_requirement="2.7.2 尺寸 当用通用量具测量时，导管连接线外径、长度应符合导管连接线型号/规格表中尺寸要求。"),
+                InspectionItem(standard_requirement="连接线长度±0.05m", test_result="2m 单位：m", item_conclusion="+0.02"),
+                InspectionItem(standard_requirement="外径±0.5mm", test_result="6.5mm 单位：mm", item_conclusion="-0.2～+0.0"),
+                InspectionItem(standard_requirement="2.7.3 连接牢固度"),
+            ]
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.match_reason == "measurement_bundle_match"
+
+    def test_out_of_scope_keyword_exclusion_should_not_be_reported_as_differ(self):
+        """Named exclusions on third page should become out_of_scope_in_current_report."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.5.3"),
+                full_text="2.5.3 电磁兼容应符合YY 9706.102-2021要求。",
+                text_content="电磁兼容应符合YY 9706.102-2021要求。",
+                level=3,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        report_doc.third_page_fields = ThirdPageFields(
+            inspection_items=["2.1～2.8（除生物相容性、电磁兼容性）"]
+        )
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="161",
+                inspection_project="安全要求",
+                standard_requirement="2.5.3 电磁兼容应符合YY 9706.102-2021要求。",
+                test_result="/",
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.comparison_status == "out_of_scope_in_current_report"
+        assert result.match_reason == "out_of_scope_in_current_report"
+
+    def test_embedded_clause_reference_should_not_beat_row_start_clause_match(self):
+        """Clause matching should prefer rows whose requirement starts with the target clause."""
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.6.1"),
+                full_text="2.6.1 直流电阻应不大于10Ω。",
+                text_content="直流电阻应不大于10Ω。",
+                level=3,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.extend(
+            [
+                InspectionItem(
+                    sequence_number="157",
+                    inspection_project="机械性能",
+                    standard_requirement="2.1.5 弯曲疲劳应符合2.6.1直流电阻的要求。",
+                    test_result="符合要求",
+                ),
+                InspectionItem(
+                    sequence_number="162",
+                    inspection_project="电学性能",
+                    standard_clause="2.6",
+                    standard_requirement="2.6.1 直流电阻应不大于10Ω。\n单位：Ω",
+                    item_conclusion="6",
+                    remark="符合",
+                ),
+            ]
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+
+        assert result.result == ComparisonResult.MATCH
+        assert result.match_reason == "numeric_semantic_match"
+        assert result.report_item == table.items[1]
+        assert result.details["numeric_evidence"] == "6"
 
     def test_compare_single_clause_match_when_ptr_has_spaces_and_newlines(self):
         """PTR text spacing/newline noise should be ignored like report side."""

@@ -152,6 +152,24 @@ class ThirdPageChecker:
         """Strict equality for module-2 field checks."""
         return (text1 or "").strip() == (text2 or "").strip()
 
+    def _sample_name_equals(self, text1: str, text2: str) -> bool:
+        """Sample/product name equality with tiny tail-character OCR tolerance."""
+        norm1 = re.sub(r"\s+", "", self._normalize_for_comparison(text1))
+        norm2 = re.sub(r"\s+", "", self._normalize_for_comparison(text2))
+        if norm1 == norm2:
+            return True
+        if not norm1 or not norm2:
+            return False
+
+        shorter, longer = sorted((norm1, norm2), key=len)
+        if (
+            len(longer) == len(shorter) + 1
+            and longer.startswith(shorter)
+            and SequenceMatcher(None, shorter, longer[:-1]).ratio() >= 0.98
+        ):
+            return True
+        return False
+
     def _address_equals(self, text1: str, text2: str) -> bool:
         """Address equality with whitespace-insensitive normalization."""
         norm1 = re.sub(r"\s+", "", self._normalize_for_comparison(text1))
@@ -179,25 +197,48 @@ class ThirdPageChecker:
 
     def _model_spec_equals(self, text1: str, text2: str) -> bool:
         """Model/spec equality with limited OCR confusion tolerance."""
-        norm1 = (text1 or "").strip()
-        norm2 = (text2 or "").strip()
+        norm1 = re.sub(r"\s+", "", (text1 or "").strip().upper())
+        norm2 = re.sub(r"\s+", "", (text2 or "").strip().upper())
         if norm1 == norm2:
             return True
         if not norm1 or not norm2:
             return False
+        if len(norm1) != len(norm2):
+            return False
 
-        # Accept common OCR substitutions in alphanumeric model codes.
-        trans = str.maketrans({
-            "O": "0",
-            "o": "0",
-            "I": "1",
-            "l": "1",
-            "|": "1",
-            "S": "5",
-        })
-        canon1 = norm1.translate(trans)
-        canon2 = norm2.translate(trans)
-        return canon1 == canon2
+        confusable_groups = (
+            {"O", "0"},
+            {"I", "1", "L", "|"},
+            {"S", "5"},
+            {"B", "8"},
+        )
+
+        mismatches: list[tuple[str, str]] = []
+        for ch1, ch2 in zip(norm1, norm2, strict=False):
+            if ch1 == ch2:
+                continue
+            mismatches.append((ch1, ch2))
+
+        if not mismatches:
+            return True
+
+        if all(any(ch1 in group and ch2 in group for group in confusable_groups) for ch1, ch2 in mismatches):
+            return True
+
+        digit_suffix1 = re.search(r"(\d{3,})$", norm1)
+        digit_suffix2 = re.search(r"(\d{3,})$", norm2)
+        if (
+            len(mismatches) == 1
+            and digit_suffix1
+            and digit_suffix2
+            and digit_suffix1.group(1) == digit_suffix2.group(1)
+        ):
+            prefix1 = norm1[: digit_suffix1.start()]
+            prefix2 = norm2[: digit_suffix2.start()]
+            if prefix1 and prefix2 and SequenceMatcher(None, prefix1, prefix2).ratio() >= 0.8:
+                return True
+
+        return False
 
     def _is_see_sample_desc(self, value: str) -> bool:
         """Check if value is "见样品描述栏" pattern.
@@ -246,7 +287,12 @@ class ThirdPageChecker:
             third_value = getattr(third_page_fields, third_key, "")
 
             # Strict comparison per PRD: character-level equality.
-            if self._strict_equals(first_value, third_value):
+            values_match = (
+                self._sample_name_equals(first_value, third_value)
+                if display_name == "样品名称"
+                else self._strict_equals(first_value, third_value)
+            )
+            if values_match:
                 status = CheckStatus.PASS
                 message = f"{display_name}一致: {first_value}"
             else:
@@ -271,6 +317,7 @@ class ThirdPageChecker:
         third_page_fields: ThirdPageFields,
         label_ocr_results: list[tuple[CaptionInfo, LabelOCRResult]],
         sample_name: str,
+        first_page_fields: dict[str, str] | None = None,
     ) -> list[C02Result]:
         """Check C02: Third page extended field checks.
 
@@ -293,6 +340,8 @@ class ThirdPageChecker:
         matching_label = self._find_matching_label(
             label_ocr_results,
             sample_name,
+            third_page_fields.model_spec,
+            third_page_fields.product_id_batch,
         )
 
         if not matching_label:
@@ -385,6 +434,46 @@ class ThirdPageChecker:
         for field_name in fields_to_compare:
             page_value = field_values.get(field_name, "")
 
+            if field_name in {"委托方", "委托方地址"}:
+                first_page_value = ""
+                if first_page_fields:
+                    first_page_value = (
+                        first_page_fields.get("client", "")
+                        if field_name == "委托方"
+                        else first_page_fields.get("client_address", "")
+                    )
+                values_match = (
+                    self._client_equals(first_page_value, page_value)
+                    if field_name == "委托方" and first_page_value and page_value
+                    else (
+                        self._address_equals(first_page_value, page_value)
+                        if field_name == "委托方地址" and first_page_value and page_value
+                        else bool(page_value.strip())
+                    )
+                )
+                status = CheckStatus.PASS if values_match else CheckStatus.ERROR
+                if values_match:
+                    message = (
+                        f"{field_name}一致: {page_value}"
+                        if first_page_value
+                        else f"{field_name}使用首页/第三页数据源，标签不参与比对"
+                    )
+                else:
+                    message = f"{field_name}不一致: 首页='{first_page_value}' vs 第三页='{page_value}'"
+
+                results.append(
+                    C02Result(
+                        check_id="C02",
+                        status=status,
+                        message=message,
+                        field_name=field_name,
+                        source_a=first_page_value or page_value,
+                        source_b=page_value,
+                        details={"comparison_source": "first_page_vs_third_page"},
+                    )
+                )
+                continue
+
             # Get corresponding OCR value
             ocr_value = self._get_ocr_field_value(
                 field_name,
@@ -472,6 +561,8 @@ class ThirdPageChecker:
         matching_label = self._find_matching_label(
             label_ocr_results,
             sample_name,
+            third_page_fields.model_spec,
+            third_page_fields.product_id_batch,
         )
 
         if not matching_label:
@@ -554,6 +645,8 @@ class ThirdPageChecker:
         self,
         label_ocr_results: list[tuple[CaptionInfo, LabelOCRResult]],
         sample_name: str,
+        model_spec: str = "",
+        batch_number: str = "",
     ) -> tuple[CaptionInfo, LabelOCRResult] | None:
         """Find label whose caption main name matches sample name.
 
@@ -565,30 +658,58 @@ class ThirdPageChecker:
             Matching (caption info, OCR result) or None
         """
         normalized_sample = self._normalize_label_name(sample_name)
-        if not normalized_sample:
-            return None
+        normalized_model = re.sub(r"\s+", "", model_spec or "")
+        normalized_batch = re.sub(r"\s+", "", batch_number or "")
+        best_match: tuple[tuple[int, int, int], tuple[CaptionInfo, LabelOCRResult]] | None = None
 
         for caption_info, ocr_result in label_ocr_results:
-            if caption_info.is_chinese_label:
-                caption_main = self._normalize_label_name(caption_info.main_name)
-                caption_raw = self._normalize_label_name(caption_info.raw_caption)
+            if not caption_info.is_chinese_label:
+                continue
 
-                # Support exact match and partial match
-                if (
-                    (caption_main and (
-                        caption_main == normalized_sample
-                        or normalized_sample in caption_main
-                        or caption_main in normalized_sample
-                    ))
-                    or (caption_raw and (
-                        caption_raw == normalized_sample
-                        or normalized_sample in caption_raw
-                        or caption_raw in normalized_sample
-                    ))
-                ):
-                    return caption_info, ocr_result
+            label_model = re.sub(r"\s+", "", ocr_result.fields.get("model_spec", "") or "")
+            label_batch = re.sub(
+                r"\s+",
+                "",
+                (
+                    ocr_result.fields.get("batch_number")
+                    or ocr_result.fields.get("serial_number")
+                    or ""
+                ),
+            )
+            product_name = self._normalize_label_name(ocr_result.fields.get("product_name", ""))
+            caption_main = self._normalize_label_name(caption_info.main_name)
+            caption_raw = self._normalize_label_name(caption_info.raw_caption)
 
-        return None
+            model_match = bool(
+                normalized_model
+                and label_model
+                and self._model_spec_equals(normalized_model, label_model)
+            )
+            batch_match = bool(
+                normalized_batch
+                and label_batch
+                and self._model_spec_equals(normalized_batch, label_batch)
+            )
+            name_match = bool(
+                normalized_sample
+                and (
+                    (product_name and (product_name == normalized_sample or normalized_sample in product_name or product_name in normalized_sample))
+                    or (caption_main and (caption_main == normalized_sample or normalized_sample in caption_main or caption_main in normalized_sample))
+                    or (caption_raw and (caption_raw == normalized_sample or normalized_sample in caption_raw or caption_raw in normalized_sample))
+                )
+            )
+            if not (model_match or name_match):
+                continue
+
+            score = (
+                3 if model_match and batch_match else 2 if model_match else 1,
+                int(batch_match),
+                len(product_name or caption_main or caption_raw),
+            )
+            if best_match is None or score > best_match[0]:
+                best_match = (score, (caption_info, ocr_result))
+
+        return best_match[1] if best_match else None
 
     def _normalize_label_name(self, text: str) -> str:
         """Normalize label/sample names for robust matching.
@@ -727,6 +848,7 @@ class ThirdPageChecker:
             third_page_fields,
             label_ocr_results,
             third_page_fields.sample_name,
+            first_page_fields=first_page_fields,
         )
         results["C02"].extend(c02_results)
 

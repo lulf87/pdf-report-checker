@@ -226,6 +226,26 @@ class TestC01FieldConsistency:
         sample_result = next(r for r in results if r.field_name == "样品名称")
         assert sample_result.status == CheckStatus.ERROR
 
+    def test_sample_name_missing_one_tail_character_should_pass(self):
+        """Trailing single-character OCR miss should not fail C01 sample-name comparison."""
+        checker = ThirdPageChecker()
+
+        first_page_fields = {
+            "client": "ABC医疗器械有限公司",
+            "sample_name": "一次性使用磁电定位心脏脉冲电场消融导",
+            "model_spec": "NavAEPP1206",
+        }
+
+        third_page_fields = ThirdPageFields(
+            client="ABC医疗器械有限公司",
+            sample_name="一次性使用磁电定位心脏脉冲电场消融导管",
+            model_spec="NavAEPP1206",
+        )
+
+        results = checker.check_c01_field_consistency(first_page_fields, third_page_fields)
+        sample_result = next(r for r in results if r.field_name == "样品名称")
+        assert sample_result.status == CheckStatus.PASS
+
     def test_model_spec_mismatch(self):
         """Test model spec field mismatch."""
         checker = ThirdPageChecker()
@@ -249,6 +269,12 @@ class TestC01FieldConsistency:
 
         model_result = next(r for r in results if r.field_name == "型号规格")
         assert model_result.status == CheckStatus.ERROR
+
+    def test_model_spec_common_ocr_noise_should_match(self):
+        """Model/spec comparison should tolerate small OCR confusions in code values."""
+        checker = ThirdPageChecker()
+        assert checker._model_spec_equals("NavAEPP1206", "NOVAEPP1206") is True
+        assert checker._model_spec_equals("2BL010", "28L010") is True
 
     def test_with_fullwidth_halfwidth_difference(self):
         """Test that full-width/half-width differences are strict mismatch."""
@@ -412,6 +438,48 @@ class TestC02ExtendedFields:
         )
         client_result = next(r for r in results if r.field_name == "委托方")
         assert client_result.status == CheckStatus.PASS
+
+    def test_c02_client_fields_should_not_depend_on_label_payload(self):
+        """Client and address should use first/third-page sources instead of label OCR."""
+        checker = ThirdPageChecker()
+
+        first_page_fields = {
+            "client": "艾科脉医疗器械(绍兴)有限公司",
+        }
+        third_page_fields = ThirdPageFields(
+            model_spec="NavAEPP1206",
+            production_date="2025-12-03",
+            product_id_batch="2BL009",
+            client="艾科脉医疗器械(绍兴)有限公司",
+            client_address="浙江省绍兴市越城区沥海街道南滨东路8号",
+            sample_name="一次性使用磁电定位心脏脉冲电场消融导管",
+        )
+
+        caption_info = CaptionInfo(
+            raw_caption="№2 一次性使用磁电定位心脏脉冲电场消融导管 中文标签",
+            main_name="一次性使用磁电定位心脏脉冲电场消融导管",
+            is_chinese_label=True,
+        )
+        ocr_result = LabelOCRResult(
+            raw_text="标签无注册人字段",
+            fields={
+                "model_spec": "NOVAEPP1206",
+                "production_date": "2025-12-03",
+                "batch_number": "2BL009",
+            },
+        )
+
+        results = checker.check_c02_extended_fields(
+            third_page_fields,
+            [(caption_info, ocr_result)],
+            third_page_fields.sample_name,
+            first_page_fields=first_page_fields,
+        )
+
+        client_result = next(r for r in results if r.field_name == "委托方")
+        addr_result = next(r for r in results if r.field_name == "委托方地址")
+        assert client_result.status == CheckStatus.PASS
+        assert addr_result.status == CheckStatus.PASS
 
     def test_model_spec_ocr_zero_o_noise_should_match(self):
         """Model/spec compare should tolerate OCR O/0 confusion."""
@@ -664,6 +732,79 @@ class TestC03ProductionDateFormat:
 
         # Should return WARNING since no production date in label
         assert result.status == CheckStatus.WARNING
+
+    def test_real_product_name_label_should_pass_c03(self):
+        """Real-like label payload should match by product_name and date value."""
+        checker = ThirdPageChecker()
+
+        third_page_fields = ThirdPageFields(
+            sample_name="一次性使用磁电定位心脏脉冲电场消融导管",
+            production_date="2025-12-03",
+        )
+        label_ocr_results = [
+            (
+                CaptionInfo(
+                    raw_caption="中文标签：导管",
+                    main_name="导管",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="test",
+                    fields={
+                        "product_name": "一次性使用磁电定位心脏脉冲电场消融导管",
+                        "model_spec": "NavAEPP1206",
+                        "batch_number": "2BL009",
+                        "production_date": "2025-12-03",
+                    },
+                ),
+            )
+        ]
+
+        result = checker.check_c03_production_date_format(
+            third_page_fields,
+            label_ocr_results,
+            "一次性使用磁电定位心脏脉冲电场消融导管",
+        )
+
+        assert result.status == CheckStatus.PASS
+        assert result.page_value == "2025-12-03"
+        assert result.label_value == "2025-12-03"
+
+    def test_c03_should_prefer_model_and_batch_when_caption_name_is_noisy(self):
+        checker = ThirdPageChecker()
+
+        third_page_fields = ThirdPageFields(
+            sample_name="一次性使用磁电定位心脏脉冲电场消融导管",
+            model_spec="NavAEPP1206",
+            product_id_batch="2BL009",
+            production_date="2025-12-03",
+        )
+        label_ocr_results = [
+            (
+                CaptionInfo(
+                    raw_caption="中文标签：其他部件",
+                    main_name="其他部件",
+                    is_chinese_label=True,
+                ),
+                LabelOCRResult(
+                    raw_text="test",
+                    fields={
+                        "product_name": "完全不同的名字",
+                        "model_spec": "NavAEPP1206",
+                        "batch_number": "2BL009",
+                        "production_date": "2025-12-03",
+                    },
+                ),
+            )
+        ]
+
+        result = checker.check_c03_production_date_format(
+            third_page_fields,
+            label_ocr_results,
+            third_page_fields.sample_name,
+        )
+
+        assert result.status == CheckStatus.PASS
 
 
 class TestFindMatchingLabel:
