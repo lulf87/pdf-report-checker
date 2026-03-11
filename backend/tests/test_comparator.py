@@ -363,6 +363,9 @@ class TestCompareDocuments:
         result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
         assert result.result == ComparisonResult.MATCH
         assert result.match_reason == "measurement_bundle_match"
+        assert result.details["display_type"] == "measurement_bundle"
+        assert result.details["display_title"] == "尺寸要求"
+        assert len(result.details["structured_rows"]) == 6
 
     def test_segmented_threshold_bundle_should_match(self):
         """Segment threshold tables should pass when every measured interval satisfies the minimum."""
@@ -396,6 +399,9 @@ class TestCompareDocuments:
         result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
         assert result.result == ComparisonResult.MATCH
         assert result.match_reason == "segmented_threshold_bundle_match"
+        assert result.details["display_type"] == "segmented_threshold_bundle"
+        assert result.details["display_title"] == "断裂力"
+        assert len(result.details["structured_rows"]) == 5
 
     def test_measurement_bundle_should_combine_base_value_and_tolerance_split_across_columns(self):
         """Rows like '连接线长度±0.05m' + '2m' + '+0.02' should still pass as one bundle."""
@@ -425,6 +431,8 @@ class TestCompareDocuments:
         result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
         assert result.result == ComparisonResult.MATCH
         assert result.match_reason == "measurement_bundle_match"
+        assert result.details["display_type"] == "measurement_bundle"
+        assert [row["item"] for row in result.details["structured_rows"]] == ["连接线长度", "外径"]
 
     def test_out_of_scope_keyword_exclusion_should_not_be_reported_as_differ(self):
         """Named exclusions on third page should become out_of_scope_in_current_report."""
@@ -458,6 +466,8 @@ class TestCompareDocuments:
         assert result.result == ComparisonResult.MATCH
         assert result.comparison_status == "out_of_scope_in_current_report"
         assert result.match_reason == "out_of_scope_in_current_report"
+        assert result.details["display_type"] == "out_of_scope_notice"
+        assert "范围外" in result.details["structured_notice"]
 
     def test_embedded_clause_reference_should_not_beat_row_start_clause_match(self):
         """Clause matching should prefer rows whose requirement starts with the target clause."""

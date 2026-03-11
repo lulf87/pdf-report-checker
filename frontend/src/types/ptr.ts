@@ -68,9 +68,25 @@ export interface ClauseResult {
   report_text: string;
   result: string;  // 'match' | 'differ' | 'missing' | 'excluded'
   similarity: number;
+  status?: string;
   match_reason?: string;
+  display_title?: string;
+  display_type?: 'plain_text' | 'measurement_bundle' | 'segmented_threshold_bundle' | 'out_of_scope_notice';
+  raw_text_collapsed?: boolean;
+  structured_summary?: string;
+  structured_notice?: string;
+  structured_rows?: StructuredRow[];
+  details?: Record<string, unknown>;
   differences?: Difference[];
   table_expansions?: ClauseTableExpansion[];
+}
+
+export interface StructuredRow {
+  item?: string;
+  segment?: string;
+  requirement: string;
+  actual: string;
+  result?: string;
 }
 
 export interface ClauseTableExpansion {
@@ -95,7 +111,13 @@ export interface Clause {
   ptr_text: string;
   report_text: string;
   is_match: boolean;
+  status?: string;
   match_reason?: string;
+  display_type?: ClauseResult['display_type'];
+  raw_text_collapsed?: boolean;
+  structured_summary?: string;
+  structured_notice?: string;
+  structured_rows?: StructuredRow[];
   diffs: DiffItem[];
   table_expansions?: ClauseTableExpansion[];
 }

@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from app.models.ptr_models import PTRClause, PTRDocument
 from app.models.report_models import InspectionItem, ReportDocument
@@ -68,7 +68,7 @@ class ComparisonDetail:
     similarity: float = 0.0
     match_reason: str = ""
     comparison_status: str = "pass"
-    details: dict[str, str] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
     @property
     def has_differences(self) -> bool:
@@ -175,6 +175,9 @@ class ClauseComparator:
             ComparisonDetail with comparison result
         """
         detail = ComparisonDetail(ptr_clause=ptr_clause)
+        detail.details["display_title"] = self._extract_clause_display_title(ptr_clause)
+        detail.details["display_type"] = "plain_text"
+        detail.details["raw_text_collapsed"] = True
 
         # Check if this clause is excluded
         clause_num_str = str(ptr_clause.number)
@@ -231,6 +234,9 @@ class ClauseComparator:
             detail.comparison_status = scope_status
             detail.match_reason = scope_status
             detail.details["special_status"] = scope_status
+            detail.details["display_type"] = "out_of_scope_notice"
+            detail.details["structured_summary"] = "本项在当前报告检验范围外，按范围外条款展示。"
+            detail.details["structured_notice"] = "本项属于当前报告检验范围外内容，证据引用当前报告范围说明或外部报告。"
             if scope_evidence:
                 detail.details["special_evidence"] = scope_evidence
             return detail
@@ -241,6 +247,10 @@ class ClauseComparator:
             detail.comparison_status = special_status
             detail.match_reason = special_status
             detail.details["special_status"] = special_status
+            if special_status in {"external_reference", "pending_evidence", "out_of_scope_in_current_report"}:
+                detail.details["display_type"] = "out_of_scope_notice"
+                detail.details["structured_summary"] = "本项不按正文一致性失败处理。"
+                detail.details["structured_notice"] = self._build_special_status_notice(special_status)
             if special_evidence:
                 detail.details["special_evidence"] = special_evidence
             return detail
@@ -370,11 +380,15 @@ class ClauseComparator:
             required_keywords = self._expected_measurement_keywords(ptr_clause)
             if required_keywords and not self._bundle_covers_keywords(matched_names, required_keywords):
                 return None
+            structured_rows = self._build_measurement_bundle_display_rows(bundle_rows)
             return {
                 "reason": "measurement_bundle_match",
                 "details": {
                     "bundle_type": "measurement",
                     "bundle_rows": "、".join(matched_names),
+                    "display_type": "measurement_bundle",
+                    "structured_summary": f"共核对 {len(structured_rows)} 个测量项目，均满足要求。",
+                    "structured_rows": structured_rows,
                 },
             }
 
@@ -385,11 +399,15 @@ class ClauseComparator:
             matched_names = self._evaluate_measurement_bundle_rows(bundle_rows)
             if len(matched_names) < 2:
                 return None
+            structured_rows = self._build_threshold_bundle_display_rows(bundle_rows)
             return {
                 "reason": "segmented_threshold_bundle_match",
                 "details": {
                     "bundle_type": "threshold_table",
                     "bundle_rows": "、".join(matched_names),
+                    "display_type": "segmented_threshold_bundle",
+                    "structured_summary": f"共核对 {len(structured_rows)} 个试验段，均满足要求。",
+                    "structured_rows": structured_rows,
                 },
             }
 
@@ -445,6 +463,62 @@ class ClauseComparator:
                 return []
             matched_names.append(name)
         return matched_names
+
+    def _build_measurement_bundle_display_rows(
+        self,
+        rows: list[InspectionItem],
+    ) -> list[dict[str, str]]:
+        display_rows: list[dict[str, str]] = []
+        for row in rows:
+            raw_name = self.normalizer.normalize(row.standard_requirement or "")
+            name = self._normalize_bundle_name(raw_name)
+            expected = self._resolve_bundle_expected_value(raw_name, row.test_result or "")
+            actual = self._resolve_bundle_actual_value(row)
+            if not name or not expected or not actual:
+                continue
+            display_rows.append(
+                {
+                    "item": name,
+                    "requirement": expected,
+                    "actual": actual,
+                    "result": "一致",
+                }
+            )
+        return display_rows
+
+    def _build_threshold_bundle_display_rows(
+        self,
+        rows: list[InspectionItem],
+    ) -> list[dict[str, str]]:
+        display_rows: list[dict[str, str]] = []
+        for row in rows:
+            segment = self._normalize_bundle_name(row.standard_requirement or "")
+            requirement = self.normalizer.normalize(row.test_result or "")
+            actual = self._resolve_bundle_actual_value(row)
+            if not segment or not requirement or not actual:
+                continue
+            if segment == "试验段":
+                continue
+            display_rows.append(
+                {
+                    "segment": segment,
+                    "requirement": requirement,
+                    "actual": actual,
+                    "result": "一致",
+                }
+            )
+        return display_rows
+
+    def _resolve_bundle_actual_value(self, row: InspectionItem) -> str:
+        for candidate in (
+            row.item_conclusion or "",
+            row.remark or "",
+            row.test_result or "",
+        ):
+            normalized = self.normalizer.normalize(candidate)
+            if normalized:
+                return normalized
+        return ""
 
     def _normalize_bundle_name(self, value: str) -> str:
         text = self.normalizer.normalize(value or "")
@@ -529,6 +603,41 @@ class ClauseComparator:
             return (-tolerance) <= value <= tolerance
 
         return False
+
+    def _extract_clause_display_title(self, ptr_clause: PTRClause) -> str:
+        text = self.normalizer.normalize(ptr_clause.text_content or ptr_clause.full_text or "")
+        if not text:
+            return str(ptr_clause.number)
+
+        compact_text = self._compact_for_compare(text)
+        if "断裂力" in compact_text:
+            return "断裂力"
+        if "尺寸要求" in compact_text or ("直径" in compact_text and "有效长度" in compact_text):
+            return "尺寸要求"
+        if "导管连接线" in compact_text and "尺寸要求" in compact_text:
+            return "尺寸"
+
+        lines = [line.strip(" ：:;；") for line in re.split(r"[\r\n]+", text) if line.strip()]
+        for line in lines:
+            compact = self._compact_for_compare(line)
+            if 1 <= len(compact) <= 18 and not re.match(r"^(当用|各试验段|应符合|产品型号|导管连接线)", compact):
+                return line
+
+        sentence = re.split(r"[。；;]", text, maxsplit=1)[0].strip()
+        if sentence:
+            sentence = re.sub(r"^(当用通用量具测量时，?)", "", sentence)
+            sentence = re.sub(r"(应符合.*)$", "", sentence).strip(" ，,：:")
+            if sentence:
+                return sentence[:24]
+        return text[:24]
+
+    def _build_special_status_notice(self, special_status: str) -> str:
+        mapping = {
+            "external_reference": "本项结果引用外部报告，当前报告正文未重复列出完整数据。",
+            "pending_evidence": "本项在当前材料中待补证，暂不按不一致处理。",
+            "out_of_scope_in_current_report": "本项在当前报告检验范围外，不纳入正文一致性失败统计。",
+        }
+        return mapping.get(special_status, "本项按特殊状态展示，不按普通文本条款解释。")
 
     def _build_report_comparison_context(
         self,

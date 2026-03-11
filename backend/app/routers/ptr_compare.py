@@ -507,9 +507,30 @@ def build_comparison_result(
             "status": getattr(detail, "comparison_status", "pass"),
             "similarity": detail.similarity,
             "match_reason": detail.match_reason,
+            "display_title": (
+                detail.details.get("display_title")
+                if getattr(detail, "details", None)
+                else (detail.ptr_clause.text_content[:24] if detail.ptr_clause else "")
+            ),
+            "display_type": (
+                detail.details.get("display_type")
+                if getattr(detail, "details", None)
+                else "plain_text"
+            ),
+            "raw_text_collapsed": bool(
+                detail.details.get("raw_text_collapsed", True)
+                if getattr(detail, "details", None)
+                else True
+            ),
         }
         if getattr(detail, "details", None):
             clause_data["details"] = detail.details
+            if "structured_rows" in detail.details:
+                clause_data["structured_rows"] = detail.details["structured_rows"]
+            if "structured_summary" in detail.details:
+                clause_data["structured_summary"] = detail.details["structured_summary"]
+            if "structured_notice" in detail.details:
+                clause_data["structured_notice"] = detail.details["structured_notice"]
 
         if detail.has_differences:
             clause_data["differences"] = [

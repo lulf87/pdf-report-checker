@@ -22,7 +22,13 @@ interface ClauseCardProps {
  */
 export function ClauseCard({ clause, index }: ClauseCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showRawText, setShowRawText] = useState(false);
   const isMismatch = !clause.is_match;
+  const isOutOfScope = clause.display_type === 'out_of_scope_notice';
+  const titleText = clause.title || clause.ptr_text;
+  const badgeVariant = isOutOfScope ? 'warn' : (clause.is_match ? 'success' : 'danger');
+  const badgeLabel = isOutOfScope ? '范围外/引用' : (clause.is_match ? '一致' : '不一致');
+  const structuredRows = clause.structured_rows || [];
 
   return (
     <motion.div
@@ -100,13 +106,13 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                   flex: 1,
                 }}
               >
-                {clause.title}
+                {titleText}
               </h3>
               <Badge
-                variant={clause.is_match ? 'success' : 'danger'}
+                variant={badgeVariant}
                 pulse={!clause.is_match}
               >
-                {clause.is_match ? '一致' : '不一致'}
+                {badgeLabel}
               </Badge>
             </div>
             {clause.is_match && clause.match_reason === 'table_parameter_equivalent' && (
@@ -174,7 +180,70 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                     >
                       检验报告
                     </p>
-                    <DiffViewer diffs={clause.diffs} fallbackText={clause.report_text} />
+                    {clause.display_type === 'measurement_bundle' && structuredRows.length > 0 ? (
+                      <StructuredTable
+                        columns={['项目', '要求', '实测', '结论']}
+                        rows={structuredRows.map((row) => [
+                          row.item || '-',
+                          row.requirement,
+                          row.actual,
+                          row.result || '一致',
+                        ])}
+                        summary={clause.structured_summary}
+                      />
+                    ) : clause.display_type === 'segmented_threshold_bundle' && structuredRows.length > 0 ? (
+                      <StructuredTable
+                        columns={['试验段', '要求', '实测', '结论']}
+                        rows={structuredRows.map((row) => [
+                          row.segment || '-',
+                          row.requirement,
+                          row.actual,
+                          row.result || '一致',
+                        ])}
+                        summary={clause.structured_summary}
+                      />
+                    ) : clause.display_type === 'out_of_scope_notice' ? (
+                      <NoticeBlock
+                        summary={clause.structured_summary}
+                        notice={clause.structured_notice}
+                      />
+                    ) : (
+                      <DiffViewer diffs={clause.diffs} fallbackText={formatReadableText(clause.report_text)} />
+                    )}
+                  </div>
+
+                  {/* Raw text */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowRawText((value) => !value);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--color-accent)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '0.8rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {showRawText ? '收起原始提取文本' : '查看原始提取文本'}
+                    </button>
+                    {showRawText && (
+                      <div
+                        style={{
+                          marginTop: '0.75rem',
+                          display: 'grid',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <RawTextBlock label="PTR 原始文本" text={clause.ptr_text} />
+                        <RawTextBlock label="报告原始文本" text={clause.report_text} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Table Expansion Details */}
@@ -267,4 +336,157 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
       </GlassCard>
     </motion.div>
   );
+}
+
+function StructuredTable({
+  columns,
+  rows,
+  summary,
+}: {
+  columns: string[];
+  rows: string[][];
+  summary?: string;
+}) {
+  return (
+    <div style={{ display: 'grid', gap: '0.75rem' }}>
+      {summary && (
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          {summary}
+        </p>
+      )}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column}
+                  style={{
+                    textAlign: 'left',
+                    padding: '0.6rem',
+                    borderBottom: '1px solid var(--glass-border)',
+                    color: 'var(--text-muted)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={`${row[0]}-${rowIndex}`}>
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={`${columns[cellIndex]}-${rowIndex}`}
+                    style={{
+                      padding: '0.6rem',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                      color: cellIndex === 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      verticalAlign: 'top',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {formatReadableText(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function NoticeBlock({ summary, notice }: { summary?: string; notice?: string }) {
+  return (
+    <div
+      style={{
+        border: '1px solid rgba(196, 167, 108, 0.4)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '0.9rem',
+        background: 'rgba(196, 167, 108, 0.08)',
+        display: 'grid',
+        gap: '0.45rem',
+      }}
+    >
+      {summary && <p style={{ fontSize: '0.84rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>{summary}</p>}
+      {notice && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{notice}</p>}
+    </div>
+  );
+}
+
+function RawTextBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <div>
+      <p
+        style={{
+          fontSize: '0.72rem',
+          fontWeight: 600,
+          color: 'var(--text-muted)',
+          marginBottom: '0.4rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
+      >
+        {label}
+      </p>
+      <pre
+        style={{
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          fontSize: '0.78rem',
+          lineHeight: 1.55,
+          color: 'var(--text-secondary)',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--glass-border)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '0.75rem',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        }}
+      >
+        {formatReadableText(text)}
+      </pre>
+    </div>
+  );
+}
+
+function formatReadableText(text: string): string {
+  if (!text) {
+    return '';
+  }
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const merged: string[] = [];
+  for (const line of lines) {
+    const previous = merged[merged.length - 1];
+    if (
+      previous &&
+      shouldMergeReadable(previous, line)
+    ) {
+      merged[merged.length - 1] = `${previous}${line}`;
+    } else {
+      merged.push(line);
+    }
+  }
+
+  return merged.join('\n');
+}
+
+function shouldMergeReadable(previous: string, current: string): boolean {
+  const previousCompact = previous.replace(/\s+/g, '');
+  const currentCompact = current.replace(/\s+/g, '');
+  if (!previousCompact || !currentCompact) {
+    return false;
+  }
+  const shortPrevious = previousCompact.length <= 4;
+  const shortCurrent = currentCompact.length <= 4;
+  const endsWithConnector = /[与及和头身柄圈端管径度力段值外内大小最手连接线]$/.test(previousCompact);
+  return (shortPrevious || shortCurrent || endsWithConnector) && !/[：:。；;]$/.test(previousCompact);
 }

@@ -336,6 +336,43 @@ class TestBackgroundProcessing:
         assert clause_data["table_expansions"][0]["table_number"] == 1
         assert clause_data["table_expansions"][0]["parameters"][0]["name"] == "脉冲宽度"
 
+    def test_build_comparison_result_includes_display_metadata(self):
+        """Structured clauses should expose display metadata for the frontend detail view."""
+        from app.models.ptr_models import PTRClause, PTRClauseNumber, PTRDocument
+        from app.models.report_models import ReportDocument
+        from app.routers.ptr_compare import build_comparison_result
+        from app.services.comparator import ComparisonDetail, ComparisonResult
+
+        ptr_clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 断裂力",
+            text_content="断裂力 各试验段的断裂力应符合下表的规定。",
+            level=3,
+        )
+        detail = ComparisonDetail(
+            ptr_clause=ptr_clause,
+            result=ComparisonResult.MATCH,
+            match_reason="segmented_threshold_bundle_match",
+            comparison_status="pass",
+            details={
+                "display_title": "断裂力",
+                "display_type": "segmented_threshold_bundle",
+                "raw_text_collapsed": True,
+                "structured_summary": "共核对 5 个试验段，均满足要求。",
+                "structured_rows": [
+                    {"segment": "环形圈头端与环形圈管身", "requirement": "≥10", "actual": "17～46", "result": "一致"},
+                ],
+            },
+        )
+
+        result = build_comparison_result(PTRDocument(clauses=[ptr_clause]), ReportDocument(), [detail], [])
+
+        clause_data = result["clauses"][0]
+        assert clause_data["display_title"] == "断裂力"
+        assert clause_data["display_type"] == "segmented_threshold_bundle"
+        assert clause_data["raw_text_collapsed"] is True
+        assert clause_data["structured_rows"][0]["actual"] == "17～46"
+
 
 class TestAPIRoutes:
     """Test API route registration."""
