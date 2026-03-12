@@ -125,6 +125,7 @@ class ReportExtractor:
         """
         report_doc = ReportDocument()
         report_doc.metadata = pdf_doc.metadata
+        report_doc.pdf_doc = pdf_doc
 
         # Extract fields from page 1 (首页)
         if pdf_doc.pages:

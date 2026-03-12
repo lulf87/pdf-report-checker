@@ -7,6 +7,8 @@ Defines structures for report clauses, inspection items, and test results.
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.models.common_models import PDFDocument
+
 
 @dataclass
 class InspectionItem:
@@ -243,6 +245,7 @@ class ReportDocument:
     third_page_fields: ThirdPageFields | None = None
     first_page_fields: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    pdf_doc: PDFDocument | None = None
 
     def get_inspection_item(self, seq: str) -> InspectionItem | None:
         """Get inspection item by sequence number."""

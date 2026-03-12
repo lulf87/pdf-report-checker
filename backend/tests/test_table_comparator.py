@@ -684,6 +684,128 @@ class TestEdgeCases:
         )
         assert len(comparisons) == 1
         assert comparisons[0].matches is True
+        assert comparisons[0].details["referenced_table_label"] == "表1"
+        assert comparisons[0].details["ptr_parameter_name"] == "脉冲宽度(ms)"
+
+    def test_compare_table_parameters_should_keep_multiple_report_evidence_segments(self):
+        """One matched parameter should preserve multiple report evidence segments for display."""
+        comparator = TableComparator()
+        ptr_table = PTRTable(
+            table_number=1,
+            headers=["参数", "型号", "常规数值", "标准设置", "允许误差"],
+            rows=[
+                ["脉冲宽度(ms)", "全部型号", "0.1...(0.1)...1.5", "0.4", "±20μs"],
+            ],
+        )
+        head_row = InspectionItem(
+            sequence_number="39",
+            standard_clause="2.1.3",
+            standard_requirement="脉冲宽度应符合表1中的数值。",
+            inspection_project="脉冲宽度(ms)",
+        )
+        continuation_rows = [
+            InspectionItem(
+                sequence_number="",
+                inspection_project="",
+                standard_requirement="脉冲宽度(ms)（心房）\n常规数值：0.1...(0.1)...1.5\n标准设置：0.4",
+                test_result="允许误差：±20μs\n@240Ω 0.1ms：±20μs",
+            ),
+            InspectionItem(
+                sequence_number="",
+                inspection_project="",
+                standard_requirement="脉冲宽度(ms)（右室）\n常规数值：0.1...(0.1)...1.5\n标准设置：0.4",
+                test_result="允许误差：±20μs\n@500Ω 0.2ms～1.5ms：±10%",
+            ),
+        ]
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.3"),
+            full_text="2.1.3 脉冲宽度",
+            text_content="脉冲宽度(ms)：脉冲宽度应符合表1中的数值。",
+            level=3,
+        )
+
+        comparisons = comparator._compare_table_parameters(
+            ptr_table=ptr_table,
+            report_item=head_row,
+            clause=clause,
+            report_items=[head_row, *continuation_rows],
+        )
+
+        assert len(comparisons) == 1
+        evidence_rows = comparisons[0].details["report_evidence_rows"]
+        assert len(evidence_rows) >= 2
+        assert "心房" in evidence_rows[0]["label"]
+        assert "右室" in evidence_rows[1]["label"]
+
+    def test_table_summary_reference_should_not_require_single_parameter_match(self):
+        comparator = TableComparator()
+        clause = PTRClause(
+            number=PTRClauseNumber.from_string("2.1.2"),
+            full_text="2.1.2 尺寸",
+            text_content="尺寸具体要求见表1。\n组件\n项目\n接收标准\n导管有效长度L",
+            level=3,
+            table_references=[PTRTableReference(table_number=1)],
+        )
+        ptr_doc = PTRDocument(clauses=[clause], tables=[])
+        report_item = InspectionItem(
+            sequence_number="11",
+            standard_clause="2.1.2",
+            inspection_project="尺寸",
+            standard_requirement="尺寸具体要求见表1。\n表1 尺寸\n组件\n导管\n导丝",
+        )
+
+        result = comparator._compare_table_reference(1, clause, ptr_doc, [report_item])
+
+        assert result.table_found is True
+        assert result.reference_type == "table_summary_reference"
+        assert result.parameters[0].parameter_name == "整表摘要"
+        assert result.parameters[0].details["reference_type"] == "table_summary_reference"
+        assert result.parameters[0].details["referenced_table_label"] == "表1"
+
+    def test_extract_value_map_from_segment_should_keep_multi_step_expression_intact(self):
+        comparator = TableComparator()
+        segment = "基础频率(bpm) 常规数值：30...(5)...100...(10)...200 标准设置：60 允许误差：±20ms 单位：ms"
+
+        value_map = comparator._extract_value_map_from_segment(segment)
+
+        assert value_map["常规数值"] == "30...(5)...100...(10)...200"
+        assert value_map["标准设置"] == "60"
+        assert value_map["允许误差"] == "±20ms"
+        assert value_map["单位"] == "ms"
+
+    def test_extract_condition_result_rows_should_bind_condition_to_result(self):
+        comparator = TableComparator()
+        content = "@240Ω\n-10～+3\n@500Ω\n-10～+3\n@2000Ω\n-10～+3\n单位：ms"
+
+        rows = comparator._extract_condition_result_rows(content)
+
+        assert rows == [
+            {"condition": "@240Ω", "result": "-10～+3"},
+            {"condition": "@500Ω", "result": "-10～+3"},
+            {"condition": "@2000Ω", "result": "-10～+3"},
+        ]
+
+    def test_resolve_report_value_from_condition_rows_should_not_return_condition_label(self):
+        comparator = TableComparator()
+        report_evidence_rows = [
+            {
+                "label": "基础频率(bpm)",
+                "content": "允许误差：±20ms\n@240Ω\n@500Ω\n@2000Ω",
+                "condition_rows": [
+                    {"condition": "@240Ω", "result": "-10～+3"},
+                    {"condition": "@500Ω", "result": "-10～+3"},
+                    {"condition": "@2000Ω", "result": "-10～+3"},
+                ],
+            }
+        ]
+
+        report_value = comparator._resolve_report_value_from_evidence_rows(
+            report_evidence_rows=report_evidence_rows,
+            report_text="基础频率(bpm)\n@240Ω\n-10～+3\n@500Ω\n-10～+3\n@2000Ω\n-10～+3",
+            parameter_name="基础频率(bpm)",
+        )
+
+        assert report_value == "-10～+3（@240Ω/@500Ω/@2000Ω）"
 
     def test_compare_table_parameters_should_mark_external_reference_without_failing(self):
         comparator = TableComparator()

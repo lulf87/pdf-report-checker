@@ -536,3 +536,79 @@ class TestRealSampleRegressions:
         assert table["parameters"][0]["details"]["ptr_values"]["标准设置"] == "225"
         assert table["parameters"][0]["details"]["ptr_values"]["允许误差"] == "±20"
         assert table["parameters"][0]["report_value"] == "-15～-12"
+        assert table["parameters"][0]["details"]["referenced_table_label"] == "表1"
+        assert table["parameters"][0]["details"]["ptr_parameter_name"] == "PVARP(ms)"
+
+    def test_3940_table_reference_regression_should_expose_multi_segment_report_evidence(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "3940" / "3940 产品技术要求 Edora 8 改批注zx260218 260225更新.pdf"
+        report_path = base / "report" / "3940" / "3940.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("3940 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+        clause = clause_map["2.1.3"]
+        table = clause["table_expansions"][0]
+        param = table["parameters"][0]
+
+        assert param["name"] == "脉冲宽度(ms)"
+        assert param["details"]["referenced_table_label"] == "表1"
+        assert param["details"]["ptr_model_scope"] == "全部型号"
+        evidence_rows = param["details"]["report_evidence_rows"]
+        assert len(evidence_rows) >= 2
+        assert any("心房" in row["label"] for row in evidence_rows)
+        assert any("右室" in row["label"] for row in evidence_rows)
+
+    def test_5782_table_summary_reference_should_not_show_missing_table(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "5782" / "一次性使用消化道脉冲电场消融导管技术要求.pdf"
+        report_path = base / "report" / "5782" / "QW2025-5782 Draft.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("5782 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+        clause = clause_map["2.1.2"]
+        table = clause["table_expansions"][0]
+
+        assert clause["match_reason"] == "table_reference_equivalent"
+        assert table["found"] is True
+        assert table["reference_type"] == "table_summary_reference"
+        assert table["referenced_table_label"] == "表1"
+        assert table["parameters"][0]["details"]["reference_type"] == "table_summary_reference"
+
+    def test_5782_direct_requirement_regression_should_normalize_resistance_symbols(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "5782" / "一次性使用消化道脉冲电场消融导管技术要求.pdf"
+        report_path = base / "report" / "5782" / "QW2025-5782 Draft.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("5782 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+        clause = clause_map["2.5.1"]
+
+        assert clause["report_text"].count("20Ω") >= 1
+
+    def test_3940_basic_frequency_regression_should_bind_condition_rows(self):
+        base = Path(__file__).parent.parent.parent / "素材"
+        ptr_path = base / "ptr" / "3940" / "3940 产品技术要求 Edora 8 改批注zx260218 260225更新.pdf"
+        report_path = base / "report" / "3940" / "3940.pdf"
+        if not ptr_path.exists() or not report_path.exists():
+            pytest.skip("3940 sample not available")
+
+        result = self._run_ptr_compare(ptr_path, report_path)
+        clause_map = {clause["ptr_number"]: clause for clause in result["clauses"]}
+        clause = clause_map["2.1.4"]
+        table = clause["table_expansions"][0]
+        param = table["parameters"][0]
+
+        assert param["name"] == "基础频率(bpm)"
+        assert param["details"]["ptr_values"]["标准设置"] == "60"
+        assert param["details"]["report_evidence_rows"][0]["condition_rows"] == [
+            {"condition": "@240Ω", "result": "-10～+3"},
+            {"condition": "@500Ω", "result": "-10～+3"},
+            {"condition": "@2000Ω", "result": "-10～+3"},
+        ]
+        assert param["report_value"] == "-10～+3（@240Ω/@500Ω/@2000Ω）"

@@ -58,6 +58,8 @@ class TableExpansionResult:
     total_matches: int = 0
     total_parameters: int = 0
     clause_number: str = ""
+    reference_type: str = "table_parameter_reference"
+    referenced_table_label: str = ""
 
     @property
     def all_match(self) -> bool:
@@ -145,17 +147,30 @@ class TableComparator:
             table_number=table_number,
             table_found=False,
             clause_number=str(clause.number),
+            referenced_table_label=f"表{table_number}",
         )
+        reference_type = self._classify_clause_reference_type(clause, report_item=None)
+        result.reference_type = reference_type
 
         # Find matching report item first (used for selecting best table candidate).
         report_item = self._find_matching_report_item(clause, report_items)
         if not report_item:
             logger.info(f"No matching report item for clause {clause.number}")
             return result
+        reference_type = self._classify_clause_reference_type(clause, report_item=report_item)
+        result.reference_type = reference_type
 
         # Find table in PTR (support duplicate-number candidates).
         table_candidates = ptr_doc.get_tables_by_number(table_number)
         if not table_candidates:
+            if reference_type == "table_summary_reference":
+                return self._build_table_summary_reference_result(
+                    result=result,
+                    clause=clause,
+                    report_item=report_item,
+                    report_items=report_items,
+                    report_doc=report_doc,
+                )
             logger.warning(f"Table {table_number} not found in PTR document")
             return result
         scoped_candidates = self._scope_table_candidates_for_clause(
@@ -179,6 +194,15 @@ class TableComparator:
             return result
 
         result.table_found = True
+        if reference_type == "table_summary_reference":
+            return self._build_table_summary_reference_result(
+                result=result,
+                clause=clause,
+                report_item=report_item,
+                report_items=report_items,
+                ptr_table=ptr_table,
+                report_doc=report_doc,
+            )
 
         # Compare parameters
         result.parameters = self._compare_table_parameters(
@@ -189,8 +213,8 @@ class TableComparator:
             report_doc=report_doc,
         )
 
-        if not result.parameters:
-            result.parameters = self._extract_continuation_parameter_evidence(
+        if not result.parameters or all(not parameter.matches for parameter in result.parameters):
+            continuation_parameters = self._extract_continuation_parameter_evidence(
                 ptr_doc=ptr_doc,
                 base_table=ptr_table,
                 clause=clause,
@@ -198,12 +222,246 @@ class TableComparator:
                 report_items=report_items,
                 report_doc=report_doc,
             )
+            if continuation_parameters:
+                result.parameters = continuation_parameters
 
         # Calculate statistics
         result.total_parameters = len(result.parameters)
         result.total_matches = sum(1 for p in result.parameters if p.matches)
 
         return result
+
+    def _classify_clause_reference_type(
+        self,
+        clause: PTRClause,
+        report_item: InspectionItem | None = None,
+    ) -> str:
+        if not clause.has_table_references():
+            return "direct_requirement"
+
+        text = self.normalizer.normalize(
+            "\n".join(
+                part
+                for part in [
+                    clause.text_content or "",
+                    clause.full_text or "",
+                    report_item.inspection_project if report_item else "",
+                    report_item.standard_requirement if report_item else "",
+                ]
+                if part and str(part).strip()
+            )
+        )
+        compact = self._compact(text)
+        if not compact:
+            return "table_parameter_reference"
+
+        summary_markers = (
+            "具体要求见表",
+            "详细要求见表",
+            "详见表",
+            "见下表",
+            "见表",
+        )
+        parameter_markers = (
+            "应符合表",
+            "符合表中的数值",
+            "符合表中的规定",
+            "符合下表中的数值",
+            "符合下表中的规定",
+        )
+        if any(marker in compact for marker in parameter_markers):
+            return "table_parameter_reference"
+
+        clause_topics = self._extract_clause_topics(clause.text_content or clause.full_text or "")
+        if clause_topics and any(self._looks_like_parameter_topic(topic) for topic in clause_topics):
+            return "table_parameter_reference"
+
+        if any(marker in compact for marker in summary_markers):
+            return "table_summary_reference"
+
+        return "table_parameter_reference"
+
+    def _build_table_summary_reference_result(
+        self,
+        result: TableExpansionResult,
+        clause: PTRClause,
+        report_item: InspectionItem,
+        report_items: list[InspectionItem],
+        ptr_table: PTRTable | None = None,
+        report_doc: ReportDocument | None = None,
+    ) -> TableExpansionResult:
+        report_item = self._select_best_summary_report_item(
+            clause=clause,
+            report_items=report_items,
+            fallback=report_item,
+            table_number=result.table_number,
+        )
+        ptr_rows = self._extract_table_summary_rows_from_clause(clause, ptr_table=ptr_table)
+        report_rows = self._extract_table_summary_rows_from_report_doc(
+            clause=clause,
+            report_doc=report_doc,
+            table_number=result.table_number,
+        )
+        if not report_rows:
+            report_text = self._build_grouped_report_text(report_item, report_items)
+            report_rows = self._extract_table_summary_rows_from_report(report_text)
+        else:
+            report_text = "\n".join(report_rows)
+
+        ptr_summary = "；".join(ptr_rows) if ptr_rows else self.normalizer.normalize(clause.text_content or "")
+        report_summary = "；".join(report_rows) if report_rows else self.normalizer.normalize(report_text or "")
+
+        result.table_found = True
+        result.reference_type = "table_summary_reference"
+        result.parameters = [
+            self._build_parameter_comparison(
+                parameter_name="整表摘要",
+                ptr_value=ptr_summary,
+                report_value=report_summary,
+                matches=True,
+                details=self._base_evidence_details(
+                    table_number=result.table_number,
+                    table_page=ptr_table.page if ptr_table else None,
+                    parameter_name="整表摘要",
+                    evidence_source="table_summary_reference",
+                    extra={
+                        "reference_type": "table_summary_reference",
+                        "ptr_summary_rows": ptr_rows,
+                        "report_summary_rows": report_rows,
+                        "ptr_evidence_summary": f"本条款引用{result.referenced_table_label}，按整表/分组证据展示。",
+                    },
+                ),
+            )
+        ]
+        result.total_parameters = 1
+        result.total_matches = 1
+        return result
+
+    def _select_best_summary_report_item(
+        self,
+        clause: PTRClause,
+        report_items: list[InspectionItem],
+        fallback: InspectionItem,
+        table_number: int,
+    ) -> InspectionItem:
+        clause_topics = self._extract_clause_topics(clause.text_content or clause.full_text or "")
+        title = clause_topics[0] if clause_topics else self.normalizer.normalize(clause.text_content or "").splitlines()[0].strip()
+        title_compact = self._compact(title)
+        table_label = f"表{table_number}"
+
+        best_item = fallback
+        best_score = float("-inf")
+        for item in report_items:
+            score = 0.0
+            std_clause = self._extract_clause_number(item.standard_clause)
+            if std_clause == str(clause.number):
+                score += 10.0
+            text = self.normalizer.normalize(
+                "\n".join(
+                    part
+                    for part in [
+                        item.inspection_project or "",
+                        item.standard_requirement or "",
+                        item.test_result or "",
+                    ]
+                    if part and part.strip()
+                )
+            )
+            compact = self._compact(text)
+            if clause_number := str(clause.number):
+                if clause_number in compact:
+                    score += 8.0
+            if table_label in text or table_label in compact:
+                score += 4.0
+            if title_compact and title_compact in compact:
+                score += 3.0
+            if title_compact and self._compact(item.inspection_project or "") == title_compact:
+                score += 2.0
+            if compact.startswith(title_compact):
+                score += 1.0
+            if score > best_score:
+                best_score = score
+                best_item = item
+        return best_item
+
+    def _extract_table_summary_rows_from_clause(
+        self,
+        clause: PTRClause,
+        ptr_table: PTRTable | None = None,
+    ) -> list[str]:
+        if ptr_table and ptr_table.rows:
+            summary_rows: list[str] = []
+            for row in ptr_table.rows[:5]:
+                cells = [self.normalizer.normalize(str(cell or "")) for cell in row if str(cell or "").strip()]
+                if not cells:
+                    continue
+                summary_rows.append(" / ".join(cells[:4]))
+            if summary_rows:
+                return summary_rows
+
+        text = self.normalizer.normalize(clause.text_content or clause.full_text or "")
+        return self._extract_inline_table_summary_rows(text)
+
+    def _extract_table_summary_rows_from_report(self, report_text: str) -> list[str]:
+        text = self.normalizer.normalize(report_text or "")
+        return self._extract_inline_table_summary_rows(text)
+
+    def _extract_table_summary_rows_from_report_doc(
+        self,
+        clause: PTRClause,
+        report_doc: ReportDocument | None,
+        table_number: int,
+    ) -> list[str]:
+        if not report_doc or not getattr(report_doc, "pdf_doc", None):
+            return []
+        title = self.normalizer.normalize(clause.text_content or clause.full_text or "").splitlines()[0].strip()
+        title_compact = self._compact(title)
+        clause_number = str(clause.number)
+        table_label = f"表{table_number}"
+        best_rows: list[str] = []
+        best_score = float("-inf")
+        for page in report_doc.pdf_doc.pages:
+            text = self.normalizer.normalize(page.raw_text or "")
+            if not text:
+                continue
+            compact = self._compact(text)
+            score = 0.0
+            if clause_number and clause_number in compact:
+                score += 4.0
+            if title_compact and title_compact in compact:
+                score += 3.0
+            if table_label in text or table_label in compact:
+                score += 4.0
+            if score <= 0:
+                continue
+            rows = self._extract_inline_table_summary_rows(text)
+            if rows and score > best_score:
+                best_rows = rows
+                best_score = score
+        return best_rows
+
+    def _extract_inline_table_summary_rows(self, text: str) -> list[str]:
+        if not text:
+            return []
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            return []
+        start = 0
+        for idx, line in enumerate(lines):
+            if "表" in line or "见表" in line:
+                start = idx
+                break
+        rows: list[str] = []
+        for line in lines[start:]:
+            compact = self._compact(line)
+            if not compact:
+                continue
+            if len(compact) > 40 and "表" not in compact and "组件" not in compact and "项目" not in compact:
+                continue
+            rows.append(line)
+            if len(rows) >= 6:
+                break
+        return rows
 
     def _select_best_ptr_table(
         self,
@@ -580,6 +838,41 @@ class TableComparator:
             details=dict(details or {}),
         )
 
+    def _base_evidence_details(
+        self,
+        *,
+        table_number: int | None = None,
+        referenced_table_label: str | None = None,
+        table_page: int | None = None,
+        parameter_name: str = "",
+        ptr_values: dict[str, str] | None = None,
+        model_scope: str = "",
+        report_evidence_rows: list[dict[str, str]] | None = None,
+        evidence_source: str = "",
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        details: dict[str, Any] = dict(extra or {})
+        if referenced_table_label:
+            details["referenced_table_label"] = referenced_table_label
+        elif table_number is not None:
+            details["referenced_table_label"] = f"表{table_number}"
+        if table_page:
+            details["ptr_source_page"] = table_page
+        if parameter_name:
+            details["ptr_parameter_name"] = parameter_name
+        if ptr_values:
+            details["ptr_values"] = ptr_values
+        if model_scope:
+            details["ptr_model_scope"] = model_scope
+        if report_evidence_rows:
+            details["report_evidence_rows"] = report_evidence_rows
+        if evidence_source:
+            details["evidence_source"] = evidence_source
+        label = details.get("referenced_table_label")
+        if label and parameter_name:
+            details["ptr_evidence_summary"] = f"引用{label}中的参数“{parameter_name}”"
+        return details
+
     def _detect_report_special_status(self, report_text: str) -> tuple[str, str]:
         compact = self._compact(report_text)
         if not compact:
@@ -705,6 +998,15 @@ class TableComparator:
                 headers=ptr_table.headers,
                 roles=role_map,
             )
+            model_scope = (
+                str(row[model_col_idx] or "").strip()
+                if model_col_idx is not None and model_col_idx < len(row)
+                else ""
+            )
+            report_evidence_rows = self._extract_report_evidence_rows(
+                parameter_name=str(param_name or ""),
+                report_text=report_text,
+            )
             special_status, special_evidence = self._detect_report_special_status(report_text)
 
             if not param_name:
@@ -718,11 +1020,16 @@ class TableComparator:
                         report_value=special_evidence or report_text,
                         matches=True,
                         comparison_status=special_status,
-                        details={
-                            "special_status": special_status,
-                            "ptr_values": ptr_values,
-                            "evidence_source": "direct_table_row",
-                        },
+                        details=self._base_evidence_details(
+                            table_number=ptr_table.table_number,
+                            table_page=ptr_table.page,
+                            parameter_name=str(param_name or ""),
+                            ptr_values=ptr_values,
+                            model_scope=model_scope,
+                            report_evidence_rows=report_evidence_rows,
+                            evidence_source="direct_table_row",
+                            extra={"special_status": special_status},
+                        ),
                     )
                 )
                 continue
@@ -741,7 +1048,11 @@ class TableComparator:
             matches = covered
             if not matches:
                 # Backward-compatible fallback.
-                report_value = self._extract_parameter_value(param_name, report_text)
+                report_value = self._resolve_report_value_from_evidence_rows(
+                    report_evidence_rows=report_evidence_rows,
+                    report_text=report_text,
+                    parameter_name=str(param_name or ""),
+                ) or self._extract_parameter_value(param_name, report_text)
                 if not report_value:
                     model_text = row[model_col_idx] if model_col_idx < len(row) else ""
                     if model_text and model_text.strip() and model_text.strip() != "全部型号":
@@ -757,10 +1068,15 @@ class TableComparator:
                     ptr_value=ptr_value,
                     report_value=report_value,
                     matches=matches,
-                    details={
-                        "ptr_values": ptr_values,
-                        "evidence_source": "direct_table_row",
-                    },
+                    details=self._base_evidence_details(
+                        table_number=ptr_table.table_number,
+                        table_page=ptr_table.page,
+                        parameter_name=str(param_name or ""),
+                        ptr_values=ptr_values,
+                        model_scope=model_scope,
+                        report_evidence_rows=report_evidence_rows,
+                        evidence_source="direct_table_row",
+                    ),
                 )
             )
 
@@ -824,6 +1140,12 @@ class TableComparator:
             special_status, special_evidence = self._detect_report_special_status(report_text)
             ptr_value = self._pick_ptr_value_from_parameter_record(record)
             ptr_values = self._extract_ptr_value_map_from_record(record)
+            dimensions = record.get("dimensions") if isinstance(record.get("dimensions"), dict) else {}
+            model_scope = self._extract_model_scope_from_dimensions(dimensions)
+            report_evidence_rows = self._extract_report_evidence_rows(
+                parameter_name=parameter_name,
+                report_text=report_text,
+            )
 
             if special_status:
                 comparisons.append(
@@ -833,11 +1155,16 @@ class TableComparator:
                         report_value=special_evidence or report_text,
                         matches=True,
                         comparison_status=special_status,
-                        details={
-                            "special_status": special_status,
-                            "ptr_values": ptr_values,
-                            "evidence_source": "canonical_record",
-                        },
+                        details=self._base_evidence_details(
+                            table_number=ptr_table.table_number,
+                            table_page=ptr_table.page,
+                            parameter_name=parameter_name,
+                            ptr_values=ptr_values,
+                            model_scope=model_scope,
+                            report_evidence_rows=report_evidence_rows,
+                            evidence_source="canonical_record",
+                            extra={"special_status": special_status, "dimensions": dimensions},
+                        ),
                     )
                 )
                 continue
@@ -846,12 +1173,16 @@ class TableComparator:
                 record=record,
                 report_text=report_text,
             )
-            report_value = evidence or ""
+            report_value = evidence or self._resolve_report_value_from_evidence_rows(
+                report_evidence_rows=report_evidence_rows,
+                report_text=report_text,
+                parameter_name=parameter_name,
+            )
             matches = covered
 
             if not matches:
                 # Backward-compatible fallback.
-                report_value = self._extract_parameter_value(parameter_name, report_text)
+                report_value = report_value or self._extract_parameter_value(parameter_name, report_text)
                 matches = self._compare_values(ptr_value, report_value)
 
             comparisons.append(
@@ -860,11 +1191,16 @@ class TableComparator:
                     ptr_value=ptr_value,
                     report_value=report_value,
                     matches=matches,
-                    details={
-                        "ptr_values": ptr_values,
-                        "dimensions": record.get("dimensions") if isinstance(record.get("dimensions"), dict) else {},
-                        "evidence_source": "canonical_record",
-                    },
+                    details=self._base_evidence_details(
+                        table_number=ptr_table.table_number,
+                        table_page=ptr_table.page,
+                        parameter_name=parameter_name,
+                        ptr_values=ptr_values,
+                        model_scope=model_scope,
+                        report_evidence_rows=report_evidence_rows,
+                        evidence_source="canonical_record",
+                        extra={"dimensions": dimensions},
+                    ),
                 )
             )
 
@@ -1487,6 +1823,181 @@ class TableComparator:
             or report_doc.first_page_fields.get("型号规格", "")
         )
 
+    def _extract_model_scope_from_dimensions(self, dimensions: dict[str, Any]) -> str:
+        for key, value in dimensions.items():
+            text = str(value or "").strip()
+            key_text = self._compact(str(key or ""))
+            if not text:
+                continue
+            if key_text in {"型号", "model", "规格", "spec", "axis_1", "axis_2"} or self._looks_like_model_value(text):
+                return text
+        return ""
+
+    def _extract_report_evidence_rows(self, parameter_name: str, report_text: str) -> list[dict[str, str]]:
+        if not parameter_name or not report_text:
+            return []
+        lines = [line.strip() for line in report_text.splitlines() if line.strip()]
+        if not lines:
+            return []
+
+        ignored_unit_aliases = {"ms", "mv", "bpm", "hz", "v", "a", "ω", "kω", "ppm"}
+        param_aliases = [
+            alias
+            for alias in self._build_topic_aliases(parameter_name)
+            if alias.lower() not in ignored_unit_aliases
+        ]
+        if not param_aliases:
+            return []
+
+        start_indexes: list[int] = []
+        for idx, line in enumerate(lines):
+            line_aliases = self._build_topic_aliases(line)
+            if any(left in right or right in left for left in param_aliases for right in line_aliases):
+                start_indexes.append(idx)
+
+        if not start_indexes:
+            return []
+
+        evidence_rows: list[dict[str, str]] = []
+        for pos, start_idx in enumerate(start_indexes):
+            end_idx = start_indexes[pos + 1] if pos + 1 < len(start_indexes) else len(lines)
+            chunk = lines[start_idx:end_idx]
+            if not chunk:
+                continue
+            heading = chunk[0]
+            if len(chunk) == 1:
+                content = chunk[0]
+            else:
+                content = "\n".join(chunk[1:])
+            condition_rows = self._extract_condition_result_rows(content)
+            evidence_rows.append(
+                {
+                    "label": heading,
+                    "content": content.strip(),
+                    "condition_rows": condition_rows,
+                }
+            )
+
+        if evidence_rows:
+            marker_tokens = ("（", "(", "心房", "右室", "左室", "房室", "负载", "@", "240Ω", "500Ω", "2000Ω")
+            specific_rows = [
+                row
+                for row in evidence_rows
+                if self._compact(row.get("label", "")) != self._compact(parameter_name)
+                or self._compact(row.get("content", "")) != self._compact(row.get("label", ""))
+            ]
+            informative_rows = [
+                row
+                for row in specific_rows
+                if not re.fullmatch(r"[（(][A-Za-z0-9μΩ°/%\-.]+[）)]", row.get("label", "").strip(), re.IGNORECASE)
+                and "应符合表" not in row.get("label", "")
+            ]
+            if informative_rows:
+                specific_rows = informative_rows
+            descriptive_rows = [
+                row
+                for row in specific_rows
+                if (
+                    any(marker in row.get("label", "") for marker in marker_tokens)
+                    or "\n" in row.get("content", "")
+                    or any(token in row.get("content", "") for token in marker_tokens)
+                )
+            ]
+            if descriptive_rows:
+                return descriptive_rows
+            return specific_rows
+
+        return [{"label": parameter_name, "content": report_text.strip()}]
+
+    def _extract_condition_result_rows(self, text: str) -> list[dict[str, str]]:
+        lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+        if not lines:
+            return []
+
+        rows: list[dict[str, str]] = []
+        idx = 0
+        while idx < len(lines):
+            line = lines[idx]
+            if not self._looks_like_condition_label(line):
+                idx += 1
+                continue
+            condition = line
+            result_parts: list[str] = []
+            idx += 1
+            while idx < len(lines):
+                current = lines[idx]
+                if self._looks_like_condition_label(current):
+                    break
+                if "单位" in current:
+                    idx += 1
+                    continue
+                if self._looks_like_unit_only_line(current):
+                    idx += 1
+                    continue
+                result_parts.append(current)
+                idx += 1
+            result_text = "\n".join(result_parts).strip()
+            if result_text:
+                rows.append({"condition": condition, "result": result_text})
+        return rows
+
+    def _looks_like_condition_label(self, line: str) -> bool:
+        compact = self._compact(line)
+        if not compact:
+            return False
+        if compact.startswith("@"):
+            return True
+        if re.match(r"^(?:条件|负载|工况|模式|温度|频率|压力|流量)[:：@]", compact):
+            return True
+        if re.match(r"^@?[-+]?\d+(?:\.\d+)?(?:Ω|Ω|ohm|Ohm|V|A|Hz|kHz|MHz|ms|μs|℃|°C|N|g|kg)\b", line, re.IGNORECASE):
+            return True
+        return False
+
+    def _looks_like_unit_only_line(self, line: str) -> bool:
+        compact = self._compact(line)
+        if compact.startswith("单位:") or compact.startswith("单位："):
+            compact = compact[3:]
+        return bool(re.fullmatch(r"(?:μs|ms|s|Ω|Ω|V|A|Hz|kHz|MHz|℃|°C|N|g|kg|mL|mm|cm)", compact, re.IGNORECASE))
+
+    def _resolve_report_value_from_evidence_rows(
+        self,
+        report_evidence_rows: list[dict[str, Any]],
+        report_text: str,
+        parameter_name: str,
+    ) -> str:
+        condition_results: list[str] = []
+        condition_labels: list[str] = []
+        for row in report_evidence_rows:
+            for condition_row in row.get("condition_rows") or []:
+                condition = str(condition_row.get("condition") or "").strip()
+                value = str(condition_row.get("result") or "").strip()
+                if condition:
+                    condition_labels.append(condition)
+                if value:
+                    condition_results.append(value)
+        if condition_results:
+            unique_values = list(dict.fromkeys(condition_results))
+            unique_conditions = list(dict.fromkeys(condition_labels))
+            summary = unique_values[0] if len(unique_values) == 1 else "；".join(unique_values)
+            if unique_conditions:
+                return f"{summary}（{'/'.join(unique_conditions)}）"
+            return summary
+
+        for row in report_evidence_rows:
+            content = str(row.get("content") or "").strip()
+            if not content:
+                continue
+            numeric_candidates = self._extract_numeric_candidates(content)
+            filtered_candidates = [
+                candidate
+                for candidate in numeric_candidates
+                if not self._looks_like_condition_label(candidate)
+            ]
+            if filtered_candidates:
+                return filtered_candidates[-1]
+
+        return self._extract_parameter_value(parameter_name, report_text)
+
     def _is_header_like_row(self, row: list[str], headers: list[str]) -> bool:
         if not row:
             return False
@@ -1856,9 +2367,16 @@ class TableComparator:
     def _normalize_math_symbols(self, text: str) -> str:
         """Normalize math symbols for constraint parsing."""
         normalized = (text or "").strip()
-        normalized = normalized.replace("≤", "<=").replace("≦", "<=").replace("＜", "<")
-        normalized = normalized.replace("≥", ">=").replace("≧", ">=").replace("＞", ">")
+        normalized = normalized.replace("≤", "<=").replace("≦", "<=").replace("⩽", "<=").replace("＜", "<")
+        normalized = normalized.replace("≥", ">=").replace("≧", ">=").replace("⩾", ">=").replace("＞", ">")
+        normalized = re.sub(r"(?i)\bohm\b|欧姆", "Ω", normalized)
+        normalized = normalized.replace("Ω", "Ω").replace("µ", "μ")
         normalized = normalized.replace("—", "-").replace("–", "-").replace("−", "-")
+        normalized = re.sub(r"(?<=<)\s*=\s*", "=", normalized)
+        normalized = re.sub(r"(?<=>)\s*=\s*", "=", normalized)
+        normalized = re.sub(r"([<>]=?)\s+(?=\d)", r"\1", normalized)
+        normalized = re.sub(r"(?<=\d)\s+Ω\b", "Ω", normalized)
+        normalized = re.sub(r"(?<=\d)\s*2(?=Ω\b)", "", normalized)
         normalized = re.sub(r"\s+", " ", normalized)
         return normalized
 
@@ -1898,6 +2416,9 @@ class TableComparator:
                 clause_topics=clause_topics,
                 report_text=report_text,
                 model_context=model_context,
+                referenced_table_number=base_table.table_number,
+                report_item=report_item,
+                report_doc=report_doc,
             )
             if comparison:
                 return [comparison]
@@ -1957,6 +2478,9 @@ class TableComparator:
         clause_topics: list[str],
         report_text: str,
         model_context: str = "",
+        referenced_table_number: int | None = None,
+        report_item: InspectionItem | None = None,
+        report_doc: ReportDocument | None = None,
     ) -> ParameterComparison | None:
         blob = self._table_blob_text(table)
         lines = [line.strip() for line in blob.splitlines() if line.strip()]
@@ -1994,9 +2518,27 @@ class TableComparator:
             return None
 
         report_candidates = self._extract_numeric_candidates(report_text)
-        report_value = (
-            report_candidates[-1] if report_candidates else ""
-        ) or self._extract_parameter_value(parameter_name, report_text) or "已覆盖"
+        report_evidence_rows = self._extract_report_evidence_rows(parameter_name, report_text)
+        report_evidence_rows = self._hydrate_condition_rows_from_report_context(
+            report_evidence_rows=report_evidence_rows,
+            parameter_name=parameter_name,
+            report_item=report_item,
+            report_doc=report_doc,
+        )
+        report_value = self._resolve_report_value_from_evidence_rows(
+            report_evidence_rows=report_evidence_rows,
+            report_text=report_text,
+            parameter_name=parameter_name,
+        ) or (
+            next(
+                (
+                    candidate
+                    for candidate in reversed(report_candidates)
+                    if not self._looks_like_condition_label(candidate)
+                ),
+                "",
+            )
+        ) or "已覆盖"
         ptr_value = (
             ptr_values.get("标准设置")
             or ptr_values.get("常规数值")
@@ -2011,12 +2553,98 @@ class TableComparator:
             ptr_value=ptr_value,
             report_value=report_value,
             matches=True,
-            details={
-                "ptr_values": ptr_values,
-                "evidence_source": "continuation_table_segment",
-                "continuation_segment": segment_text,
-            },
+            details=self._base_evidence_details(
+                table_number=table.table_number,
+                referenced_table_label=f"表{referenced_table_number}"
+                if referenced_table_number is not None
+                else None,
+                table_page=table.page,
+                parameter_name=parameter_name,
+                ptr_values=ptr_values,
+                model_scope=model_context,
+                report_evidence_rows=report_evidence_rows,
+                evidence_source="continuation_table_segment",
+                extra={"continuation_segment": segment_text},
+            ),
         )
+
+    def _hydrate_condition_rows_from_report_context(
+        self,
+        report_evidence_rows: list[dict[str, Any]],
+        parameter_name: str,
+        report_item: InspectionItem | None,
+        report_doc: ReportDocument | None,
+    ) -> list[dict[str, Any]]:
+        if not report_evidence_rows:
+            return report_evidence_rows
+        if any(row.get("condition_rows") for row in report_evidence_rows):
+            return report_evidence_rows
+
+        if not any("@" in str(row.get("content") or "") for row in report_evidence_rows):
+            return report_evidence_rows
+
+        fallback_rows = self._extract_condition_rows_from_report_doc(
+            parameter_name=parameter_name,
+            report_item=report_item,
+            report_doc=report_doc,
+        )
+        if not fallback_rows:
+            return report_evidence_rows
+
+        hydrated = [dict(row) for row in report_evidence_rows]
+        hydrated[0] = {**hydrated[0], "condition_rows": fallback_rows}
+        return hydrated
+
+    def _extract_condition_rows_from_report_doc(
+        self,
+        parameter_name: str,
+        report_item: InspectionItem | None,
+        report_doc: ReportDocument | None,
+    ) -> list[dict[str, str]]:
+        if not report_item or not report_doc or not getattr(report_doc, "pdf_doc", None):
+            return []
+
+        aliases = self._build_topic_aliases(parameter_name)
+        if not aliases:
+            return []
+
+        page_numbers: list[int] = []
+        if getattr(report_item, "source_page", None):
+            page_numbers.append(int(report_item.source_page))
+            page_numbers.append(int(report_item.source_page) + 1)
+
+        best_rows: list[dict[str, str]] = []
+        for page_number in page_numbers:
+            page = report_doc.pdf_doc.get_page(page_number)
+            if page is None:
+                continue
+            lines = [line.strip() for line in (page.raw_text or "").splitlines() if line.strip()]
+            if not lines:
+                continue
+
+            start_idx = -1
+            for idx, line in enumerate(lines):
+                line_aliases = self._build_topic_aliases(line)
+                if any(left in right or right in left for left in aliases for right in line_aliases):
+                    start_idx = idx
+                    break
+            if start_idx < 0:
+                continue
+
+            chunk_lines: list[str] = []
+            for line in lines[start_idx:]:
+                if chunk_lines and re.fullmatch(r"\d+", self._compact(line)):
+                    break
+                chunk_lines.append(line)
+                if len(chunk_lines) >= 40:
+                    break
+
+            rows = self._extract_condition_result_rows("\n".join(chunk_lines))
+            if rows:
+                best_rows = rows
+                break
+
+        return best_rows
 
     def _line_starts_new_parameter(self, line: str, current_aliases: list[str]) -> bool:
         line_aliases = self._build_topic_aliases(line)
@@ -2073,6 +2701,7 @@ class TableComparator:
         return deduped
 
     def _extract_value_map_from_segment(self, segment_text: str) -> dict[str, str]:
+        raw_unit_match = re.search(r"单位\s*[:：]?\s*([A-Za-zμΩ°/%]+)", segment_text or "", re.IGNORECASE)
         normalized = self.normalizer.normalize(segment_text or "")
         compact = self._compact(normalized)
         if not compact:
@@ -2080,13 +2709,19 @@ class TableComparator:
         if "不适用" in compact:
             return {"常规数值": "不适用"}
 
+        labelled_map = self._extract_labelled_value_map(normalized)
+        if raw_unit_match:
+            labelled_map.setdefault("单位", raw_unit_match.group(1))
+        if labelled_map:
+            return labelled_map
+
         tolerance_match = re.search(r"(±\s*[-+]?\d+(?:\.\d+)?(?:\s*%|\s*[A-Za-zμΩ°/]+)?)", normalized)
         tolerance = tolerance_match.group(1).strip() if tolerance_match else ""
         body = normalized[: tolerance_match.start()] if tolerance_match else normalized
         body = body.strip()
 
         ranged_tokens = re.findall(
-            r"[-+]?\d+(?:\.\d+)?\s*\.\.\.\s*\(\s*[-+]?\d+(?:\.\d+)?\s*\)\s*\.\.\.\s*[-+]?\d+(?:\.\d+)?",
+            r"[-+]?\d+(?:\.\d+)?(?:\s*\.\.\.\s*\(\s*[-+]?\d+(?:\.\d+)?\s*\)\s*\.\.\.\s*[-+]?\d+(?:\.\d+)?)+",
             body,
         )
         singles = re.findall(r"[-+]?\d+(?:\.\d+)?", body)
@@ -2106,6 +2741,23 @@ class TableComparator:
 
         if tolerance:
             value_map["允许误差"] = re.sub(r"\s+", "", tolerance)
+        return value_map
+
+    def _extract_labelled_value_map(self, text: str) -> dict[str, str]:
+        normalized = self.normalizer.normalize(text or "")
+        labels = ("常规数值", "标准设置", "允许误差", "单位")
+        value_map: dict[str, str] = {}
+        for label in labels:
+            match = re.search(
+                rf"{label}\s*[:：]?\s*(.+?)(?=(?:{'|'.join(labels)})\s*[:：]?|$)",
+                normalized,
+                re.DOTALL,
+            )
+            if not match:
+                continue
+            value = match.group(1).strip(" ：:;\n")
+            if value:
+                value_map[label] = re.sub(r"\s+", " ", value)
         return value_map
 
 
