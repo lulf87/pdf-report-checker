@@ -301,3 +301,10 @@ class TestEdgeCases:
         assert normalizer.normalize("通用要求:应符合GB16174.1-2024的要求。") == (
             "通用要求应符合GB16174.1-2024的要求。"
         )
+
+    def test_normalize_special_symbols_and_resistance_ocr_variants(self):
+        normalizer = TextNormalizer()
+        assert normalizer.normalize("直流电阻值⩽20 Ω。") == "直流电阻值<=20Ω。"
+        assert normalizer.normalize("绝缘电阻应大于5M2。") == "绝缘电阻应大于5MΩ。"
+        assert normalizer.normalize("相间间隔< = 20 us") == "相间间隔<=20μs"
+        assert normalizer.normalize("直流电阻值202。") == "直流电阻值<=20Ω。"

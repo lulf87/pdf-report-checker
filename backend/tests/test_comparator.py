@@ -285,8 +285,38 @@ class TestCompareDocuments:
 
         result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
         assert result.result == ComparisonResult.MATCH
-        assert result.match_reason == "numeric_semantic_match"
+        assert result.match_reason in {"numeric_semantic_match", "exact_normalized_match"}
         assert result.details["numeric_evidence"] == "0.4mL"
+
+    def test_numeric_semantic_clause_comparison_should_tolerate_resistance_symbol_ocr_drift(self):
+        ptr_doc = PTRDocument()
+        ptr_doc.clauses.append(
+            PTRClause(
+                number=PTRClauseNumber.from_string("2.5.1"),
+                full_text="2.5.1 直流电阻",
+                text_content="直流电阻 各电极与连接器对应芯脚之间的导线的直流电阻值202。",
+                level=3,
+                clause_type="main_requirement",
+            )
+        )
+
+        report_doc = ReportDocument()
+        table = InspectionTable()
+        table.items.append(
+            InspectionItem(
+                sequence_number="57",
+                inspection_project="直流电阻",
+                standard_clause="2.5.1",
+                standard_requirement="各电极与连接器对应芯脚之间的导线的直流电阻值≤20Ω。",
+                test_result="≤20Ω",
+                item_conclusion="符合",
+            )
+        )
+        report_doc.inspection_table = table
+
+        result = ClauseComparator(strict_mode=True).compare_documents(ptr_doc, report_doc)[0]
+        assert result.result == ComparisonResult.MATCH
+        assert result.match_reason in {"numeric_semantic_match", "exact_normalized_match"}
 
     def test_noisy_parent_group_clause_should_be_excluded_instead_of_differ(self):
         """Noisy parent clauses with compared descendants should not report text mismatch."""

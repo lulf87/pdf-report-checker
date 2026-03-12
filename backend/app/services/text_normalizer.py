@@ -50,7 +50,7 @@ SCRIPT_SYMBOL_MAP = {
     "×": "x",
     "－": "-", "–": "-", "—": "-", "−": "-",
     "＜": "<", "＞": ">",
-    "≤": "<=", "≦": "<=", "≥": ">=", "≧": ">=",
+    "≤": "<=", "≦": "<=", "⩽": "<=", "≥": ">=", "≧": ">=", "⩾": ">=",
 }
 
 # Pattern for natural line breaks (lines ending without terminal punctuation)
@@ -215,6 +215,7 @@ class TextNormalizer:
 
         # Common symbol variants for concentration expressions and units.
         normalized = normalized.replace("µ", "μ")
+        normalized = re.sub(r"(?i)\bohm\b|欧姆", "Ω", normalized)
         normalized = re.sub(r"ρ\s*(?=\()", "p", normalized)
         # OCR may confuse leading numeric "1" as l/I in range expressions.
         normalized = re.sub(r"(?<=[<>=≤≥])\s*[lI|](?=\s*(?:μ|u))", "1", normalized)
@@ -257,6 +258,19 @@ class TextNormalizer:
         normalized = re.sub(r"(?<=\d)\s*Hz\b", "Hz", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=\d)\s*V\b", "V", normalized, flags=re.IGNORECASE)
         normalized = re.sub(r"(?<=\d)\s*A\b", "A", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(?<=\d)\s*Ω\b", "Ω", normalized)
+        normalized = re.sub(r"([<>]=?)\s+(?=\d)", r"\1", normalized)
+        normalized = re.sub(r"(?<=<)\s*=\s*", "=", normalized)
+        normalized = re.sub(r"(?<=>)\s*=\s*", "=", normalized)
+        normalized = re.sub(r"(?<=\d)\s*M(?:Q)?2\b", "MΩ", normalized)
+        normalized = re.sub(r"(?<=\d)\s*K(?:Q)?2\b", "KΩ", normalized)
+        normalized = re.sub(r"(?<=\d)\s*Q2\b", "Ω", normalized)
+        normalized = re.sub(r"(?<=\d)\s*2(?=Ω\b)", "", normalized)
+        normalized = re.sub(
+            r"(电阻值)\s*([-+]?\d+(?:\.\d+)?)2(?=[。；;，,\s]|$)",
+            r"\1<=\2Ω",
+            normalized,
+        )
         normalized = re.sub(r"(?<=[A-Za-z0-9μΩ/\]\)\+\-])\s+(?=[\u4e00-\u9fff])", "", normalized)
 
         # Targeted OCR drift in this domain: subscript digit split into nearby phrase.

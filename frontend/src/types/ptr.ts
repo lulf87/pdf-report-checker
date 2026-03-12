@@ -151,6 +151,15 @@ export interface TableParameter {
   status?: string;
   details?: {
     ptr_values?: Record<string, string>;
+    referenced_table_label?: string;
+    ptr_evidence_summary?: string;
+    ptr_parameter_name?: string;
+    ptr_model_scope?: string;
+    ptr_source_page?: number;
+    report_evidence_rows?: Array<{
+      label: string;
+      content: string;
+    }>;
     evidence_source?: string;
     continuation_segment?: string;
     [key: string]: unknown;

@@ -447,6 +447,8 @@ def build_comparison_result(
             "table_number": table_result.table_number,
             "clause_number": table_result.clause_number,
             "found": table_result.table_found,
+            "reference_type": getattr(table_result, "reference_type", "table_parameter_reference"),
+            "referenced_table_label": getattr(table_result, "referenced_table_label", f"表{table_result.table_number}"),
             "total_parameters": table_result.total_parameters,
             "matches": table_result.total_matches,
             "match_rate": table_result.match_rate,
@@ -474,6 +476,8 @@ def build_comparison_result(
                 {
                     "table_number": table_result.table_number,
                     "found": table_result.table_found,
+                    "reference_type": getattr(table_result, "reference_type", "table_parameter_reference"),
+                    "referenced_table_label": getattr(table_result, "referenced_table_label", f"表{table_result.table_number}"),
                     "total_parameters": table_result.total_parameters,
                     "matches": table_result.total_matches,
                     "match_rate": table_result.match_rate,

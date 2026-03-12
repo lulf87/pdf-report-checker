@@ -223,43 +223,9 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                     )}
                   </div>
 
-                  {/* Raw text */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setShowRawText((value) => !value);
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--color-accent)',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '0.8rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {showRawText ? '收起原始提取文本' : '查看原始提取文本'}
-                    </button>
-                    {showRawText && (
-                      <div
-                        style={{
-                          marginTop: '0.75rem',
-                          display: 'grid',
-                          gap: '0.75rem',
-                        }}
-                      >
-                        <RawTextBlock label="PTR 原始文本" text={clause.ptr_text} />
-                        <RawTextBlock label="报告原始文本" text={clause.report_text} />
-                      </div>
-                    )}
-                  </div>
-
                   {/* Table Expansion Details */}
                   {(clause.table_expansions && clause.table_expansions.length > 0) && (
-                    <div>
+                    <div style={{ marginBottom: '1rem' }}>
                       <p
                         style={{
                           fontSize: '0.75rem',
@@ -307,21 +273,155 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                             </div>
 
                             {(table.parameters && table.parameters.length > 0) ? (
-                              <StructuredTable
-                                columns={['匹配参数', '常规数值', '标准设置', '允许误差', '报告实测', '结论']}
-                                rows={table.parameters.map((param) => {
+                              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                  详情只展示本条款实际命中的技术要求表参数，不再默认展开整张表的前几行。
+                                </p>
+                                {table.parameters.map((param, paramIndex) => {
                                   const ptrValues = param.details?.ptr_values || {};
-                                  return [
-                                    param.name || '-',
-                                    ptrValues['常规数值'] || param.ptr_value || '-',
-                                    ptrValues['标准设置'] || (ptrValues['常规数值'] ? param.ptr_value || '-' : '-'),
-                                    ptrValues['允许误差'] || '-',
-                                    param.report_value || '-',
-                                    param.matches ? '一致' : '不一致',
-                                  ];
+                                  const evidenceRows = param.details?.report_evidence_rows || [];
+                                  const evidenceMeta = [
+                                    {
+                                      label: '来源',
+                                      value: param.details?.referenced_table_label || `表${table.table_number}`,
+                                    },
+                                    {
+                                      label: '命中参数',
+                                      value: param.details?.ptr_parameter_name || param.name || '',
+                                    },
+                                    {
+                                      label: '适用范围',
+                                      value: param.details?.ptr_model_scope || '',
+                                    },
+                                    {
+                                      label: '来源页',
+                                      value: typeof param.details?.ptr_source_page === 'number'
+                                        ? `第${param.details.ptr_source_page}页`
+                                        : '',
+                                    },
+                                  ].filter((item) => item.value);
+                                  return (
+                                    <div
+                                      key={`${clause.number}-table-${table.table_number}-param-${paramIndex}`}
+                                      style={{
+                                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        padding: '0.85rem',
+                                        background: 'rgba(255, 255, 255, 0.02)',
+                                        display: 'grid',
+                                        gap: '0.85rem',
+                                      }}
+                                    >
+                                      <div style={{ display: 'grid', gap: '0.35rem' }}>
+                                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                          技术要求证据
+                                        </p>
+                                        <div
+                                          style={{
+                                            display: 'grid',
+                                            gap: '0.45rem',
+                                            padding: '0.7rem 0.8rem',
+                                            border: '1px solid rgba(122, 143, 181, 0.22)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            background: 'rgba(122, 143, 181, 0.08)',
+                                          }}
+                                        >
+                                          {param.details?.ptr_evidence_summary && (
+                                            <p style={{ fontSize: '0.84rem', color: 'var(--text-primary)', fontWeight: 600, lineHeight: 1.5 }}>
+                                              {param.details.ptr_evidence_summary}
+                                            </p>
+                                          )}
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem 0.75rem' }}>
+                                            {evidenceMeta.map((item) => (
+                                              <span
+                                                key={`${clause.number}-${paramIndex}-${item.label}`}
+                                                style={{
+                                                  fontSize: '0.79rem',
+                                                  color: 'var(--text-secondary)',
+                                                  lineHeight: 1.5,
+                                                  padding: '0.18rem 0.45rem',
+                                                  borderRadius: '999px',
+                                                  background: 'rgba(255, 255, 255, 0.05)',
+                                                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                                                }}
+                                              >
+                                                <span style={{ color: 'var(--text-muted)' }}>{item.label}：</span>
+                                                {item.value}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                        <StructuredTable
+                                          columns={['参数', '适用型号/范围', '常规数值', '标准设置', '允许误差', '结论']}
+                                          rows={[[
+                                            param.details?.ptr_parameter_name || param.name || '-',
+                                            param.details?.ptr_model_scope || '未标注',
+                                            ptrValues['常规数值'] || '-',
+                                            ptrValues['标准设置'] || '-',
+                                            ptrValues['允许误差'] || '-',
+                                            param.matches ? '一致' : '不一致',
+                                          ]]}
+                                        />
+                                      </div>
+
+                                      <div style={{ display: 'grid', gap: '0.35rem' }}>
+                                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                          报告证据
+                                        </p>
+                                        {evidenceRows.length > 0 ? (
+                                          <div style={{ display: 'grid', gap: '0.65rem' }}>
+                                            {evidenceRows.map((row, rowIndex) => (
+                                              <div
+                                                key={`${clause.number}-report-evidence-${paramIndex}-${rowIndex}`}
+                                                style={{
+                                                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                  borderRadius: 'var(--radius-sm)',
+                                                  padding: '0.75rem 0.85rem',
+                                                  background: 'rgba(255, 255, 255, 0.03)',
+                                                  display: 'grid',
+                                                  gap: '0.35rem',
+                                                }}
+                                              >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                                                  <span
+                                                    style={{
+                                                      fontSize: '0.72rem',
+                                                      color: 'var(--text-muted)',
+                                                      textTransform: 'uppercase',
+                                                      letterSpacing: '0.05em',
+                                                    }}
+                                                  >
+                                                    证据段 {rowIndex + 1}
+                                                  </span>
+                                                  <span
+                                                    style={{
+                                                      fontSize: '0.83rem',
+                                                      color: 'var(--text-primary)',
+                                                      fontWeight: 600,
+                                                      padding: '0.16rem 0.48rem',
+                                                      borderRadius: '999px',
+                                                      background: 'rgba(122, 143, 181, 0.14)',
+                                                    }}
+                                                  >
+                                                    {formatReadableText(row.label)}
+                                                  </span>
+                                                </div>
+                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                                  {formatReadableText(row.content || param.report_value || '-')}
+                                                </p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                            {formatReadableText(param.report_value || '-')}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
                                 })}
-                                summary="详情只展示本条款实际命中的表行，不再默认展开整张表的前几行。"
-                              />
+                              </div>
                             ) : (
                               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                 未提取到可展示的参数项。
@@ -332,6 +432,40 @@ export function ClauseCard({ clause, index }: ClauseCardProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Raw text */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowRawText((value) => !value);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--color-accent)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '0.8rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {showRawText ? '收起原始提取文本' : '查看原始提取文本'}
+                    </button>
+                    {showRawText && (
+                      <div
+                        style={{
+                          marginTop: '0.75rem',
+                          display: 'grid',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <RawTextBlock label="PTR 原始文本" text={clause.ptr_text} />
+                        <RawTextBlock label="报告原始文本" text={clause.report_text} />
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
